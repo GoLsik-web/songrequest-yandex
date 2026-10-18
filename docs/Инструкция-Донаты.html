@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Заказы за донаты</title>
+<style>
+  :root {
+    --bg: #08090a; --card: #101214; --line: #1c1f22;
+    --text: #f2f4f5; --dim: #858d94; --accent: #ffcc00;
+    --bad: #ff4d4d; --ink: #0c0c0c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 20px 80px;
+    background: var(--bg); color: var(--text);
+    font: 17px/1.65 "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .lead { color: var(--dim); margin: 0 0 28px; }
+  p { margin: 0 0 14px; }
+  ol, ul { padding-left: 24px; margin: 0 0 14px; }
+  li { margin-bottom: 8px; }
+  code {
+    background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+    padding: 2px 6px; font-family: Consolas, "Courier New", monospace; font-size: 15px;
+  }
+  .copy {
+    display: block; background: var(--card); border: 1px solid var(--accent);
+    border-radius: 4px; padding: 14px 16px; margin: 14px 0;
+    font-family: Consolas, "Courier New", monospace; font-size: 17px;
+    color: var(--accent); word-break: break-all; user-select: all;
+  }
+  .warn, .note {
+    border-left: 3px solid var(--accent); background: #161204;
+    padding: 12px 16px; margin: 18px 0;
+  }
+  .note { border-left-color: var(--line); background: var(--card); }
+  .warn strong { color: var(--accent); }
+  .stop { border-left-color: var(--bad); background: #170808; }
+  .stop strong { color: var(--bad); }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 15px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; }
+  td:first-child { white-space: nowrap; font-family: Consolas, monospace; color: var(--accent); }
+  a { color: var(--accent); }
+  .step { color: var(--dim); font-size: 14px; letter-spacing: .8px; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Заказы за донаты</h1>
+<p class="lead">Необязательный шаг. Без него всё работает — просто музыку
+заказывают только за баллы канала. Если донаты тебе не нужны, закрывай этот
+файл со спокойной совестью.</p>
+
+<p><strong>Что получится.</strong> Зритель кидает донат и пишет в сообщении
+название трека — заказ попадает в ту же очередь, что и заказы за баллы.
+Настраивается, от какой суммы принимать и пускать ли донаты вперёд баллов.</p>
+
+<div class="note">
+Сервисов три, и <strong>подключать нужно только свой</strong>. Их не сравнивают
+и не выбирают заново — бери тот, которым уже пользуешься, а остальные разделы
+пропусти. Можно подключить и несколько сразу, если донаты идут отовсюду.
+</div>
+
+<table>
+<tr><th>Сервис</th><th>Сколько возни</th></tr>
+<tr><td>DonatePay</td><td>Минута. Скопировать ключ из профиля.</td></tr>
+<tr><td>DonateX</td><td>Минута. Скопировать ключ из личного кабинета.</td></tr>
+<tr><td>DonationAlerts</td><td>Минут десять: там нужно зарегистрировать приложение.</td></tr>
+</table>
+
+<h2><span class="step">Самое простое</span><br>DonatePay</h2>
+
+<ol>
+<li>Зайди на <a href="https://donatepay.ru/">donatepay.ru</a> под своим аккаунтом.</li>
+<li>Открой <strong>Настройки → API</strong>.</li>
+<li>Найди строку <strong>«Ключ доступа»</strong> (может называться
+    <em>API-ключ</em> или <em>Токен</em>) и скопируй её целиком.</li>
+<li>В панели приложения: <strong>настройки → блок «Донаты»</strong>, вставь ключ
+    в поле <strong>«Ключ DonatePay»</strong> и нажми <strong>Сохранить</strong>.</li>
+<li><strong>Перезапусти приложение</strong> — закрой окно и открой заново.
+    Без этого ключ не заработает.</li>
+</ol>
+
+<div class="warn">
+<strong>Ключ бессрочный.</strong> Один раз вставил — и забыл, переподключать
+его не нужно. Но и показывать никому нельзя: по нему видно твои донаты.
+Приложение вырезает его из выгрузки лога, так что архив мне слать безопасно.
+</div>
+
+<h2><span class="step">Тоже просто</span><br>DonateX</h2>
+
+<ol>
+<li>Зайди на <a href="https://donatex.gg/">donatex.gg</a> под своим аккаунтом.</li>
+<li>Открой <strong>Настройки → Api</strong>.</li>
+<li>Скопируй <strong>внешний токен</strong> целиком.</li>
+<li>В панели: <strong>настройки → «Ключ DonateX»</strong>, вставь и нажми
+    <strong>Сохранить</strong>.</li>
+<li><strong>Перезапусти приложение.</strong></li>
+</ol>
+
+<p>У DonateX есть своя форма заказа музыки. Если зритель ей воспользовался,
+приложение возьмёт ссылку прямо оттуда — это точнее, чем разбирать текст
+сообщения.</p>
+
+<h2><span class="step">Подольше</span><br>DonationAlerts</h2>
+
+<p>Здесь нужно зарегистрировать приложение. Ничего
+программировать не надо — заполнить форму и скопировать одну строку.</p>
+
+<ol>
+<li>Открой <a href="https://www.donationalerts.com/application/clients">
+    donationalerts.com/application/clients</a>. Если попросит войти — войди
+    своим обычным аккаунтом.</li>
+<li>Нажми кнопку создания нового приложения.</li>
+<li><strong>Название</strong> — любое, например <code>Заказ музыки</code>.
+    Его видишь только ты.</li>
+<li><strong>Redirect URI</strong> — вот здесь внимательно. Вставь ровно эту
+    строку, без пробелов в конце:</li>
+</ol>
+
+<div class="copy">http://127.0.0.1:8977/donations/callback</div>
+
+<div class="stop">
+<strong>Проверь адрес по буквам.</strong> Это самая частая ошибка. Должно быть
+именно <code>127.0.0.1</code>, а не <code>localhost</code>. И порт <code>8977</code>.
+Если приложение написало другой порт при запуске — подставь его.
+Приложение показывает нужный адрес прямо в панели после нажатия
+«Подключить DonationAlerts»: сверь с тем, что вписал сюда.
+</div>
+
+<ol start="5">
+<li>Сохрани. Появится <strong>Client ID</strong> — набор цифр.</li>
+<li>Скопируй его в панель: <strong>настройки → «Client ID DonationAlerts»</strong>,
+    нажми <strong>Сохранить</strong>.</li>
+<li>Нажми <strong>«Подключить DonationAlerts»</strong>. Откроется браузер,
+    разреши доступ.</li>
+<li>Вкладка скажет, что можно закрывать. В панели загорится карточка сервиса.</li>
+</ol>
+
+<h2>Настроить, как принимать заказы</h2>
+
+<p>В панели, в блоке <strong>«Донаты»</strong>:</p>
+
+<table>
+<tr><td>Заказ за донат от какой суммы</td>
+    <td>Донаты меньше просто показываются в хронике и заказом не становятся.
+        Деньги в любом случае остаются у тебя.</td></tr>
+</table>
+
+<p>И в блоке <strong>«Правила заказа»</strong>:</p>
+
+<table>
+<tr><td>Донаты вперёд баллов</td>
+    <td>Заказ за донат встаёт перед заказами за баллы, но после других донатов.
+        Заплатившие деньгами ждут меньше.</td></tr>
+</table>
+
+<h2>Проверить, что работает</h2>
+
+<p>Все три сервиса умеют слать тестовый донат — ищи кнопку с таким названием
+в своём личном кабинете. Приложение принимает такой донат как обычный, и заказ
+появится в панели.</p>
+
+<div class="note">
+<strong>Повторные показы не считаются.</strong> Если ты переигрываешь старый
+донат через «показать заново», приложение его пропустит: трек уже играл, и
+второй раз его никто не заказывал.
+</div>
+
+<h2>Если что-то не так</h2>
+
+<table>
+<tr><th>Что видно</th><th>Что делать</th></tr>
+<tr>
+  <td>Карточка сервиса серая</td>
+  <td>Ключ не вставлен или приложение не перезапускали после вставки.</td>
+</tr>
+<tr>
+  <td>Код DN-01 или DN-02</td>
+  <td>Сервис не принял ключ. Возьми его заново в личном кабинете: старый мог
+      быть отозван или скопирован не целиком.</td>
+</tr>
+<tr>
+  <td>Код DN-03</td>
+  <td>Сервис не отвечает. Обычно это у него, а не у тебя: приложение будет
+      переподключаться само.</td>
+</tr>
+<tr>
+  <td>Донат пришёл, а заказа нет</td>
+  <td>Сумма меньше порога, или в сообщении не было названия трека, или трек
+      не нашёлся. Смотри хронику — там написана причина.</td>
+</tr>
+<tr>
+  <td>DonationAlerts не пускает</td>
+  <td>Почти всегда Redirect URI. Нажми «Подключить», посмотри адрес в панели
+      и сверь его по буквам с тем, что вписан в настройках сервиса.</td>
+</tr>
+</table>
+
+<div class="warn">
+<strong>Баллы за донат не возвращаются.</strong> Это деньги, а не баллы канала:
+если трек не нашёлся, приложение скажет об этом в чат, но перевод не отменит.
+Возврат — только руками через сам сервис, если ты сам захочешь.
+</div>
+
+</main>
+</body>
+</html>

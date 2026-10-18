@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Как подключить Twitch</title>
+<style>
+  :root {
+    --bg: #08090a; --card: #101214; --line: #1c1f22;
+    --text: #f2f4f5; --dim: #858d94; --accent: #ffcc00;
+    --bad: #ff4d4d; --ink: #0c0c0c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 20px 80px;
+    background: var(--bg); color: var(--text);
+    font: 17px/1.65 "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .lead { color: var(--dim); margin: 0 0 28px; }
+  p { margin: 0 0 14px; }
+  ol, ul { padding-left: 24px; margin: 0 0 14px; }
+  li { margin-bottom: 8px; }
+  code {
+    background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+    padding: 2px 6px; font-family: Consolas, "Courier New", monospace; font-size: 15px;
+  }
+  .copy {
+    display: block; background: var(--card); border: 1px solid var(--accent);
+    border-radius: 4px; padding: 14px 16px; margin: 14px 0;
+    font-family: Consolas, "Courier New", monospace; font-size: 17px;
+    color: var(--accent); word-break: break-all; user-select: all;
+  }
+  .warn, .note {
+    border-left: 3px solid var(--accent); background: #161204;
+    padding: 12px 16px; margin: 18px 0;
+  }
+  .note { border-left-color: var(--line); background: var(--card); }
+  .warn strong { color: var(--accent); }
+  .stop { border-left-color: var(--bad); background: #170808; }
+  .stop strong { color: var(--bad); }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 15px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; }
+  td:first-child { white-space: nowrap; font-family: Consolas, monospace; color: var(--accent); }
+  a { color: var(--accent); }
+  .step { color: var(--dim); font-size: 14px; letter-spacing: .8px; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Как подключить Twitch</h1>
+<p class="lead">Вторая и последняя настройка — минут десять,
+один раз, ничего программировать не нужно.</p>
+
+<p><strong>Что получится.</strong> На твоём канале появится награда за баллы
+«Заказ трека». Зритель тратит баллы, пишет название — заказ прилетает в
+приложение. Если трек не найдётся или не подойдёт, приложение вернёт зрителю
+баллы само.</p>
+
+<div class="stop">
+<strong>Сначала проверь главное.</strong> Баллы канала есть только у
+<strong>аффилиатов и партнёров</strong> Twitch. Если у тебя обычный канал,
+награду создать невозможно — это ограничение Twitch, а не приложения.
+Проверить просто: если в панели управления Twitch есть раздел
+«Channel Points» / «Баллы канала» — всё в порядке.
+</div>
+
+<h2><span class="step">Шаг 1</span><br>Включить двухфакторную защиту</h2>
+
+<p>Без неё Twitch не даст зарегистрировать приложение. Если она уже включена —
+пропускай шаг.</p>
+
+<p>Открой <a href="https://www.twitch.tv/settings/security">Настройки → Безопасность
+и приватность</a> и включи <strong>Two-Factor Authentication</strong>. Понадобится
+телефон.</p>
+
+<h2><span class="step">Шаг 2</span><br>Зарегистрировать приложение</h2>
+
+<p>Открой <a href="https://dev.twitch.tv/console/apps">dev.twitch.tv/console/apps</a>
+и войди своим аккаунтом Twitch — <strong>тем самым, на котором стримишь</strong>.</p>
+
+<p>Нажми <strong>Register Your Application</strong> и заполни:</p>
+
+<table>
+  <tr><th>Поле</th><th>Что вписать</th></tr>
+  <tr><td>Name</td><td>Заказ музыки — <span style="color:var(--dim)">имя должно быть
+    уникальным на весь Twitch. Если ругнётся «уже занято», добавь свой ник:
+    <code>Заказ музыки NickName</code></span></td></tr>
+  <tr><td>OAuth Redirect URLs</td><td>см. ниже</td></tr>
+  <tr><td>Category</td><td>Broadcasting Suite</td></tr>
+  <tr><td>Client Type</td><td><strong>Public</strong> — <span style="color:var(--dim)">если
+    такого поля нет, ничего не делай, значит в твоей версии страницы его не показывают</span></td></tr>
+</table>
+
+<p>В поле <strong>OAuth Redirect URLs</strong> вставь эту строку и нажми
+<strong>Add</strong> справа от поля:</p>
+
+<span class="copy">http://localhost</span>
+
+<div class="note">
+Этот адрес приложению не нужен — вход в Twitch устроен по-другому, через код.
+Но поле обязательное, и без него форма не отправится.
+</div>
+
+<p>Поставь галочку капчи и нажми <strong>Create</strong>.</p>
+
+<h2><span class="step">Шаг 3</span><br>Скопировать Client ID</h2>
+
+<p>Вернись на вкладку <strong>Applications</strong> и нажми
+<strong>Manage</strong> у только что созданного приложения.</p>
+
+<p>Найди <strong>Client ID</strong> и скопируй его.</p>
+
+<div class="warn">
+<strong>Кнопку «New Secret» не трогай.</strong> Секрет приложению не нужен,
+и показывать его никому нельзя. Нам достаточно Client ID.
+</div>
+
+<h2><span class="step">Шаг 4</span><br>Ввести код в приложении</h2>
+
+<ol>
+  <li>Запусти <code>songrequest.exe</code> — откроется окно с панелью. Нажми
+      <strong>«настройки»</strong> справа вверху.</li>
+  <li>Вставь Client ID в поле <strong>Client ID Twitch</strong> и нажми
+      <strong>«Сохранить»</strong>.</li>
+  <li>Нажми <strong>«Подключить Twitch»</strong>.</li>
+  <li>Наверху панели появится <strong>крупный код</strong> вроде
+      <code>WXYZ-7788</code> и адрес рядом с ним.</li>
+  <li>Открой этот адрес — можно прямо в панели по ссылке, можно с телефона —
+      и введи код. Twitch спросит, разрешаешь ли доступ. Нажми
+      <strong>Authorize</strong>.</li>
+  <li>Возвращайся в панель. Через несколько секунд код исчезнет сам, а в
+      настройках появится карточка канала.</li>
+</ol>
+
+<div class="note">
+Код живёт полчаса. Если не успел — просто нажми «Подключить Twitch» ещё раз,
+Twitch выдаст новый.
+</div>
+
+<h2><span class="step">Шаг 5</span><br>Проверить награду</h2>
+
+<p>Если всё прошло, приложение <strong>само создаст награду</strong> на твоём
+канале. Проверь: открой свой канал, нажми на значок баллов под плеером — там
+должна появиться награда <strong>«Заказ трека»</strong> за 1000 баллов.</p>
+
+<p>Название и стоимость потом можно поменять в настройках приложения, награда
+подстроится сама.</p>
+
+<div class="warn">
+<strong>Не создавай награду руками.</strong> Вернуть баллы Twitch разрешает
+только за награду, которую создало само приложение. За награду, сделанную
+вручную, баллы вернуть невозможно — Twitch просто не даст.
+</div>
+
+<p>Дальше открывай файл <strong>«Чек-лист-Twitch»</strong> — там проверяем,
+как приложение принимает заказ и возвращает баллы.</p>
+
+<h2>Если что-то пошло не так</h2>
+
+<table>
+  <tr><th>Код</th><th>Что случилось</th><th>Что делать</th></tr>
+  <tr><td>TW-01</td><td>Client ID не вставлен</td><td>Вернись к шагу 3</td></tr>
+  <tr><td>TW-02</td><td>Twitch не выдал код</td><td>Проверь Client ID и интернет</td></tr>
+  <tr><td>TW-03</td><td>Код не подтвердили вовремя или нажали «Отмена»</td><td>Нажми «Подключить Twitch» и введи новый код</td></tr>
+  <tr><td>TW-04</td><td>Доступ слетел</td><td>Нажми «Подключить Twitch» заново</td></tr>
+  <tr><td>TW-05</td><td>На канале нет баллов</td><td>Это не поломка. Баллы бывают только у аффилиатов и партнёров, награду создать невозможно. Ячейка Twitch станет приглушённой, а не красной. Донаты работать будут</td></tr>
+  <tr><td>TW-06</td><td>Не удалось создать награду</td><td>Проверь, что на канале включены баллы, и выгрузи лог</td></tr>
+  <tr><td>TW-07</td><td>Не удалось вернуть баллы</td><td>Выгрузи лог — это важная ошибка</td></tr>
+  <tr><td>TW-10</td><td>Оборвалась связь с Twitch</td><td>Приложение переподключится само. Если не прошло за минуту — выгрузи лог</td></tr>
+  <tr><td>TW-12</td><td>Награда с таким названием уже есть, но создана не приложением</td><td>Переименуй свою награду на канале или задай другое название в настройках приложения</td></tr>
+</table>
+
+<p>Выгрузка лога — в настройках, блок
+<strong>Диагностика</strong>, кнопка «Сохранить лог и историю». Подробности
+пишутся всегда, включать ничего не надо.</p>
+
+</main>
+</body>
+</html>

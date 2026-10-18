@@ -197,7 +197,7 @@ func Download(ctx context.Context, rel Release, dir string) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", errs.Wrap(errs.UpdateDownload, "Некуда положить обновление.", err)
 	}
-	path := filepath.Join(dir, "songrequest-new.exe")
+	path := filepath.Join(dir, "songrequest-yandex-new.exe")
 	if err := os.WriteFile(path, raw, 0o755); err != nil {
 		return "", errs.Wrap(errs.UpdateDownload, "Не получилось записать обновление на диск.", err)
 	}

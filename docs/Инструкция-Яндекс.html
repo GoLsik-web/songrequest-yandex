@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Как подключить Яндекс Музыку</title>
+<style>
+  :root {
+    --bg: #08090a; --card: #101214; --line: #1c1f22;
+    --text: #f2f4f5; --dim: #858d94; --accent: #ffcc00;
+    --bad: #ff4d4d; --ink: #0c0c0c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 20px 80px;
+    background: var(--bg); color: var(--text);
+    font: 17px/1.65 "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .lead { color: var(--dim); margin: 0 0 28px; }
+  p { margin: 0 0 14px; }
+  ol, ul { padding-left: 24px; margin: 0 0 14px; }
+  li { margin-bottom: 8px; }
+  code {
+    background: var(--card); border: 1px solid var(--line); border-radius: 4px;
+    padding: 2px 6px; font-family: Consolas, "Courier New", monospace; font-size: 15px;
+  }
+  .copy {
+    display: block; background: var(--card); border: 1px solid var(--accent);
+    border-radius: 4px; padding: 14px 16px; margin: 14px 0;
+    font-family: Consolas, "Courier New", monospace; font-size: 17px;
+    color: var(--accent); word-break: break-all; user-select: all;
+  }
+  .warn, .note {
+    border-left: 3px solid var(--accent); background: #161204;
+    padding: 12px 16px; margin: 18px 0;
+  }
+  .note { border-left-color: var(--line); background: var(--card); }
+  .warn strong { color: var(--accent); }
+  .stop { border-left-color: var(--bad); background: #170808; }
+  .stop strong { color: var(--bad); }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 15px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; }
+  td:first-child { white-space: nowrap; font-family: Consolas, monospace; color: var(--accent); }
+  a { color: var(--accent); }
+  .step { color: var(--dim); font-size: 14px; letter-spacing: .8px; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Как подключить Яндекс Музыку</h1>
+<p class="lead">Первая настройка — пара минут, один раз. Ни ключей, ни
+регистрации приложений: просто входишь в свой Яндекс.</p>
+
+<p><strong>Что получится.</strong> Заказы зрителей будут играть в твоём
+приложении Яндекс Музыки на компьютере: заказ встаёт в его очередь сразу за
+текущим треком. Когда очередь заказов кончится, музыка вернётся туда, где ты
+её оставил, — тот же плейлист и то же место в треке.</p>
+
+<div class="warn"><strong>Нужен Плюс.</strong> Без подписки Яндекс играет
+только отрывки по тридцать секунд — заказ зрителя оборвётся на середине.</div>
+
+<h2><span class="step">Шаг 1</span><br>Открой приложение Яндекс Музыки</h2>
+<ol>
+  <li>Запусти приложение Яндекс Музыки на этом компьютере (или открой
+      music.yandex.ru в браузере) и войди в свой аккаунт.</li>
+  <li>Включи любой трек. Так приложению будет куда ставить заказы.</li>
+</ol>
+
+<h2><span class="step">Шаг 2</span><br>Войди в Яндекс из приложения заказов</h2>
+<ol>
+  <li>Открой настройки, вкладка «Подключения», блок «Яндекс Музыка».</li>
+  <li>Нажми «Войти в Яндекс». Откроется окно входа Яндекса.</li>
+  <li>Войди тем же аккаунтом, где у тебя Плюс. Окно закроется само.</li>
+  <li>В блоке появится твой аккаунт, а ниже — «Очередь Яндекса на связи».</li>
+</ol>
+
+<div class="note"><strong>Окно не открылось?</strong> Нажми «Войти в Яндекс»
+ещё раз — откроется браузер. Войди, и когда браузер перекинет на
+music.yandex.ru, скопируй адрес из строки браузера целиком и вставь его в поле
+«Токен вручную — если окно входа не открылось», потом нажми «Сохранить
+токен».</div>
+
+<h2>Если очередь Яндекса недоступна</h2>
+<p>Приложение ставит заказы в очередь через ту же связь, которой пользуется
+сама Яндекс Музыка, чтобы телефон видел, что играет на компьютере. Если эта
+связь недоступна, заказ не пропадает: он ложится в плейлист «Заказы со
+стрима», баллы остаются списанными, а зрителю в чат уходит сообщение. Плейлист
+приложение создаёт само — включи его, когда будет удобно.</p>
+
+<h2>Если что-то не работает</h2>
+<table>
+<tr><th>Код</th><th>Что значит</th><th>Что делать</th></tr>
+<tr><td>YM-02</td><td>Вход не выполнен</td><td>Нажми «Войти в Яндекс»</td></tr>
+<tr><td>YM-03</td><td>Вход слетел</td><td>Войди заново — токен Яндекса иногда отзывается, например после смены пароля</td></tr>
+<tr><td>YM-04</td><td>Яндекс не отвечает</td><td>Проверь интернет и нажми «Проверить связь»</td></tr>
+<tr><td>YM-06</td><td>На аккаунте нет Плюса</td><td>Войди аккаунтом с подпиской</td></tr>
+<tr><td>YM-08</td><td>Нет связи с очередью Яндекса</td><td>Заказы пойдут в плейлист; связь поднимется сама. Не поднимается — перезапусти приложение заказов</td></tr>
+<tr><td>YM-09</td><td>Яндекс Музыка нигде не играет</td><td>Открой приложение Яндекс Музыки и включи любой трек</td></tr>
+<tr><td>YM-10</td><td>Не вышло записать в плейлист заказов</td><td>Нажми «Проверить связь»; повторится — выгрузи лог</td></tr>
+</table>
+
+<p>Выгрузка лога — в настройках, блок <strong>Диагностика</strong>, кнопка
+«Сохранить лог и историю». Токен Яндекса из архива вырезан.</p>
+
+</main>
+</body>
+</html>
