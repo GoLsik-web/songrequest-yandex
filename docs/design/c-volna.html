@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C · Волна</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat+Alternates:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b0a14;--glass:#ffffff0d;--glass2:#ffffff17;--line:#ffffff1f;--text:#f1efff;--dim:#a29fbf;--acc:#ffcc00;--acc2:#ff5fa2;--ok:#5ef0b0;--bad:#ff6a6a}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.45 Inter,system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+.blob{position:fixed;border-radius:50%;filter:blur(90px);opacity:.55;z-index:0}
+.b1{width:520px;height:520px;background:#ff5fa2;left:-120px;top:-160px}
+.b2{width:460px;height:460px;background:#ffcc00;right:-140px;top:200px;opacity:.3}
+.b3{width:520px;height:520px;background:#5b3cff;left:30%;bottom:-260px}
+.app{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:22px;display:grid;grid-template-columns:1fr 360px;gap:18px}
+.glass{background:var(--glass);border:1px solid var(--line);border-radius:26px;backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
+header{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:12px 16px}
+.logo{font:700 20px "Montserrat Alternates";background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;color:transparent}
+.dots{margin-left:auto;display:flex;gap:14px;font-size:13px;color:var(--dim)}
+.dots span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px;box-shadow:0 0 10px var(--ok)}
+.dots .w::before{background:var(--bad);box-shadow:0 0 10px var(--bad)}
+.ib{border:1px solid var(--line);background:var(--glass2);color:var(--text);border-radius:14px;padding:9px 14px;font:600 14px Inter;cursor:pointer}
+.ib.acc{background:linear-gradient(90deg,var(--acc),#ff9f1c);color:#1c1300;border:0;box-shadow:0 6px 24px #ffcc0055}
+.stage{padding:30px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.disc{width:260px;height:260px;border-radius:50%;background:conic-gradient(from 0deg,#ff8a3d,#c2185b,#3b1c6e,#ff8a3d);position:relative;animation:spin 12s linear infinite;box-shadow:0 0 80px #ff5fa255}
+.disc::after{content:"";position:absolute;inset:42%;border-radius:50%;background:var(--bg);border:3px solid #ffffff30}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lbl{margin-top:24px;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--acc)}
+.title{font:700 42px/1.05 "Montserrat Alternates";margin:8px 0 4px}
+.artist{color:var(--dim);font-size:18px}
+.who{margin-top:14px;display:inline-flex;gap:8px;align-items:center;padding:6px 12px;border-radius:99px;background:var(--glass2);font-size:14px}
+.who i{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#5ef0b0,#5b3cff)}
+.bar{width:100%;max-width:520px;margin-top:22px;height:8px;border-radius:9px;background:var(--glass2);overflow:hidden}
+.bar i{display:block;height:100%;width:42%;background:linear-gradient(90deg,var(--acc),var(--acc2));box-shadow:0 0 14px var(--acc2)}
+.time{width:100%;max-width:520px;display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:6px}
+.ctrls{display:flex;gap:10px;margin-top:20px}
+.side{display:flex;flex-direction:column;gap:18px}
+.card{padding:18px}
+.card h3{font:600 15px "Montserrat Alternates";margin-bottom:12px;display:flex;justify-content:space-between}
+.card h3 span{font:500 12px Inter;color:var(--dim)}
+.q{display:flex;gap:12px;align-items:center;padding:8px;border-radius:14px}
+.q:hover{background:var(--glass2)}
+.q .c{width:42px;height:42px;border-radius:12px;flex:none}
+.q .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q .s{font-size:12px;color:var(--dim)}
+.q .m{margin-left:auto;font-size:12px;color:var(--dim)}
+.st{font-size:11px;padding:3px 8px;border-radius:99px;margin-left:auto;white-space:nowrap}
+.st.ok{background:#5ef0b022;color:var(--ok)}.st.no{background:#ff6a6a22;color:var(--bad)}
+.bottom{grid-column:1/2;padding:18px}
+@media (max-width:900px){.app{grid-template-columns:1fr}.bottom{grid-column:auto}}
+</style>
+</head>
+<body>
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+<div class="app">
+  <header class="glass">
+    <div class="logo">заказ·волна</div>
+    <div class="dots"><span>Яндекс</span><span>Twitch</span><span class="w">Ynison → плейлист</span></div>
+    <button class="ib">Виджет</button><button class="ib">Настройки</button>
+  </header>
+
+  <section class="glass stage">
+    <div class="disc"></div>
+    <div class="lbl">заказ зрителя</div>
+    <div class="title">Розовое вино</div>
+    <div class="artist">Элджей, Feduk</div>
+    <div class="who"><i></i>kotik_228 · 300 баллов</div>
+    <div class="bar"><i></i></div>
+    <div class="time"><span>1:31</span><span>3:37</span></div>
+    <div class="ctrls"><button class="ib acc">Скип</button><button class="ib">Пауза</button><button class="ib">Вернуть баллы</button><button class="ib">Бан</button></div>
+  </section>
+
+  <aside class="side">
+    <section class="glass card">
+      <h3>Очередь <span>4 · 13 мин</span></h3>
+      <div class="q"><div class="c" style="background:linear-gradient(135deg,#2bd2ff,#2b6bff)"></div><div><div class="t">Тамада</div><div class="s">Мияги · dimon_tv</div></div><span class="m">3:45</span></div>
+      <div class="q"><div class="c" style="background:linear-gradient(135deg,#a8ff78,#078c58)"></div><div><div class="t">Never Gonna Give You Up</div><div class="s">Rick Astley · anna_s</div></div><span class="m">3:33</span></div>
+      <div class="q"><div class="c" style="background:linear-gradient(135deg,#f7971e,#ffd200)"></div><div><div class="t">Кукла колдуна</div><div class="s">Король и Шут · gena</div></div><span class="m">3:24</span></div>
+      <div class="q"><div class="c" style="background:linear-gradient(135deg,#8e2de2,#4a00e0)"></div><div><div class="t">Blinding Lights</div><div class="s">The Weeknd · lex</div></div><span class="m">3:20</span></div>
+    </section>
+    <section class="glass card">
+      <h3>Потом <span>своя музыка</span></h3>
+      <div class="q"><div class="c" style="background:conic-gradient(#ffcc00,#ff5fa2,#5b3cff,#ffcc00)"></div><div><div class="t">Моя волна</div><div class="s">вернётся на 2:10</div></div></div>
+    </section>
+  </aside>
+
+  <section class="glass bottom card">
+    <h3>Лента заказов <span>сегодня · 14 заказов · 2 возврата</span></h3>
+    <div class="q"><div class="c" style="background:linear-gradient(135deg,#2bd2ff,#2b6bff)"></div><div><div class="t">«мияги тамада»</div><div class="s">dimon_tv · текст</div></div><span class="st ok">в очереди</span></div>
+    <div class="q"><div class="c" style="background:#333"></div><div><div class="t">open.spotify.com/track/4uLU6h…</div><div class="s">zxc_ghoul · Spotify</div></div><span class="st no">нет в Яндексе · возврат</span></div>
+    <div class="q"><div class="c" style="background:linear-gradient(135deg,#a8ff78,#078c58)"></div><div><div class="t">youtu.be/dQw4w9</div><div class="s">anna_s · YouTube</div></div><span class="st ok">в очереди</span></div>
+  </section>
+</div>
+</body>
+</html>

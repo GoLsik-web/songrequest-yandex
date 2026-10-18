@@ -1,0 +1,1562 @@
+/* Оформление виджета.
+   ─────────────────────────────────────────────────────────────────────────
+   Устроено в два слоя, и это важно.
+
+   СЕМЕЙСТВО задаёт устройство плашки: где обложка и есть ли она, в строку
+   или в столбец, какой голос у шрифта, как ведёт себя полоса времени.
+   ВАРИАНТ задаёт только краску и настроение внутри этого устройства.
+
+   Поэтому десять семейств — это десять разных предметов, а не один предмет
+   в десяти цветах. Вариантов по четыре: перебрать их можно за полминуты,
+   и каждый заметно отличается от соседнего.
+
+   Всё оформление выражено токенами. Ручная настройка в панели пишет те же
+   токены поверх набора, поэтому «свой цвет» работает в любом семействе и
+   ничего не ломает. */
+
+/* Обёртка держит место в кадре, плашка внутри живёт своей жизнью.
+   ─────────────────────────────────────────────────────────────────────────
+   Зачем разделять. У плашки transform занят анимациями: въезд, уход,
+   покачивание винила, дрожь терминала, поворот тонарма. Прижать её к
+   середине кадра можно только через translate(-50%) — и он затирался бы
+   первой же анимацией, а плашка уезжала бы из центра. Поэтому середину
+   держит обёртка, у которой своих анимаций нет и не будет.
+
+   Прозрачность тоже здесь: у плашки opacity занята появлением и уходом. */
+
+.slot { position: absolute; }
+
+.slot[data-h="center"][data-v="middle"]            { transform: translate(-50%, -50%); }
+.slot[data-h="center"]:not([data-v="middle"])      { transform: translateX(-50%); }
+.slot[data-v="middle"]:not([data-h="center"])      { transform: translateY(-50%); }
+
+/* Тикер занимает всю ширину кадра: обёртка растянута от края до края, а
+   плашка внутри занимает её целиком. */
+.slot[data-h="wide"] { left: 0; right: 0; }
+
+.card {
+  /* Значения по умолчанию — они же то, что видит ручная настройка, пока
+     стример ничего не трогал. */
+  --w-bg:         rgba(8, 9, 10, .82);
+  --w-ink:        #ffffff;
+  --w-sub:        rgba(255, 255, 255, .75);
+  --w-accent:     #c8f751;
+  --w-line:       transparent;
+  --w-edge:       0px;
+  --w-radius:     4px;
+  --w-pad:        12px 18px 12px 12px;
+  --w-blur:       8px;
+  --w-shadow:     none;
+  --w-art:        64px;
+  --w-art-radius: 3px;
+  --w-title-font: Unbounded, Manrope, sans-serif;
+  --w-body-font:  Manrope, system-ui, sans-serif;
+  --w-title-size: 17px;
+  --w-weight:     600;
+  --w-caps:       none;
+  --w-track:      0;
+  --w-gap:        14px;
+  --w-bar:        rgba(255, 255, 255, .18);
+  --w-glow:       none;
+  --w-stroke:     0 transparent;
+
+  /* Не absolute: место в кадре держит обёртка .slot, см. выше. */
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--w-gap) * var(--scale, 1));
+  padding: var(--w-pad);
+  max-width: calc(460px * var(--scale, 1));
+
+  background: var(--w-bg);
+  border-radius: var(--w-radius);
+  border-left: calc(var(--w-edge) * 1) solid var(--w-line);
+  box-shadow: var(--w-shadow);
+  backdrop-filter: blur(var(--w-blur));
+
+  color: var(--w-ink);
+  font-family: var(--w-body-font);
+  font-size: calc(15px * var(--scale, 1));
+  line-height: 1.4;
+
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .4s cubic-bezier(.2, .7, .3, 1),
+              transform .4s cubic-bezier(.2, .7, .3, 1);
+}
+
+.card.show { opacity: 1; transform: none; }
+
+.art {
+  width: calc(var(--w-art) * var(--scale, 1));
+  height: calc(var(--w-art) * var(--scale, 1));
+  flex: none;
+  border-radius: var(--w-art-radius);
+  overflow: hidden;
+  background: rgba(127, 127, 127, .18);
+  display: grid;
+  place-items: center;
+}
+.art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.art .no { width: 40%; height: 40%; opacity: .35; }
+
+/* Обложку можно выключить — иногда в кадре просто нет для неё места. */
+.card[data-art="off"] .art { display: none; }
+
+.text { display: block; min-width: 0; flex: 1; }
+
+/* Прижим текста к стороне плашки.
+   ─────────────────────────────────────────────────────────────────────────
+   Просьба владельца: «если слева — текст от левой стороны, если справа —
+   текст упирается в правую». Это выключка строк, а не переворот плашки:
+   обложка остаётся ровно там, где её поставил набор. Переворот пришлось бы
+   рисовать в каждом из десяти семейств заново, а смысл был бы тот же.
+
+   Отдельным правилом, а не text-align на .card: у тикера строка устроена
+   флексбоксом, и там выключка задаётся иначе — см. ниже. */
+.card[data-align="left"]   .text { text-align: left; }
+.card[data-align="center"] .text { text-align: center; }
+.card[data-align="right"]  .text { text-align: right; }
+
+/* Запасной отступ для старых сборок OBS: gap во флексбоксе появился только
+   в Chrome 84, а без него обложка приклеивается к тексту вплотную во всех
+   семействах сразу — выглядит как «вёрстка поехала». */
+@supports not (gap: 1px) {
+  .card > .text { margin-left: calc(var(--w-gap) * var(--scale, 1)); }
+  .card[data-family="ticker"] .text > * + * { margin-left: 12px; }
+}
+
+.title {
+  display: block;
+  font-family: var(--w-title-font);
+  font-weight: var(--w-weight);
+  font-size: calc(var(--w-title-size) * var(--scale, 1));
+  line-height: 1.15;
+  text-transform: var(--w-caps);
+  letter-spacing: var(--w-track);
+  text-shadow: var(--w-glow);
+  -webkit-text-stroke: var(--w-stroke);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.artist {
+  display: block;
+  font-size: calc(14px * var(--scale, 1));
+  color: var(--w-sub);
+  margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.by {
+  display: block;
+  font-size: calc(12px * var(--scale, 1));
+  margin-top: 6px;
+  color: var(--w-accent);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Заказ и своя музыка отличаются не только словами, но и голосом строки:
+   заказ — акцентом, своя музыка — тем же тихим цветом, что артист. Работает
+   во всех сорока пяти наборах, потому что оба цвета есть у каждого. */
+.card[data-source="own"] .by { color: var(--w-sub); }
+
+.bar {
+  display: block;
+  height: 2px;
+  background: var(--w-bar);
+  margin-top: 8px;
+  border-radius: 2px;
+}
+.bar i {
+  display: block; height: 100%; width: 0;
+  background: var(--w-accent);
+  border-radius: inherit;
+}
+.card[data-bar="off"] .bar { display: none; }
+
+
+/* ═══ 1. ЭФИР ═══════════════════════════════════════════════════════════
+   Родное оформление приложения: плотная плашка с цветной гранью слева.
+   Грань — единственное цветное пятно в спокойном прямоугольнике, поэтому
+   плашка читается краем глаза как «свой» элемент, а не как всплывшее окно. */
+
+.card[data-family="efir"] {
+  --w-edge: 3px;
+  --w-line: var(--w-accent);
+}
+.card[data-family="efir"][data-variant="lime"]    { --w-accent: #c8f751; --w-bg: rgba(8, 9, 10, .82); }
+.card[data-family="efir"][data-variant="berry"]   { --w-accent: #ff5c8a; --w-bg: rgba(13, 7, 10, .84); }
+.card[data-family="efir"][data-variant="ice"]     { --w-accent: #7fe3ff; --w-bg: rgba(6, 11, 14, .84); }
+.card[data-family="efir"][data-variant="sand"]    { --w-accent: #e8c76a; --w-bg: rgba(13, 11, 7, .84); }
+
+
+/* ═══ 2. ОТКРЫТЫЙ ТЕКСТ ═════════════════════════════════════════════════
+   Без подложки — не закрывает ни пикселя картинки. Держится на тени, а не
+   на плашке, поэтому годится там, где кадр дорог. */
+
+.card[data-family="bare"] {
+  --w-bg: none;
+  --w-blur: 0px;
+  --w-radius: 0px;
+  --w-pad: 0;
+  --w-gap: 16px;
+  --w-title-font: Manrope, system-ui, sans-serif;
+  --w-weight: 700;
+  --w-title-size: 19px;
+  --w-glow: 0 2px 10px rgba(0, 0, 0, .95), 0 0 3px rgba(0, 0, 0, .9);
+  --w-shadow: none;
+}
+.card[data-family="bare"] .artist,
+.card[data-family="bare"] .by { text-shadow: var(--w-glow); }
+.card[data-family="bare"] .art { box-shadow: 0 6px 22px rgba(0, 0, 0, .7); }
+
+.card[data-family="bare"][data-variant="white"]   { --w-ink: #fff;    --w-accent: rgba(255, 255, 255, .82); }
+.card[data-family="bare"][data-variant="lime"]    { --w-ink: #fff;    --w-accent: #c8f751; }
+.card[data-family="bare"][data-variant="amber"]   { --w-ink: #ffdf8a; --w-accent: #ffdf8a; --w-sub: rgba(255, 236, 199, .8); }
+.card[data-family="bare"][data-variant="outline"] {
+  --w-ink: transparent;
+  --w-stroke: 1px #fff;
+  --w-glow: 0 2px 14px rgba(0, 0, 0, .95);
+  --w-accent: #fff;
+}
+
+
+/* ═══ 3. ТИКЕР ══════════════════════════════════════════════════════════
+   Строка во всю ширину кадра, как бегущая строка новостей. Не занимает
+   угол, а честно отделяет полосу сверху или снизу — на пёстрой сцене это
+   читается лучше любой плашки. */
+
+.card[data-family="ticker"] {
+  --w-art: 26px;
+  --w-art-radius: 2px;
+  --w-gap: 12px;
+  --w-pad: 9px 18px;
+  --w-radius: 0px;
+  --w-title-font: Oswald, "Arial Narrow", sans-serif;
+  --w-body-font: Oswald, "Arial Narrow", sans-serif;
+  --w-title-size: 16px;
+  --w-weight: 500;
+  --w-caps: uppercase;
+  --w-track: .04em;
+  --w-blur: 4px;
+
+  max-width: none;
+  align-items: center;
+}
+/* Тикер занимает всю ширину — угол для него не имеет смысла, остаётся
+   только выбор «сверху или снизу». */
+.card[data-family="ticker"] .text { display: flex; align-items: baseline; gap: 12px; }
+.card[data-family="ticker"] .title { flex: none; max-width: 46%; }
+.card[data-family="ticker"] .artist {
+  margin-top: 0; font-size: calc(14px * var(--scale, 1));
+  min-width: 0; flex: 0 1 auto;
+}
+/* Ник прижат к правому краю и не сжимается: он короткий, а вот название с
+   артистом длинные — сжиматься должны они. */
+.card[data-family="ticker"] .by { margin-top: 0; margin-left: auto; flex: none; padding-left: 16px; }
+/* У тикера строка — флексбокс, и text-align в ней ничего не двигает.
+   Прижимаем саму строку, а ник при этом перестаёт отлетать вправо: иначе
+   выключка «по центру» выглядела бы как «всё слева, ник справа». */
+.card[data-family="ticker"][data-align="center"] .text { justify-content: center; }
+.card[data-family="ticker"][data-align="right"]  .text { justify-content: flex-end; }
+.card[data-family="ticker"][data-align="center"] .by,
+.card[data-family="ticker"][data-align="right"]  .by { margin-left: 0; }
+/* Полоса времени становится подчёркиванием всей строки. */
+.card[data-family="ticker"] .bar {
+  position: absolute; left: 0; right: 0; bottom: 0; margin: 0; border-radius: 0;
+}
+
+.card[data-family="ticker"][data-variant="dark"]  { --w-bg: rgba(10, 11, 12, .88); --w-accent: #c8f751; }
+.card[data-family="ticker"][data-variant="light"] {
+  --w-bg: rgba(244, 245, 246, .92); --w-ink: #14171a;
+  --w-sub: rgba(20, 23, 26, .62); --w-accent: #1d6b3f; --w-bar: rgba(0, 0, 0, .12);
+}
+.card[data-family="ticker"][data-variant="acid"]  {
+  --w-bg: #c8f751; --w-ink: #0d1204; --w-sub: rgba(13, 18, 4, .68);
+  --w-accent: #0d1204; --w-bar: rgba(13, 18, 4, .2);
+}
+.card[data-family="ticker"][data-variant="clear"] {
+  --w-bg: rgba(0, 0, 0, .35); --w-blur: 14px; --w-accent: #fff;
+}
+
+
+/* ═══ 4. ВИНИЛ ══════════════════════════════════════════════════════════
+   Не «круглая обложка», а пластинка на вертушке.
+
+   Почему прошлая версия выглядела мёртвой: крутились дорожки. Дорожки —
+   концентрические окружности, они радиально симметричны, и их вращение глаз
+   не видит вообще. Двигалось всё, а казалось, что ничего.
+
+   Живой пластинку делают три вещи, и все три здесь есть:
+     — вращается ЭТИКЕТКА, единственное асимметричное пятно на диске;
+     — по поверхности идёт блик: он стоит на месте, диск идёт под ним;
+     — тонарм ползёт к центру по ходу трека — по настоящему прогрессу,
+       а не по таймеру: JS отдаёт --progress, тонарм его отыгрывает.
+
+   Диск при этом неподвижен как коробка: вращается только то, что должно. */
+
+.card[data-family="vinyl"] {
+  --w-art: 76px;
+  --w-art-radius: 50%;
+  --w-radius: 999px;
+  --w-pad: 11px 30px 11px 11px;
+  --w-gap: 17px;
+  --w-title-font: "Playfair Display", Georgia, serif;
+  --w-title-size: 19px;
+  --w-weight: 700;
+  --w-blur: 6px;
+  --w-disc: #12100f;
+  --w-groove: rgba(255, 255, 255, .07);
+  --w-shine: rgba(255, 255, 255, .17);
+}
+
+/* Диск. Сам по себе не крутится: вращать симметричные дорожки бессмысленно. */
+.card[data-family="vinyl"] .art {
+  position: relative;
+  overflow: visible;
+  background:
+    /* дорожки: частые у края, реже к центру — как на настоящей пластинке */
+    repeating-radial-gradient(circle at 50% 50%,
+      var(--w-groove) 0 1px, transparent 1px 2.5px),
+    /* разделительный поясок между дорожками и этикеткой */
+    radial-gradient(circle at 50% 50%,
+      transparent 0 30%, rgba(0, 0, 0, .55) 30% 32%, transparent 32%),
+    radial-gradient(circle at 50% 50%, #1a1716 0 30%, var(--w-disc) 30% 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .09),
+    inset 0 0 14px rgba(0, 0, 0, .6),
+    0 3px 12px rgba(0, 0, 0, .5);
+  animation: discWobble 3.4s ease-in-out infinite;
+}
+
+/* Этикетка — вот она и крутится. Кроме неё крутиться нечему: только по
+   ней и видно, что диск идёт. */
+.card[data-family="vinyl"] .art img {
+  position: absolute;
+  left: 26%; top: 26%; width: 48%; height: 48%;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .55);
+  animation: discSpin 1.8s linear infinite;
+}
+/* Нет обложки — крутится нота: пустой неподвижный кружок читался бы как
+   поломка, а не как «обложки нет». */
+.card[data-family="vinyl"] .art .no {
+  position: absolute; left: 38%; top: 38%; width: 24%; height: 24%;
+  opacity: .55;
+  animation: discSpin 1.8s linear infinite;
+}
+
+/* Блик. Он НЕ вращается — свет стоит на месте, пластинка идёт под ним.
+   Прошлая версия крутила его в обратную сторону, но диск и блик стартовали
+   в разное время из-за разгона и разъезжались по фазе. */
+.card[data-family="vinyl"] .art::before {
+  content: ""; position: absolute; top: -1px; right: -1px; bottom: -1px; left: -1px;
+  border-radius: 50%;
+  background: linear-gradient(118deg,
+    transparent 30%, var(--w-shine) 44%,
+    rgba(255, 255, 255, .04) 50%, transparent 58%);
+  animation: discShine 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Штырь по центру. */
+.card[data-family="vinyl"] .art::after {
+  content: ""; position: absolute;
+  left: 46.5%; top: 46.5%; width: 7%; height: 7%;
+  border-radius: 50%;
+  background: var(--w-bg);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .6);
+}
+
+/* Тонарм. Угол считается из настоящего прогресса трека: в начале он у края,
+   к концу приходит к этикетке. Таймер тут врал бы — трек можно перемотать. */
+.card[data-family="vinyl"] .text { position: relative; }
+.card[data-family="vinyl"] .text::before {
+  content: "";
+  position: absolute;
+  left: calc(-34px * var(--scale, 1)); top: 50%;
+  width: calc(30px * var(--scale, 1)); height: 2px;
+  background: linear-gradient(90deg,
+    var(--w-accent) 0 22%, rgba(230, 230, 230, .85) 22% 100%);
+  border-radius: 2px;
+  transform-origin: right center;
+  transform: rotate(calc(-31deg + 15deg * var(--progress, 0)));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+}
+/* Игла на конце тонарма. */
+.card[data-family="vinyl"] .text::after {
+  content: "";
+  position: absolute;
+  left: calc(-34px * var(--scale, 1)); top: 50%;
+  width: calc(30px * var(--scale, 1)); height: 2px;
+  transform-origin: right center;
+  transform: rotate(calc(-31deg + 15deg * var(--progress, 0)));
+  border-left: 2px solid var(--w-accent);
+  pointer-events: none;
+}
+
+.card[data-family="vinyl"] .bar { border-radius: 999px; }
+
+@keyframes discSpin { to { transform: rotate(360deg); } }
+
+/* Блик гуляет по диску туда-обратно — так читается объём, а бесконечный
+   прогон в одну сторону выглядит как крутящийся градиент. */
+@keyframes discShine {
+  0%, 100% { transform: rotate(-11deg); opacity: .85; }
+  50%      { transform: rotate(11deg);  opacity: 1; }
+}
+
+/* Эксцентриситет: у любой пластинки центр чуть смещён, и диск еле заметно
+   ведёт. Полпикселя — этого хватает, чтобы вещь перестала быть иконкой. */
+@keyframes discWobble {
+  0%, 100% { transform: translate(0, 0); }
+  25%      { transform: translate(.4px, -.3px); }
+  50%      { transform: translate(0, .4px); }
+  75%      { transform: translate(-.4px, -.2px); }
+}
+
+.card[data-family="vinyl"][data-variant="shellac"] {
+  --w-bg: rgba(14, 12, 11, .9); --w-ink: #f3ece0;
+  --w-sub: rgba(243, 236, 224, .6); --w-accent: #e0b070;
+  --w-disc: #0d0b0a; --w-groove: rgba(224, 176, 112, .11);
+  --w-shine: rgba(255, 226, 180, .2);
+}
+.card[data-family="vinyl"][data-variant="sepia"] {
+  --w-bg: rgba(244, 236, 222, .94); --w-ink: #2c231a;
+  --w-sub: rgba(44, 35, 26, .62); --w-accent: #9a5b28; --w-bar: rgba(44, 35, 26, .14);
+  --w-disc: #2a231c; --w-groove: rgba(255, 236, 208, .11);
+  --w-shine: rgba(255, 244, 226, .22);
+}
+.card[data-family="vinyl"][data-variant="mint"] {
+  --w-bg: rgba(18, 38, 34, .92); --w-ink: #eafaf3;
+  --w-sub: rgba(234, 250, 243, .62); --w-accent: #6fd8ac;
+  /* Прозрачный винил: дорожки светятся насквозь, диск светлее подложки. */
+  --w-disc: #1d4d43; --w-groove: rgba(150, 255, 214, .18);
+  --w-shine: rgba(190, 255, 230, .24);
+}
+.card[data-family="vinyl"][data-variant="label"] {
+  --w-bg: rgba(120, 26, 26, .93); --w-ink: #fdf1e6;
+  --w-sub: rgba(253, 241, 230, .68); --w-accent: #f0c579; --w-bar: rgba(253, 241, 230, .18);
+  --w-disc: #14100f; --w-groove: rgba(240, 197, 121, .13);
+  --w-shine: rgba(255, 235, 200, .2);
+}
+
+
+/* ═══ 5. КАССЕТА ════════════════════════════════════════════════════════
+   Моноширинный, обложки нет, зато есть корпус с двумя окнами-катушками.
+   Прямая отсылка к микстейпу — а заказ музыки от зрителей это ровно он. */
+
+.card[data-family="tape"] {
+  --w-art: 0px;
+  --w-radius: 3px;
+  --w-pad: 12px 18px 12px 54px;
+  --w-title-font: "JetBrains Mono", Consolas, monospace;
+  --w-body-font: "JetBrains Mono", Consolas, monospace;
+  --w-title-size: 14px;
+  --w-weight: 700;
+  --w-caps: uppercase;
+  --w-track: .02em;
+  --w-blur: 4px;
+  position: absolute;
+}
+.card[data-family="tape"] .art { display: none; }
+/* Две катушки слева. Крутятся вместе с треком. */
+.card[data-family="tape"]::before,
+.card[data-family="tape"]::after {
+  content: "";
+  position: absolute; top: 50%;
+  width: calc(15px * var(--scale, 1)); height: calc(15px * var(--scale, 1));
+  margin-top: calc(-7px * var(--scale, 1));
+  border-radius: 50%;
+  border: 2px solid var(--w-accent);
+  border-right-color: transparent;
+}
+.card[data-family="tape"]::before { left: calc(14px * var(--scale, 1)); }
+.card[data-family="tape"]::after  { left: calc(33px * var(--scale, 1)); }
+.card[data-family="tape"] .artist { font-size: calc(12px * var(--scale, 1)); }
+.card[data-family="tape"] .by { font-size: calc(11px * var(--scale, 1)); }
+
+.card[data-family="tape"][data-variant="chrome"] {
+  --w-bg: rgba(226, 228, 230, .93); --w-ink: #1a1d20;
+  --w-sub: rgba(26, 29, 32, .6); --w-accent: #1a1d20; --w-bar: rgba(26, 29, 32, .16);
+}
+.card[data-family="tape"][data-variant="type2"] {
+  --w-bg: rgba(24, 18, 12, .9); --w-ink: #ffca7a;
+  --w-sub: rgba(255, 202, 122, .58); --w-accent: #ff8a3d;
+}
+.card[data-family="tape"][data-variant="clear"] {
+  --w-bg: rgba(255, 255, 255, .12); --w-blur: 16px;
+  --w-ink: #fff; --w-accent: #fff;
+}
+.card[data-family="tape"][data-variant="black"] {
+  --w-bg: rgba(9, 9, 10, .92); --w-ink: #e8eaec;
+  --w-sub: rgba(232, 234, 236, .55); --w-accent: #7fe3ff;
+}
+
+
+/* ═══ 6. ТЕРМИНАЛ ═══════════════════════════════════════════════════════
+   Строка с приглашением и мигающей кареткой. Для каналов про код, ретро
+   и всё, где интерфейс уместнее картинки. */
+
+.card[data-family="terminal"] {
+  --w-art: 0px;
+  --w-radius: 0px;
+  --w-pad: 10px 16px;
+  --w-title-font: "JetBrains Mono", Consolas, monospace;
+  --w-body-font: "JetBrains Mono", Consolas, monospace;
+  --w-title-size: 15px;
+  --w-weight: 400;
+  --w-blur: 2px;
+  --w-bar: transparent;
+}
+.card[data-family="terminal"] .art { display: none; }
+.card[data-family="terminal"] .title::before {
+  content: "> "; color: var(--w-accent);
+}
+/* Каретка после названия — единственное, что здесь движется. */
+.card[data-family="terminal"] .title::after {
+  content: "▌"; color: var(--w-accent);
+  animation: blink 1.1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.card[data-family="terminal"] .artist { font-size: calc(13px * var(--scale, 1)); }
+.card[data-family="terminal"] .artist::before { content: "  "; }
+.card[data-family="terminal"] .by { font-size: calc(12px * var(--scale, 1)); }
+.card[data-family="terminal"] .bar { height: 1px; }
+
+.card[data-family="terminal"][data-variant="phosphor"] {
+  --w-bg: rgba(4, 12, 6, .9); --w-ink: #7dff9e;
+  --w-sub: rgba(125, 255, 158, .55); --w-accent: #7dff9e;
+  --w-glow: 0 0 12px rgba(125, 255, 158, .5);
+}
+.card[data-family="terminal"][data-variant="amber"] {
+  --w-bg: rgba(14, 8, 2, .9); --w-ink: #ffb64a;
+  --w-sub: rgba(255, 182, 74, .55); --w-accent: #ffb64a;
+  --w-glow: 0 0 12px rgba(255, 182, 74, .45);
+}
+.card[data-family="terminal"][data-variant="paper"] {
+  --w-bg: rgba(247, 246, 242, .94); --w-ink: #23211c;
+  --w-sub: rgba(35, 33, 28, .6); --w-accent: #8a4b2a; --w-glow: none;
+}
+.card[data-family="terminal"][data-variant="slate"] {
+  --w-bg: rgba(16, 19, 22, .9); --w-ink: #cfd6db;
+  --w-sub: rgba(207, 214, 219, .5); --w-accent: #6fa8c9; --w-glow: none;
+}
+
+
+/* ═══ 7. НЕОН ═══════════════════════════════════════════════════════════
+   Крупная светящаяся надпись без подложки. Самое громкое семейство:
+   берут те, у кого сцена тёмная и в кадре есть воздух. */
+
+.card[data-family="neon"] {
+  --w-art: 0px;
+  --w-bg: none;
+  --w-blur: 0px;
+  --w-radius: 0px;
+  --w-pad: 0;
+  --w-title-font: Unbounded, Manrope, sans-serif;
+  --w-title-size: 22px;
+  --w-weight: 600;
+  --w-caps: uppercase;
+  --w-track: .01em;
+  --w-bar: rgba(255, 255, 255, .16);
+}
+.card[data-family="neon"] .art { display: none; }
+.card[data-family="neon"] .artist { font-size: calc(13px * var(--scale, 1)); letter-spacing: .1em; text-transform: uppercase; }
+
+.card[data-family="neon"][data-variant="pink"] {
+  --w-ink: #ffd9ea; --w-accent: #ff4fa3; --w-sub: rgba(255, 217, 234, .7);
+  --w-glow: 0 0 6px #ff4fa3, 0 0 22px rgba(255, 79, 163, .8), 0 0 46px rgba(255, 79, 163, .45);
+}
+.card[data-family="neon"][data-variant="cyan"] {
+  --w-ink: #d6f8ff; --w-accent: #35e0ff; --w-sub: rgba(214, 248, 255, .7);
+  --w-glow: 0 0 6px #35e0ff, 0 0 22px rgba(53, 224, 255, .8), 0 0 46px rgba(53, 224, 255, .45);
+}
+.card[data-family="neon"][data-variant="lime"] {
+  --w-ink: #eeffcf; --w-accent: #c8f751; --w-sub: rgba(238, 255, 207, .7);
+  --w-glow: 0 0 6px #c8f751, 0 0 22px rgba(200, 247, 81, .75), 0 0 46px rgba(200, 247, 81, .4);
+}
+.card[data-family="neon"][data-variant="violet"] {
+  --w-ink: #e9dcff; --w-accent: #9b6bff; --w-sub: rgba(233, 220, 255, .7);
+  --w-glow: 0 0 6px #9b6bff, 0 0 22px rgba(155, 107, 255, .8), 0 0 46px rgba(155, 107, 255, .45);
+}
+
+
+/* ═══ 8. СТЕКЛО ═════════════════════════════════════════════════════════
+   Сильное размытие вместо заливки: плашка берёт цвет у того, что под ней,
+   и потому садится на любую сцену, не споря с ней. */
+
+.card[data-family="glass"] {
+  --w-blur: 20px;
+  --w-radius: 14px;
+  --w-pad: 14px 20px 14px 14px;
+  --w-art-radius: 9px;
+  --w-title-font: Manrope, system-ui, sans-serif;
+  --w-weight: 700;
+  --w-title-size: 18px;
+  --w-shadow: 0 10px 34px rgba(0, 0, 0, .3);
+}
+.card[data-family="glass"] { border: 1px solid var(--w-line); border-left-width: 1px; }
+
+.card[data-family="glass"][data-variant="milk"] {
+  --w-bg: rgba(255, 255, 255, .16); --w-line: rgba(255, 255, 255, .32);
+  --w-ink: #fff; --w-accent: #fff; --w-sub: rgba(255, 255, 255, .72);
+}
+.card[data-family="glass"][data-variant="smoke"] {
+  --w-bg: rgba(12, 14, 16, .42); --w-line: rgba(255, 255, 255, .14);
+  --w-ink: #f0f3f5; --w-accent: #a8e5ff;
+}
+.card[data-family="glass"][data-variant="warm"] {
+  --w-bg: rgba(255, 226, 190, .22); --w-line: rgba(255, 214, 165, .4);
+  --w-ink: #fff6ea; --w-accent: #ffc987;
+}
+.card[data-family="glass"][data-variant="deep"] {
+  --w-bg: rgba(10, 20, 40, .5); --w-line: rgba(140, 180, 255, .26);
+  --w-ink: #eaf1ff; --w-accent: #8fb7ff;
+}
+
+
+/* ═══ 9. ПОЛОСА ═════════════════════════════════════════════════════════
+   Самое тихое семейство: вертикальная черта и две строки мелким кеглем.
+   Ничего не перекрывает и не мигает — для тех, кому виджет нужен, но
+   мешать он не должен. */
+
+.card[data-family="stripe"] {
+  --w-art: 0px;
+  --w-bg: none;
+  --w-blur: 0px;
+  --w-radius: 0px;
+  --w-pad: 2px 0 2px 14px;
+  --w-edge: 2px;
+  --w-line: var(--w-accent);
+  --w-title-font: Manrope, system-ui, sans-serif;
+  --w-title-size: 15px;
+  --w-weight: 600;
+  --w-bar: transparent;
+  --w-glow: 0 1px 6px rgba(0, 0, 0, .8);
+}
+.card[data-family="stripe"] .art { display: none; }
+.card[data-family="stripe"] .artist,
+.card[data-family="stripe"] .by { text-shadow: var(--w-glow); font-size: calc(12px * var(--scale, 1)); }
+.card[data-family="stripe"] .bar { height: 1px; margin-top: 6px; }
+
+.card[data-family="stripe"][data-variant="light"] {
+  --w-ink: #fff; --w-accent: rgba(255, 255, 255, .9); --w-sub: rgba(255, 255, 255, .65);
+}
+.card[data-family="stripe"][data-variant="dark"] {
+  --w-ink: #14171a; --w-accent: rgba(20, 23, 26, .85); --w-sub: rgba(20, 23, 26, .6);
+  --w-glow: 0 1px 6px rgba(255, 255, 255, .7);
+}
+.card[data-family="stripe"][data-variant="accent"] {
+  --w-ink: #fff; --w-accent: #c8f751; --w-sub: rgba(255, 255, 255, .62);
+}
+.card[data-family="stripe"][data-variant="double"] {
+  --w-ink: #fff; --w-accent: #ff5c8a; --w-sub: rgba(255, 255, 255, .62);
+  --w-edge: 6px;
+}
+
+
+/* ═══ 10. КАРТОЧКА ══════════════════════════════════════════════════════
+   Вертикальная: крупная обложка сверху, подпись снизу, поля как у снимка.
+   Единственное семейство, где обложка — главное, а не подпись к тексту. */
+
+.card[data-family="card"] {
+  --w-art: 128px;
+  --w-art-radius: 1px;
+  --w-radius: 2px;
+  --w-pad: 10px 10px 12px;
+  --w-gap: 10px;
+  --w-blur: 2px;
+  --w-title-font: "Playfair Display", Georgia, serif;
+  --w-title-size: 17px;
+  --w-weight: 700;
+  --w-shadow: 0 12px 30px rgba(0, 0, 0, .38);
+
+  flex-direction: column;
+  align-items: stretch;
+  max-width: calc(168px * var(--scale, 1));
+}
+/* Обложки квадратные. Ширину задаёт плашка, высоту — пропорция, иначе
+   выходил прямоугольник 148×128 и снимок читался как обрезанный. */
+/* Квадрат через padding, а не aspect-ratio: последнее появилось только в
+   Chrome 88, а без него height:auto у пустого блока даёт ноль — и обложка,
+   ради которой это семейство и сделано, исчезает из кадра целиком. */
+.card[data-family="card"] .art { width: 100%; height: 0; padding-top: 100%; position: relative; }
+.card[data-family="card"] .art img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.card[data-family="card"] .text { width: 100%; }
+.card[data-family="card"] .title { white-space: normal; line-height: 1.2; }
+.card[data-family="card"] .artist { font-size: calc(13px * var(--scale, 1)); }
+.card[data-family="card"] .by { margin-top: 4px; }
+
+.card[data-family="card"][data-variant="white"] {
+  --w-bg: #fbfbf9; --w-ink: #191714; --w-sub: rgba(25, 23, 20, .6);
+  --w-accent: #9a5b28; --w-bar: rgba(25, 23, 20, .12);
+}
+.card[data-family="card"][data-variant="cream"] {
+  --w-bg: #f2e7d2; --w-ink: #2a2117; --w-sub: rgba(42, 33, 23, .62);
+  --w-accent: #a3542b; --w-bar: rgba(42, 33, 23, .14);
+}
+.card[data-family="card"][data-variant="black"] {
+  --w-bg: #111214; --w-ink: #f2f2f0; --w-sub: rgba(242, 242, 240, .6);
+  --w-accent: #d8c08a; --w-bar: rgba(242, 242, 240, .14);
+}
+.card[data-family="card"][data-variant="kraft"] {
+  --w-bg: #cbb18b; --w-ink: #241c12; --w-sub: rgba(36, 28, 18, .66);
+  --w-accent: #6b3f1d; --w-bar: rgba(36, 28, 18, .18);
+}
+
+
+/* ═══ 11. ИМПЛАНТ ═══════════════════════════════════════════════════════
+   Аниме-киберпанк. Отсылка собрана из приёмов, а не из имён: мятно-зелёный
+   с розовым на почти чёрном, жёсткий контур, хроматическая аберрация на
+   названии, скан-линии, топографические контуры на подложке, срезанный угол
+   и вертикальная микрополоса вдоль края. Кто смотрел — узнает с первого
+   взгляда; кто нет — увидит просто хороший киберпанк.
+
+   Ничего дословного здесь нет намеренно: ни названий, ни имён, ни логотипов.
+   Отсылка, которую нужно объяснять, перестаёт быть отсылкой, а прямая
+   цитата — это уже чужая работа. */
+
+.card[data-family="cyber"] {
+  --w-art: 62px;
+  --w-art-radius: 0px;
+  --w-radius: 0px;
+  --w-pad: 12px 34px 12px 12px;
+  --w-gap: 14px;
+  --w-title-font: Unbounded, Manrope, sans-serif;
+  --w-title-size: 17px;
+  --w-weight: 600;
+  --w-caps: uppercase;
+  --w-track: .02em;
+  --w-blur: 3px;
+
+  /* Два цвета расхождения. Именно их сдвиг даёт тот самый «сбойный» текст. */
+  --w-ab1: #ff4fd8;
+  --w-ab2: #35ffd0;
+  --w-frame: #05f2c7;
+  --w-frame-soft: rgba(5, 242, 199, .6);
+  --w-frame-glow: rgba(5, 242, 199, .22);
+  --w-line-1: rgba(5, 242, 199, .14);
+  --w-line-2: rgba(255, 79, 216, .12);
+
+  border: 2px solid #05070a;
+  border-left: 2px solid #05070a;
+  /* Срезанный угол — из тех же плакатов. Дешёвый приём, который сразу
+     убирает ощущение «прямоугольник из бутстрапа». */
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 11px), calc(100% - 11px) 100%, 0 100%);
+  /* Контурные линии на подложке: карта высот, как фон постера. */
+  /* Контурные линии на подложке: карта высот, как фон постера. Цвета взяты
+     готовыми полупрозрачными токенами, а не через color-mix: OBS возит с
+     собой CEF, который местами старше Chrome 111, и там color-mix мёртв. */
+  background-image:
+    repeating-radial-gradient(circle at 18% 120%,
+      transparent 0 13px, var(--w-line-1) 13px 14px),
+    repeating-radial-gradient(circle at 96% -20%,
+      transparent 0 17px, var(--w-line-2) 17px 18px);
+  /* Свечение через filter, а не box-shadow: тень от box-shadow рисуется по
+     прямоугольнику, и clip-path срезал бы её вместе с углом. drop-shadow
+     обводит уже обрезанную форму. */
+  box-shadow: inset 0 0 0 1px var(--w-frame-soft);
+  filter: drop-shadow(0 0 9px var(--w-frame-glow));
+}
+
+/* Обложка в жёсткой рамке с угловой меткой — как панель импланта. */
+.card[data-family="cyber"] .art {
+  position: relative;
+  box-shadow: inset 0 0 0 2px #05070a, 0 0 0 1px var(--w-frame);
+}
+.card[data-family="cyber"] .art::after {
+  content: "";
+  position: absolute; right: 3px; bottom: 3px;
+  width: 9px; height: 9px;
+  border-right: 2px solid var(--w-frame);
+  border-bottom: 2px solid var(--w-frame);
+}
+
+/* Хроматическая аберрация. Дышит еле заметно: если её зафиксировать, текст
+   читается как криво напечатанный, а не как сигнал с помехой. */
+.card[data-family="cyber"] .title {
+  text-shadow: -1px 0 var(--w-ab1), 1px 0 var(--w-ab2);
+  animation: abBreath 3.4s ease-in-out infinite;
+}
+
+.card[data-family="cyber"] .artist {
+  text-transform: uppercase;
+  font-size: calc(12px * var(--scale, 1));
+  letter-spacing: .1em;
+}
+
+/* Метки ✕✕✕ перед ником — прямо с постера. */
+.card[data-family="cyber"] .by::before {
+  content: "✕✕✕ ";
+  color: var(--w-ab1);
+  letter-spacing: .1em;
+}
+
+/* Скан-линии поверх всей плашки. Медленно ползут вниз. */
+.card[data-family="cyber"]::before {
+  content: "";
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+  background: repeating-linear-gradient(
+    180deg, rgba(0, 0, 0, .22) 0 1px, transparent 1px 3px);
+  animation: scanDrift 1.4s linear infinite;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+/* Вертикальная микрополоса вдоль правого края. Текст повторяется — это
+   ровно тот приём с плаката, и он же честно называет, что происходит. */
+.card[data-family="cyber"]::after {
+  content: "SONG REQUEST · SONG REQUEST · SONG REQUEST";
+  position: absolute; right: 6px; top: 0; bottom: 0;
+  writing-mode: vertical-rl;
+  font-family: Manrope, system-ui, sans-serif;
+  font-size: calc(7px * var(--scale, 1));
+  font-weight: 700;
+  letter-spacing: .22em;
+  color: var(--w-frame-soft);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.card[data-family="cyber"] .bar {
+  height: 3px;
+  border-radius: 0;
+  box-shadow: 0 0 8px var(--w-frame-glow);
+}
+
+/* Анимируем сразу text-shadow, а не своё свойство через @property.
+   @property появилось в Chrome 85, и без него незарегистрированное --ab не
+   интерполируется: вместо еле заметного дыхания получается один рывок на
+   середине цикла — то есть ровно то, чего этот блок пытается избежать. */
+@keyframes abBreath {
+  0%, 100% {
+    text-shadow: -.6px 0 var(--w-ab1), .6px 0 var(--w-ab2);
+  }
+  50% {
+    text-shadow: -1.6px 0 var(--w-ab1), 1.6px 0 var(--w-ab2);
+  }
+}
+@keyframes scanDrift { to { background-position: 0 3px; } }
+
+/* Мятный. Главный вариант: та самая пара мята + розовый. */
+.card[data-family="cyber"][data-variant="mint"] {
+  --w-frame-soft: rgba(5, 242, 199, .6); --w-frame-glow: rgba(5, 242, 199, .22);
+  --w-line-1: rgba(5, 242, 199, .14); --w-line-2: rgba(255, 111, 208, .12);
+  --w-bg: rgba(8, 10, 14, .86);
+  --w-ink: #d9fff0; --w-sub: rgba(217, 255, 240, .62);
+  --w-accent: #62ffb8; --w-frame: #05f2c7;
+  --w-ab1: #ff6fd0; --w-ab2: #35ffd0;
+  --w-bar: rgba(98, 255, 184, .18);
+}
+/* Сакура. Розовый ведёт, мята отвечает. */
+.card[data-family="cyber"][data-variant="sakura"] {
+  --w-frame-soft: rgba(255, 92, 192, .6); --w-frame-glow: rgba(255, 92, 192, .22);
+  --w-line-1: rgba(255, 92, 192, .14); --w-line-2: rgba(99, 255, 201, .12);
+  --w-bg: rgba(14, 8, 14, .87);
+  --w-ink: #ffe4f4; --w-sub: rgba(255, 228, 244, .6);
+  --w-accent: #ff7fd0; --w-frame: #ff5cc0;
+  --w-ab1: #63ffc9; --w-ab2: #ff9ee0;
+  --w-bar: rgba(255, 127, 208, .18);
+}
+/* Хром. Холодный синий с белым — техника без крови. */
+.card[data-family="cyber"][data-variant="chrome"] {
+  --w-frame-soft: rgba(63, 182, 255, .6); --w-frame-glow: rgba(63, 182, 255, .22);
+  --w-line-1: rgba(63, 182, 255, .14); --w-line-2: rgba(127, 92, 255, .12);
+  --w-bg: rgba(6, 12, 20, .88);
+  --w-ink: #e6f6ff; --w-sub: rgba(230, 246, 255, .58);
+  --w-accent: #4fd4ff; --w-frame: #3fb6ff;
+  --w-ab1: #7f5cff; --w-ab2: #4fe8ff;
+  --w-bar: rgba(79, 212, 255, .18);
+}
+/* Луна. Тихий вариант: приглушённый серо-голубой и тёплый отсвет.
+   Для тех, кому вся эта яркость в кадре не нужна. */
+.card[data-family="cyber"][data-variant="moon"] {
+  --w-frame-soft: rgba(106, 125, 148, .6); --w-frame-glow: rgba(232, 201, 138, .16);
+  --w-line-1: rgba(106, 125, 148, .13); --w-line-2: rgba(216, 194, 148, .1);
+  --w-bg: rgba(11, 14, 20, .9);
+  --w-ink: #dfe6ef; --w-sub: rgba(223, 230, 239, .55);
+  --w-accent: #e8c98a; --w-frame: #6a7d94;
+  --w-ab1: #8fa6c4; --w-ab2: #d8c294;
+  --w-bar: rgba(232, 201, 138, .16);
+}
+/* Тревога. Красный на чёрном: срыв, а не витрина. */
+.card[data-family="cyber"][data-variant="alert"] {
+  --w-frame-soft: rgba(255, 47, 69, .6); --w-frame-glow: rgba(255, 47, 69, .24);
+  --w-line-1: rgba(255, 47, 69, .14); --w-line-2: rgba(70, 224, 255, .1);
+  --w-bg: rgba(14, 6, 8, .9);
+  --w-ink: #ffe0e0; --w-sub: rgba(255, 224, 224, .58);
+  --w-accent: #ff3b52; --w-frame: #ff2f45;
+  --w-ab1: #ff2f45; --w-ab2: #46e0ff;
+  --w-bar: rgba(255, 59, 82, .2);
+}
+
+
+/* ═══ ДВИЖЕНИЕ ══════════════════════════════════════════════════════════
+
+   Пять состояний, и путать их нельзя:
+     .enter    — плашка появилась. Играет один раз, потом класс снимается.
+     .swap-out — трек меняется: старое содержимое уходит.
+     .swap-in  — новое содержимое пришло.
+     .leave    — плашка уходит. Играет до того, как её действительно спрячут.
+     без них   — плашка просто висит. Здесь живут постоянные анимации.
+
+   Любой из этих классов обязательно снимается после проигрыша: пока он
+   висит, его правила по специфичности глушат постоянные анимации — дыхание
+   неона, покачивание снимка, аберрацию импланта. Один раз на этом уже
+   обжёгся, и заметно это было не сразу.
+
+   Правила, по которым это сделано:
+
+   1. ВХОД СТУПЕНЬКОЙ. Всё разом — это вспышка, а не появление. Сначала
+      приезжает плашка, следом обложка, потом название, артист, ник, полоса.
+      Шаг 40–60 мс: меньше не читается, больше выглядит вяло.
+
+   2. ОТКУДА ПРИШЛО. Плашка входит от ближайшего края кадра, а не всегда
+      слева. Тикер сверху опускается сверху, тикер снизу поднимается снизу.
+      Иначе она пересекает весь кадр, чтобы встать в угол.
+
+   3. ЗАМЕДЛЕНИЕ, А НЕ РАВНОМЕРНОСТЬ. Линейный вход выглядит механическим.
+      Всё входит по экспоненте, тяжёлые предметы — с перелётом и осадкой.
+
+   4. ДВИЖЕНИЕ ГОВОРИТ, ЧТО ЭТО ЗА ВЕЩЬ. Пластинка идёт под бликом, кассету
+      вставляют, терминал печатает, трубка разгорается не с первого раза,
+      имплант сбоит. Ничего «просто красивого».
+
+   5. ПОСТОЯННОЕ — МЕДЛЕННОЕ. Виджет висит в кадре часами. То, что дёргается
+      раз в секунду, через двадцать минут раздражает даже автора. */
+
+.card {
+  /* Замедления. Названы по делу, а не по номерам. */
+  --e-out:   cubic-bezier(.16, 1, .3, 1);      /* экспонента: главный вход  */
+  --e-back:  cubic-bezier(.34, 1.56, .64, 1);  /* с перелётом и осадкой     */
+  --e-snap:  cubic-bezier(.2, .9, .1, 1);      /* короткий и резкий         */
+  --e-in:    cubic-bezier(.5, 0, .75, 0);      /* разгон: уход из кадра     */
+}
+
+/* Полоса времени растёт от левого края, а не из середины. */
+.bar { transform-origin: left center; }
+
+
+/* ── Общие ступени входа ────────────────────────────────────────────────
+   Ими собраны спокойные семейства. Характерным ниже написаны свои. */
+
+@keyframes stepUp   { from { opacity: 0; transform: translateY(7px); }  to { opacity: 1; transform: none; } }
+@keyframes stepSide { from { opacity: 0; transform: translateX(-7px); } to { opacity: 1; transform: none; } }
+@keyframes barGrow  { from { transform: scaleX(0); }                    to { transform: scaleX(1); } }
+@keyframes artPop   { from { opacity: 0; transform: scale(.86); }       to { opacity: 1; transform: none; } }
+
+
+/* ═══ 1. ЭФИР ═══════════════════════════════════════════════════════════
+   Грань прочерчивается сверху вниз, плашка раскрывается за ней, содержимое
+   набегает ступенькой. Читается как «включилось», а не «выехало». */
+
+.card[data-family="efir"].enter        { animation: efirOpen .44s var(--e-out) both; }
+.card[data-family="efir"].enter .art    { animation: artPop   .40s var(--e-back) .10s both; }
+.card[data-family="efir"].enter .title  { animation: stepSide .40s var(--e-out)  .14s both; }
+.card[data-family="efir"].enter .artist { animation: stepSide .40s var(--e-out)  .19s both; }
+.card[data-family="efir"].enter .by     { animation: stepSide .40s var(--e-out)  .24s both; }
+.card[data-family="efir"].enter .bar    { animation: barGrow  .55s var(--e-out)  .28s both; }
+
+@keyframes efirOpen {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+
+
+/* ═══ 2. ОТКРЫТЫЙ ТЕКСТ ═════════════════════════════════════════════════
+   Проступает из расфокуса, как титр. Строки набегают снизу вверх с разной
+   задержкой — это единственное, что держит композицию без подложки. */
+
+.card[data-family="bare"].enter .art    { animation: bareArt   .6s var(--e-out) both; }
+.card[data-family="bare"].enter .title  { animation: bareFocus .6s var(--e-out) .06s both; }
+.card[data-family="bare"].enter .artist { animation: bareFocus .6s var(--e-out) .14s both; }
+.card[data-family="bare"].enter .by     { animation: bareFocus .6s var(--e-out) .22s both; }
+.card[data-family="bare"].enter .bar    { animation: barGrow   .7s var(--e-out) .3s both; }
+
+@keyframes bareFocus {
+  from { opacity: 0; filter: blur(7px); transform: translateY(9px); }
+  70%  { opacity: 1; }
+  to   { opacity: 1; filter: blur(0);   transform: none; }
+}
+@keyframes bareArt {
+  from { opacity: 0; filter: blur(10px); transform: scale(1.08); }
+  to   { opacity: 1; filter: blur(0);    transform: none; }
+}
+
+
+/* ═══ 3. ТИКЕР ══════════════════════════════════════════════════════════
+   Выезжает из-за своего края — снизу вверх или сверху вниз, но никогда не
+   пересекает кадр. Следом слева направо разбегается содержимое, как на
+   светодиодной строке, которую только что включили. */
+
+.card[data-family="ticker"] { overflow: hidden; }
+
+.card[data-pos$="bottom"][data-family="ticker"].enter { animation: tickerUp   .42s var(--e-out) both; }
+.card[data-pos$="top"][data-family="ticker"].enter    { animation: tickerDown .42s var(--e-out) both; }
+
+.card[data-family="ticker"].enter .art    { animation: artPop   .3s var(--e-back) .14s both; }
+.card[data-family="ticker"].enter .title  { animation: stepSide .34s var(--e-snap) .18s both; }
+.card[data-family="ticker"].enter .artist { animation: stepSide .34s var(--e-snap) .24s both; }
+.card[data-family="ticker"].enter .by     { animation: stepSide .34s var(--e-snap) .3s both; }
+
+@keyframes tickerUp   { from { transform: translateY(102%); } to { transform: none; } }
+@keyframes tickerDown { from { transform: translateY(-102%); } to { transform: none; } }
+
+/* Блик по строке. Через background-position, а не через сдвиг: сдвинутый
+   слой уезжал бы за плашку, и полоса света ползла бы по всему кадру. */
+.card[data-family="ticker"]::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+  background: linear-gradient(100deg,
+    transparent 44%, rgba(255, 255, 255, .11) 50%, transparent 56%) no-repeat;
+  background-size: 260% 100%;
+  animation: strafe 9s linear infinite;
+  pointer-events: none;
+}
+
+
+/* ═══ 4. ВИНИЛ ══════════════════════════════════════════════════════════
+   Пластинку опускают на диск: она приходит сверху, чуть проседает под
+   собственным весом и встаёт. Тонарм заводится последним — как и в жизни,
+   сначала диск раскрутился.
+
+   Постоянные анимации (вращение этикетки, блик, эксцентриситет) объявлены
+   в блоке семейства и здесь не трогаются: иначе при снятии .enter они
+   стартовали бы заново и диск дёргался бы раз в трек. */
+
+.card[data-family="vinyl"].enter        { animation: vinylDrop .58s var(--e-back) both; }
+.card[data-family="vinyl"].enter .title  { animation: stepSide .45s var(--e-out) .14s both; }
+.card[data-family="vinyl"].enter .artist { animation: stepSide .45s var(--e-out) .2s both; }
+.card[data-family="vinyl"].enter .by     { animation: stepSide .45s var(--e-out) .26s both; }
+.card[data-family="vinyl"].enter .bar    { animation: barGrow  .6s var(--e-out) .3s both; }
+.card[data-family="vinyl"].enter .text::before,
+.card[data-family="vinyl"].enter .text::after { animation: armDrop .55s var(--e-back) .34s both; }
+
+@keyframes vinylDrop {
+  from { opacity: 0; transform: translateY(-16px) scale(.94); }
+  60%  { opacity: 1; transform: translateY(3px)   scale(1.01); }
+  to   { opacity: 1; transform: none; }
+}
+/* Тонарм заводится снаружи и садится на дорожку. Дальше его ведёт не
+   анимация, а настоящий прогресс трека — см. блок семейства. */
+@keyframes armDrop {
+  from { opacity: 0; transform: rotate(-54deg); }
+  to   { opacity: 1; transform: rotate(calc(-31deg + 15deg * var(--progress, 0))); }
+}
+
+
+/* ═══ 5. КАССЕТА ════════════════════════════════════════════════════════
+   Её вставляют. Заходит от своего края с перекосом, доезжает до упора,
+   отыгрывает назад и щёлкает на место. Катушки трогаются не сразу —
+   сначала лентопротяжка подхватила. */
+
+.card[data-pos^="left"][data-family="tape"].enter  { animation: tapeInL .5s var(--e-back) both; }
+.card[data-pos^="right"][data-family="tape"].enter { animation: tapeInR .5s var(--e-back) both; }
+
+.card[data-family="tape"].enter .title  { animation: stepSide .34s var(--e-snap) .2s both; }
+.card[data-family="tape"].enter .artist { animation: stepSide .34s var(--e-snap) .26s both; }
+.card[data-family="tape"].enter .by     { animation: stepSide .34s var(--e-snap) .32s both; }
+.card[data-family="tape"].enter .bar    { animation: barGrow  .5s var(--e-out) .36s both; }
+
+@keyframes tapeInL {
+  from { opacity: 0; transform: translateX(-26px) rotate(-2.6deg); }
+  55%  { opacity: 1; transform: translateX(4px)   rotate(.7deg); }
+  75%  {             transform: translateX(-1px)  rotate(-.2deg); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes tapeInR {
+  from { opacity: 0; transform: translateX(26px) rotate(2.6deg); }
+  55%  { opacity: 1; transform: translateX(-4px) rotate(-.7deg); }
+  75%  {             transform: translateX(1px)  rotate(.2deg); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Катушки. Подающая быстрее принимающей — на настоящей кассете так и есть,
+   и именно эта разница выдаёт, что лента идёт, а не просто крутятся круги. */
+.card[data-family="tape"]::before { animation: spinReel 1.5s linear infinite; }
+.card[data-family="tape"]::after  { animation: spinReel 2.7s linear infinite; }
+
+@keyframes spinReel { to { transform: rotate(360deg); } }
+
+
+/* ═══ 6. ТЕРМИНАЛ ═══════════════════════════════════════════════════════
+   Строку печатают, следом выводят остальные — построчно, как настоящий
+   вывод. Ничего не выезжает и не масштабируется: в терминале не бывает
+   плавных подъездов. */
+
+.card[data-family="terminal"].enter        { animation: termWake .12s steps(2) both; }
+.card[data-family="terminal"].enter .title  { animation: termType .62s steps(24) both; }
+.card[data-family="terminal"].enter .artist { animation: termLine .01s steps(1) .66s both; }
+.card[data-family="terminal"].enter .by     { animation: termLine .01s steps(1) .78s both; }
+.card[data-family="terminal"].enter .bar    { animation: barGrow  .4s linear .86s both; }
+
+@keyframes termWake { from { opacity: 0; } to { opacity: 1; } }
+@keyframes termType { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes termLine { from { opacity: 0; } to { opacity: 1; } }
+
+/* Развёртка лучевой трубки: медленно проходит сверху вниз и пропадает
+   надолго. Через background-position — сдвинутый слой вылезал бы за плашку. */
+.card[data-family="terminal"]::before {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+  background: linear-gradient(180deg,
+    transparent 0, rgba(255, 255, 255, .07) 6%, transparent 12%) no-repeat;
+  background-size: 100% 900%;
+  animation: sweepDown 7s linear infinite;
+  pointer-events: none;
+}
+
+
+/* ═══ 7. НЕОН ═══════════════════════════════════════════════════════════
+   Трубка разгорается с третьей попытки: два раза срывается, потом держит.
+   Дальше свечение чуть колышется — у живой трубки оно не стоит ровно.
+
+   Мерцание сидит на плашке, а не на названии: постоянное дыхание живёт на
+   названии, и два правила на один узел глушили бы друг друга. */
+
+.card[data-family="neon"].enter        { animation: tubeOn 1.05s steps(1, end) both; }
+.card[data-family="neon"].enter .artist { animation: stepUp .5s var(--e-out) .9s both; }
+.card[data-family="neon"].enter .by     { animation: stepUp .5s var(--e-out) 1s both; }
+.card[data-family="neon"].enter .bar    { animation: barGrow .6s var(--e-out) 1.05s both; }
+
+.card[data-family="neon"] .title { animation: neonBreath 4.5s ease-in-out infinite alternate; }
+
+@keyframes tubeOn {
+  0%   { opacity: 0; }
+  6%   { opacity: .9; }
+  9%   { opacity: .05; }
+  16%  { opacity: .95; }
+  19%  { opacity: .1; }
+  26%  { opacity: 1; }
+  30%  { opacity: .35; }
+  36%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+@keyframes neonBreath {
+  from { filter: brightness(1)    saturate(1); }
+  to   { filter: brightness(1.18) saturate(1.14); }
+}
+
+
+/* ═══ 8. СТЕКЛО ═════════════════════════════════════════════════════════
+   Примерзает к кадру: размытие сходит с сильного до рабочего, плашка
+   доезжает по масштабу. Содержимое проступает следом — сквозь него, а не
+   поверх. */
+
+.card[data-family="glass"] { overflow: hidden; }
+
+.card[data-family="glass"].enter        { animation: frostIn .66s var(--e-out) both; }
+.card[data-family="glass"].enter .art    { animation: artPop .5s var(--e-back) .12s both; }
+.card[data-family="glass"].enter .title  { animation: stepUp .5s var(--e-out) .16s both; }
+.card[data-family="glass"].enter .artist { animation: stepUp .5s var(--e-out) .22s both; }
+.card[data-family="glass"].enter .by     { animation: stepUp .5s var(--e-out) .28s both; }
+.card[data-family="glass"].enter .bar    { animation: barGrow .6s var(--e-out) .32s both; }
+
+@keyframes frostIn {
+  from { opacity: 0; transform: scale(.93); backdrop-filter: blur(44px); }
+  to   { opacity: 1; transform: none;       backdrop-filter: blur(var(--w-blur)); }
+}
+
+/* Отсвет проходит по стеклу редко и медленно. */
+.card[data-family="glass"]::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+  border-radius: inherit;
+  background: linear-gradient(115deg,
+    transparent 42%, rgba(255, 255, 255, .15) 50%, transparent 58%) no-repeat;
+  background-size: 280% 100%;
+  animation: strafe 11s ease-in-out infinite;
+  pointer-events: none;
+}
+
+
+/* ═══ 9. ПОЛОСА ═════════════════════════════════════════════════════════
+   Черта прочерчивается сверху вниз, текст догоняет. Самое тихое семейство —
+   и движение у него самое короткое: полсекунды и всё замерло навсегда. */
+
+.card[data-family="stripe"] { border-left: 0; }
+.card[data-family="stripe"]::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: var(--w-edge);
+  background: var(--w-accent);
+  transform-origin: top center;
+}
+.card[data-family="stripe"][data-variant="double"]::before {
+  background: linear-gradient(90deg,
+    var(--w-accent) 0 38%, transparent 38% 62%, var(--w-accent) 62% 100%);
+}
+
+.card[data-family="stripe"].enter::before  { animation: drawDown .3s var(--e-snap) both; }
+.card[data-family="stripe"].enter .title  { animation: stepSide .38s var(--e-out) .16s both; }
+.card[data-family="stripe"].enter .artist { animation: stepSide .38s var(--e-out) .21s both; }
+.card[data-family="stripe"].enter .by     { animation: stepSide .38s var(--e-out) .26s both; }
+
+@keyframes drawDown { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+
+/* ═══ 10. КАРТОЧКА ══════════════════════════════════════════════════════
+   Снимок кладут в кадр: он падает с поворотом, отыгрывает и замирает.
+   Подпись проявляется после — сначала лёг, потом прочитали. */
+
+.card[data-family="card"].enter        { animation: photoDrop .68s var(--e-back) both; }
+.card[data-family="card"].enter .title  { animation: stepUp .45s var(--e-out) .3s both; }
+.card[data-family="card"].enter .artist { animation: stepUp .45s var(--e-out) .36s both; }
+.card[data-family="card"].enter .by     { animation: stepUp .45s var(--e-out) .42s both; }
+.card[data-family="card"].enter .bar    { animation: barGrow .5s var(--e-out) .46s both; }
+
+@keyframes photoDrop {
+  from { opacity: 0; transform: translateY(-26px) rotate(-4deg) scale(1.04); }
+  50%  { opacity: 1; transform: translateY(3px)   rotate(1.6deg) scale(1); }
+  72%  {             transform: translateY(-1px)  rotate(-.7deg); }
+  88%  {             transform: translateY(0)     rotate(.25deg); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Снимок лежит в кадре, а не приклеен: еле заметно дышит. */
+.card[data-family="card"] .art { animation: photoFloat 9s ease-in-out infinite alternate; }
+@keyframes photoFloat {
+  from { transform: translateY(0) rotate(0); }
+  to   { transform: translateY(-2px) rotate(.35deg); }
+}
+
+
+/* ═══ 11. ИМПЛАНТ ═══════════════════════════════════════════════════════
+   Включается сбоем: канал ловится не сразу, картинку рвёт полосами, цвет
+   расходится. Через полсекунды стабилизируется и дальше живёт с помехой.
+
+   На названии два движения сразу — разрыв на входе и постоянная аберрация.
+   Они записаны одним правилом через запятую: разными правилами второе
+   молча отменило бы первое. */
+
+.card[data-family="cyber"].enter { animation: glitchIn .52s steps(1, end) both; }
+.card[data-family="cyber"].enter .title {
+  animation: glitchSlice .52s steps(1, end) both,
+             abBreath 3.4s ease-in-out .52s infinite;
+}
+.card[data-family="cyber"].enter .artist { animation: chan .3s steps(1) .3s both; }
+.card[data-family="cyber"].enter .by     { animation: chan .3s steps(1) .38s both; }
+.card[data-family="cyber"].enter .bar    { animation: barGrow .4s var(--e-snap) .46s both; }
+
+@keyframes glitchIn {
+  0%   { opacity: 0;  transform: translateX(-10px) scaleX(1.05) skewX(6deg); }
+  12%  { opacity: 1;  transform: translateX(8px)   scaleX(.96)  skewX(-4deg); }
+  24%  { opacity: .25; transform: translateX(-5px) skewX(3deg); }
+  38%  { opacity: 1;  transform: translateX(4px)   scaleY(1.07); }
+  52%  { opacity: .8; transform: translateX(-2px)  skewX(-1.5deg); }
+  66%  { opacity: 1;  transform: translateX(1px); }
+  80%  { opacity: .95; transform: none; }
+  100% { opacity: 1;  transform: none; }
+}
+/* Название рвётся полосами — тот самый разрыв кадра. */
+@keyframes glitchSlice {
+  0%   { clip-path: inset(42% 0 36% 0); transform: translateX(-7px); }
+  16%  { clip-path: inset(6% 0 74% 0);  transform: translateX(6px); }
+  32%  { clip-path: inset(68% 0 10% 0); transform: translateX(-4px); }
+  48%  { clip-path: inset(22% 0 50% 0); transform: translateX(3px); }
+  64%  { clip-path: inset(54% 0 28% 0); transform: translateX(-2px); }
+  80%  { clip-path: inset(0 0 0 0);     transform: translateX(1px); }
+  100% { clip-path: inset(0 0 0 0);     transform: none; }
+}
+/* Строки ловятся, как канал: два срыва и есть картинка. */
+@keyframes chan {
+  0%   { opacity: 0; transform: translateX(-4px); }
+  35%  { opacity: .5; transform: translateX(3px); }
+  70%  { opacity: 0; }
+  100% { opacity: 1; transform: none; }
+}
+
+/* Раз в семь секунд — короткий срыв. Чаще утомляет, реже не замечают. */
+.card[data-family="cyber"] .art { animation: implantTick 7s steps(1, end) infinite; }
+@keyframes implantTick {
+  0%, 91%   { transform: none; filter: none; }
+  92%       { transform: translate(-2px, 1px); filter: hue-rotate(50deg) saturate(1.6); }
+  94%       { transform: translate(2px, -1px); filter: hue-rotate(-40deg); }
+  96%       { transform: translate(-1px, 0);   filter: saturate(1.3); }
+  98%, 100% { transform: none; filter: none; }
+}
+
+
+/* ── Общее ──────────────────────────────────────────────────────────────
+   Пробег бликов и развёрток. Одна кривая на всех: они и должны идти
+   одинаково, отличаются только направлением и тем, по чему бегут. */
+
+@keyframes strafe {
+  0%        { background-position: -60% 0; }
+  40%, 100% { background-position: 160% 0; }
+}
+@keyframes sweepDown {
+  0%        { background-position: 0 -20%; }
+  55%, 100% { background-position: 0 120%; }
+}
+
+
+/* ── СМЕНА ТРЕКА ────────────────────────────────────────────────────────
+
+   Смена трека — не «появление ещё раз». Плашка остаётся на месте, меняется
+   её содержимое, и делается это в две фазы:
+
+     .swap-out — старое уходит. Коротко, 130–240 мс.
+     (в этот момент JS подменяет текст и обложку)
+     .swap-in  — новое приходит. Дольше, со ступенькой.
+
+   Одной фазой это выглядит подделкой: текст мгновенно подменяется, и потом
+   «новый» въезжает — но глаз успевает заметить подмену до анимации. Две
+   фазы убирают этот кадр: к моменту подмены старого уже не видно.
+
+   Длительность ухода объявлена токеном --swap-out и читается из JS. Так у
+   каждого семейства своя фаза, а расписание живёт там же, где анимация, —
+   а не двумя числами в разных файлах, которые однажды разъедутся.
+
+   Уходит всегда содержимое, а не плашка: подложка на месте — значит вещь
+   та же, просто на ней теперь другой трек. Исключение — «Карточка»: там
+   плашка и есть снимок, снимок целиком и меняется. */
+
+.card { --swap-out: 150ms; }
+
+
+/* ── Эфир: содержимое утягивает под грань, новое выезжает из-под неё ──── */
+
+.card[data-family="efir"].swap-out .text { animation: efirEat 150ms var(--e-in) both; }
+.card[data-family="efir"].swap-in  .text { animation: efirSpit 260ms var(--e-out) both; }
+.card[data-family="efir"].swap-in .title  { animation: stepSide .34s var(--e-out) .06s both; }
+.card[data-family="efir"].swap-in .artist { animation: stepSide .34s var(--e-out) .11s both; }
+.card[data-family="efir"].swap-in .by     { animation: stepSide .34s var(--e-out) .16s both; }
+.card[data-family="efir"].swap-in .bar    { animation: barGrow  .45s var(--e-out) .2s both; }
+
+@keyframes efirEat  { to   { clip-path: inset(0 0 0 100%); transform: translateX(-5px); } }
+@keyframes efirSpit { from { clip-path: inset(0 0 0 100%); } to { clip-path: inset(0 0 0 0); } }
+
+
+/* ── Открытый текст: расфокус и обратно, как перевод объектива ────────── */
+
+.card[data-family="bare"] { --swap-out: 180ms; }
+.card[data-family="bare"].swap-out .text { animation: defocus 180ms var(--e-in) both; }
+.card[data-family="bare"].swap-in .title  { animation: bareFocus .46s var(--e-out) both; }
+.card[data-family="bare"].swap-in .artist { animation: bareFocus .46s var(--e-out) .07s both; }
+.card[data-family="bare"].swap-in .by     { animation: bareFocus .46s var(--e-out) .14s both; }
+.card[data-family="bare"].swap-in .bar    { animation: barGrow   .5s var(--e-out) .18s both; }
+
+@keyframes defocus { to { opacity: 0; filter: blur(8px); transform: translateY(-7px); } }
+
+
+/* ── Тикер: строка проворачивается, как табло на вокзале ──────────────── */
+
+.card[data-family="ticker"] { --swap-out: 140ms; }
+.card[data-family="ticker"].swap-out .text { animation: rollUp   140ms var(--e-in) both; }
+.card[data-family="ticker"].swap-in  .text { animation: rollFrom 300ms var(--e-back) both; }
+
+@keyframes rollUp   { to   { opacity: 0; transform: translateY(-105%); } }
+@keyframes rollFrom { from { opacity: 0; transform: translateY(105%); } to { opacity: 1; transform: none; } }
+
+
+/* ── Винил: тонарм снимают, пластинка разгоняется, тонарм возвращают ──── */
+
+.card[data-family="vinyl"] { --swap-out: 200ms; }
+
+/* Уход: игла поднимается с дорожки — ровно то, что делают руками, когда
+   меняют трек. */
+.card[data-family="vinyl"].swap-out .text::before,
+.card[data-family="vinyl"].swap-out .text::after { animation: armLift 200ms var(--e-in) both; }
+.card[data-family="vinyl"].swap-out .title,
+.card[data-family="vinyl"].swap-out .artist,
+.card[data-family="vinyl"].swap-out .by { animation: fadeOff 200ms var(--e-in) both; }
+
+/* Приход: этикетка коротко разгоняется и садится на рабочие обороты — так
+   читается, что диск сменили, а не просто подменили подпись. */
+.card[data-family="vinyl"].swap-in .art img,
+.card[data-family="vinyl"].swap-in .art .no {
+  animation: spinBurst .85s cubic-bezier(.15, .85, .3, 1) both,
+             discSpin 1.8s linear .85s infinite;
+}
+.card[data-family="vinyl"].swap-in .title  { animation: stepSide .4s var(--e-out) .06s both; }
+.card[data-family="vinyl"].swap-in .artist { animation: stepSide .4s var(--e-out) .12s both; }
+.card[data-family="vinyl"].swap-in .by     { animation: stepSide .4s var(--e-out) .18s both; }
+.card[data-family="vinyl"].swap-in .bar    { animation: barGrow  .5s var(--e-out) .22s both; }
+.card[data-family="vinyl"].swap-in .text::before,
+.card[data-family="vinyl"].swap-in .text::after { animation: armDrop .5s var(--e-back) .3s both; }
+
+@keyframes armLift   { to { transform: rotate(-52deg); } }
+@keyframes fadeOff   { to { opacity: 0; transform: translateX(6px); } }
+@keyframes spinBurst { from { transform: rotate(0); } to { transform: rotate(1080deg); } }
+
+
+/* ── Кассета: перемотка. Счётчик дёргается, катушки уходят в разгон ───── */
+
+.card[data-family="tape"] { --swap-out: 190ms; }
+.card[data-family="tape"].swap-out .text { animation: rewind 190ms steps(4) both; }
+.card[data-family="tape"].swap-in  .title  { animation: clack .3s var(--e-back) both; }
+.card[data-family="tape"].swap-in  .artist { animation: clack .3s var(--e-back) .05s both; }
+.card[data-family="tape"].swap-in  .by     { animation: clack .3s var(--e-back) .1s both; }
+.card[data-family="tape"].swap-in  .bar    { animation: barGrow .4s var(--e-out) .14s both; }
+
+/* Катушки на перемотке идут втрое быстрее, потом возвращаются к своему
+   рабочему ходу. Разгон — три оборота, дальше как обычно. */
+.card[data-family="tape"].swap-out::before,
+.card[data-family="tape"].swap-in::before { animation: spinReel .3s linear 0s 4, spinReel 1.5s linear 1.2s infinite; }
+.card[data-family="tape"].swap-out::after,
+.card[data-family="tape"].swap-in::after  { animation: spinReel .5s linear 0s 3, spinReel 2.7s linear 1.5s infinite; }
+
+@keyframes rewind {
+  0%   { opacity: 1; transform: translateX(0); }
+  25%  { opacity: .7; transform: translateX(3px); }
+  50%  { opacity: .4; transform: translateX(-4px); }
+  75%  { opacity: .2; transform: translateX(2px); }
+  100% { opacity: 0; transform: translateX(-6px); }
+}
+@keyframes clack {
+  from { opacity: 0; transform: translateX(-7px); }
+  to   { opacity: 1; transform: none; }
+}
+
+
+/* ── Терминал: строку стирают забоем и печатают новую ─────────────────── */
+
+.card[data-family="terminal"] { --swap-out: 240ms; }
+/* Забой идёт справа налево — как настоящий backspace, а не как стирание
+   ластиком слева. */
+.card[data-family="terminal"].swap-out .title  { animation: erase 240ms steps(16) both; }
+.card[data-family="terminal"].swap-out .artist { animation: erase 160ms steps(10) both; }
+.card[data-family="terminal"].swap-out .by     { animation: erase 130ms steps(8) both; }
+
+.card[data-family="terminal"].swap-in .title  { animation: termType .45s steps(18) both; }
+.card[data-family="terminal"].swap-in .artist { animation: termLine .01s steps(1) .47s both; }
+.card[data-family="terminal"].swap-in .by     { animation: termLine .01s steps(1) .56s both; }
+.card[data-family="terminal"].swap-in .bar    { animation: barGrow .35s linear .6s both; }
+
+@keyframes erase { to { clip-path: inset(0 100% 0 0); } }
+
+
+/* ── Неон: трубка гаснет и зажигается заново ──────────────────────────── */
+
+.card[data-family="neon"] { --swap-out: 170ms; }
+.card[data-family="neon"].swap-out .text { animation: tubeOff 170ms steps(1, end) both; }
+.card[data-family="neon"].swap-in  .text { animation: tubeOn .8s steps(1, end) both; }
+
+@keyframes tubeOff {
+  0%   { opacity: 1; }
+  30%  { opacity: .2; }
+  45%  { opacity: .7; }
+  60%  { opacity: .05; }
+  100% { opacity: 0; }
+}
+
+
+/* ── Стекло: содержимое уходит в матовость и выходит из неё ───────────── */
+
+.card[data-family="glass"] { --swap-out: 190ms; }
+.card[data-family="glass"].swap-out .text { animation: sink 190ms var(--e-in) both; }
+.card[data-family="glass"].swap-in .title  { animation: emerge .46s var(--e-out) both; }
+.card[data-family="glass"].swap-in .artist { animation: emerge .46s var(--e-out) .07s both; }
+.card[data-family="glass"].swap-in .by     { animation: emerge .46s var(--e-out) .13s both; }
+.card[data-family="glass"].swap-in .bar    { animation: barGrow .5s var(--e-out) .17s both; }
+
+@keyframes sink   { to { opacity: 0; filter: blur(9px); transform: scale(.96); } }
+@keyframes emerge {
+  from { opacity: 0; filter: blur(9px); transform: scale(1.05); }
+  to   { opacity: 1; filter: blur(0);   transform: none; }
+}
+
+
+/* ── Полоса: черта коротко вспыхивает, текст переезжает ───────────────── */
+
+.card[data-family="stripe"] { --swap-out: 130ms; }
+.card[data-family="stripe"].swap-out .text { animation: slideOff 130ms var(--e-in) both; }
+/* Единственное движение самой черты за всё время: короткая вспышка, чтобы
+   смена трека читалась и в самом тихом семействе. */
+.card[data-family="stripe"].swap-out::before,
+.card[data-family="stripe"].swap-in::before { animation: edgeFlash .5s var(--e-out) both; }
+.card[data-family="stripe"].swap-in .title  { animation: stepSide .34s var(--e-out) both; }
+.card[data-family="stripe"].swap-in .artist { animation: stepSide .34s var(--e-out) .05s both; }
+.card[data-family="stripe"].swap-in .by     { animation: stepSide .34s var(--e-out) .1s both; }
+
+@keyframes slideOff  { to { opacity: 0; transform: translateX(-8px); } }
+@keyframes edgeFlash {
+  0%   { filter: brightness(2.4); transform: scaleY(1); }
+  40%  { filter: brightness(1);   transform: scaleY(1); }
+  100% { filter: brightness(1); }
+}
+
+
+/* ── Карточка: верхний снимок сдвигают, следующий падает ──────────────── */
+
+/* Здесь плашка и есть снимок, поэтому меняется она целиком, а не подпись
+   на ней. Стопка снимков: верхний убрали, следующий лёг. */
+.card[data-family="card"] { --swap-out: 220ms; }
+.card[data-family="card"].swap-out { animation: photoOff 220ms var(--e-in) both; }
+.card[data-family="card"].swap-in  { animation: photoDrop .6s var(--e-back) both; }
+.card[data-family="card"].swap-in .title  { animation: stepUp .4s var(--e-out) .26s both; }
+.card[data-family="card"].swap-in .artist { animation: stepUp .4s var(--e-out) .32s both; }
+.card[data-family="card"].swap-in .by     { animation: stepUp .4s var(--e-out) .38s both; }
+
+@keyframes photoOff {
+  to { opacity: 0; transform: translateX(16px) translateY(6px) rotate(4deg) scale(.97); }
+}
+
+
+/* ── Имплант: сигнал срывается в строку и ловится заново ──────────────── */
+
+.card[data-family="cyber"] { --swap-out: 160ms; }
+/* Схлопывание в горизонтальную полосу — то, как умирает картинка на
+   кинескопе. Дальше канал ловится обратно. */
+.card[data-family="cyber"].swap-out .text { animation: signalLoss 160ms steps(1, end) both; }
+.card[data-family="cyber"].swap-in  .text { animation: glitchIn .34s steps(1, end) both; }
+.card[data-family="cyber"].swap-in  .title {
+  animation: glitchSlice .34s steps(1, end) both,
+             abBreath 3.4s ease-in-out .34s infinite;
+}
+
+@keyframes signalLoss {
+  0%   { opacity: 1;  transform: none; }
+  30%  { opacity: .8; transform: translateX(5px) scaleY(.85); }
+  55%  { opacity: .5; transform: translateX(-4px) scaleY(.4); }
+  80%  { opacity: .3; transform: scaleY(.12); }
+  100% { opacity: 0;  transform: scaleY(.04); }
+}
+
+
+/* ── Уход ───────────────────────────────────────────────────────────────
+   Плашка не гаснет на месте — она уходит туда, откуда пришла, и быстрее,
+   чем приходила. Уход всегда короче входа: приход хотят разглядеть,
+   уход — нет. */
+
+.card[data-pos^="left"].leave  { animation: outLeft  .3s var(--e-in) both; }
+.card[data-pos^="right"].leave { animation: outRight .3s var(--e-in) both; }
+.card[data-pos$="bottom"][data-family="ticker"].leave { animation: outDown .3s var(--e-in) both; }
+.card[data-pos$="top"][data-family="ticker"].leave    { animation: outUp   .3s var(--e-in) both; }
+.card[data-family="card"].leave { animation: outPhoto .34s var(--e-in) both; }
+
+@keyframes outLeft  { to { opacity: 0; transform: translateX(-14px) scale(.97); } }
+@keyframes outRight { to { opacity: 0; transform: translateX(14px)  scale(.97); } }
+@keyframes outDown  { to { opacity: 0; transform: translateY(102%); } }
+@keyframes outUp    { to { opacity: 0; transform: translateY(-102%); } }
+@keyframes outPhoto { to { opacity: 0; transform: translateY(12px) rotate(2.5deg) scale(.96); } }
+
+
+/* ── Тишина ─────────────────────────────────────────────────────────────
+   Всё движение обязано уметь останавливаться: и по просьбе системы, и по
+   настройке. Узлы перечислены явно — анимации висят и на псевдоэлементах,
+   «звёздочкой» их не достать. */
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .card.enter, .card.leave, .card.swap-out, .card.swap-in,
+  .card::before, .card::after,
+  .card .art, .card .art img, .card .art .no,
+  .card .art::before, .card .art::after,
+  .card .text, .card .text::before, .card .text::after,
+  .card .title, .card .title::after,
+  .card .artist, .card .by, .card .bar {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.card[data-motion="off"], .card[data-motion="off"].enter, .card[data-motion="off"].leave,
+.card[data-motion="off"].swap-out, .card[data-motion="off"].swap-in,
+.card[data-motion="off"]::before, .card[data-motion="off"]::after,
+.card[data-motion="off"] .art, .card[data-motion="off"] .art img,
+.card[data-motion="off"] .art .no,
+.card[data-motion="off"] .art::before, .card[data-motion="off"] .art::after,
+.card[data-motion="off"] .text,
+.card[data-motion="off"] .text::before, .card[data-motion="off"] .text::after,
+.card[data-motion="off"] .title, .card[data-motion="off"] .title::after,
+.card[data-motion="off"] .artist, .card[data-motion="off"] .by, .card[data-motion="off"] .bar {
+  animation: none !important;
+  transition: none !important;
+}

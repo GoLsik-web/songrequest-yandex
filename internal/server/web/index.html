@@ -1,0 +1,920 @@
+<!doctype html>
+<html lang="ru" class="thin-scroll">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Заказ музыки</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/fonts/fonts.css">
+<link rel="stylesheet" href="/static/widget.css">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/setup.css">
+</head>
+<body>
+
+<!-- Иконки вставляются сюда при загрузке: <use> на внешний файл
+     Chrome не поддерживает, поэтому спрайт живёт прямо в странице. -->
+<div id="sprite" hidden></div>
+
+<!-- Своя полоса заголовка. Показывается только в окне программы: в браузере
+     двигать и закрывать нечего, и setup.js её не включает. Системную полосу
+     окно снимает с себя само — она белая и в «Эфир» не вписывается. -->
+<header class="titlebar" id="titlebar">
+  <div class="tb-grip">
+    <span class="live"></span>
+    <span class="name">Заказ музыки</span>
+    <span class="now" id="titlebar-now"></span>
+  </div>
+  <button class="win-btn win-min" title="Свернуть" aria-label="Свернуть">
+    <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1 6h10" stroke="currentColor" stroke-width="1.4"/></svg>
+  </button>
+  <button class="win-btn win-max" title="Развернуть" aria-label="Развернуть">
+    <svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="1"
+      fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+  </button>
+  <button class="win-btn win-close close" title="Свернуть к часам" aria-label="Свернуть к часам">
+    <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.4"/></svg>
+  </button>
+</header>
+
+<header class="status-bar">
+  <!-- Подключения. Раньше это была лента из пяти ячеек с «Не настроено» во всю
+       ширину экрана — она кричала о том, что и так известно, каждую секунду
+       эфира. Теперь одна иконка с точкой: точка красная, если что-то
+       отвалилось, серая, если что-то не настроено, лаймовая, когда всё на
+       месте. Подробности — в окошке по клику. -->
+  <div class="conn-slot">
+    <button class="conn-btn" id="conn-toggle" aria-expanded="false" aria-haspopup="dialog">
+      <svg aria-hidden="true"><use href="#i-plug-zap"></use></svg>
+      <i class="conn-dot"></i>
+    </button>
+    <div class="conn-pop" id="conn-pop" role="dialog" aria-label="Подключения" hidden>
+      <div class="conn-pop-head">Подключения</div>
+      <div class="conns" id="conns"></div>
+    </div>
+  </div>
+
+  <div class="bar-gap"></div>
+
+  <div class="bar-tail">
+    <!-- Кнопка обновления. Её здесь нет почти всегда: она появляется только
+         после того, как человек нажал «Проверить обновления» и новая версия
+         правда нашлась. См. renderUpdate в app.js. -->
+    <button class="tail-btn go" id="update-now" hidden></button>
+    <button class="tail-btn" id="widget-toggle" aria-expanded="false">
+      <svg aria-hidden="true"><use href="#i-monitor"></use></svg>
+      виджет
+    </button>
+    <button class="tail-btn" id="log-toggle" aria-expanded="false">
+      <svg aria-hidden="true"><use href="#i-history"></use></svg>
+      хроника
+    </button>
+    <button class="tail-btn" id="settings-toggle" aria-expanded="false">
+      <svg aria-hidden="true"><use href="#i-settings"></use></svg>
+      настройки
+    </button>
+    <span class="ver" id="version"></span>
+  </div>
+</header>
+
+<!-- Код для входа в Twitch: пока он не введён, это самое важное на экране. -->
+<div id="banner" hidden></div>
+
+<main>
+  <section class="stage" id="stage"></section>
+
+  <!-- Плейлисты, ждущие решения. Стоят выше очереди нарочно: это то, что
+       требует действия человека, а очередь идёт сама. Пусто — блока нет
+       вовсе, чтобы он не занимал место в обычный вечер. -->
+  <section class="pls" id="playlists" hidden></section>
+
+  <!-- Заказы, которых нет в Spotify и которые ждут решения: играть ли их с
+       YouTube. Появляются только в режиме «спрашивать» (вкладка «YouTube»).
+       Раньше такой заказ включался молча, и стример не понимал, откуда звук. -->
+  <section class="pls" id="ytasks" hidden></section>
+
+  <div class="lower">
+    <section class="orders">
+      <div class="kicker">
+        Очередь <span class="cnt zero" id="orders-count">0</span>
+        <span class="rest" id="queue-rest"></span>
+        <span class="queue-tools">
+          <button class="link-btn" id="queue-pause"></button>
+          <button class="link-btn danger" id="queue-clear">очистить</button>
+        </span>
+      </div>
+      <div id="orders"></div>
+    </section>
+
+    <aside class="side">
+      <div class="kicker">За эту сессию</div>
+      <div class="tally" id="tally"></div>
+
+      <div class="kicker">Хроника</div>
+      <ul class="feed" id="feed"></ul>
+      <button class="more" id="feed-more" hidden></button>
+    </aside>
+  </div>
+</main>
+
+<!-- Меню разделов.
+
+     Раньше «настройки», «виджет» и «хроника» были тремя длинными кусками,
+     дописанными снизу к главному экрану: нажатие на кнопку просто прокручивало
+     страницу вниз. Найти в этой простыне нужное было нечем, а возвращаться
+     наверх приходилось прокруткой же.
+
+     Теперь это отдельное меню поверх страницы: слева разделы, справа один
+     раздел за раз. Сами разделы не переписаны — они переехали внутрь как есть,
+     со всеми своими id, поэтому весь остальной код о переезде не знает. -->
+<div class="menu" id="menu" hidden>
+  <div class="menu-scrim" data-menu-close></div>
+  <div class="menu-sheet" role="dialog" aria-modal="true" aria-label="Меню">
+
+    <aside class="menu-rail thin-scroll">
+      <button class="menu-back" id="menu-back">
+        <svg aria-hidden="true"><use href="#i-arrow-left"></use></svg>
+        Назад
+      </button>
+      <nav class="menu-nav" id="menu-nav">
+        <button class="menu-item" data-menu="settings">
+          <svg aria-hidden="true"><use href="#i-settings"></use></svg>Настройки
+        </button>
+        <button class="menu-item" data-menu="youtube">
+          <svg aria-hidden="true"><use href="#i-youtube"></use></svg>YouTube
+        </button>
+        <button class="menu-item" data-menu="widget">
+          <svg aria-hidden="true"><use href="#i-monitor"></use></svg>Виджеты
+        </button>
+        <button class="menu-item" data-menu="log">
+          <svg aria-hidden="true"><use href="#i-history"></use></svg>Хроника
+        </button>
+      </nav>
+      <div class="menu-tail">Esc — закрыть</div>
+    </aside>
+
+    <div class="menu-body thin-scroll" id="menu-body">
+
+<!-- Настройки. Раньше это была одна сетка из девяти блоков подряд: чтобы
+     добраться до последнего, приходилось прокручивать экран целиком. Теперь
+     блоки разложены по четырём вкладкам, и на экране всегда только те,
+     которые сейчас нужны. Сами блоки не тронуты — переехали как есть. -->
+<section class="panel" id="settings" hidden>
+
+  <div class="tabs" id="settings-tabs">
+    <button class="tab on" data-tab="conn">Подключения</button>
+    <button class="tab" data-tab="orders">Заказы</button>
+    <button class="tab" data-tab="fallback">Если трека нет</button>
+    <button class="tab" data-tab="misc">Прочее</button>
+  </div>
+
+  <div class="grid tab-pane" id="tab-conn">
+
+    <div class="col">
+      <div class="kicker">Spotify</div>
+      <label class="field">
+        <span>Client ID — из инструкции, шаг 3</span>
+        <input type="text" id="client-id" spellcheck="false" autocomplete="off"
+               placeholder="набор букв и цифр">
+      </label>
+      <div class="acts">
+        <button class="act small" id="save-id">Сохранить</button>
+        <button class="act small key" data-do="login">Подключить Spotify</button>
+        <button class="act small" data-do="check">Проверить связь</button>
+        <button class="act small" data-do="probe">Проверить поиск</button>
+        <button class="act small risky" data-do="logout">Отключить</button>
+      </div>
+      <div class="account" id="account"></div>
+      <div class="hint" id="redirect"></div>
+      <div class="hint" id="probe-out"></div>
+
+      <label class="field" style="margin-top:16px">
+        <span>Обход блокировок — ключ от VPN или ссылка на подписку</span>
+        <input type="password" id="tunnel-key" spellcheck="false" autocomplete="off"
+               placeholder="vless://… , trojan://… , ss://… или https://…">
+      </label>
+      <div class="acts">
+        <button class="act small key" data-do="tunnel-on">Включить обход</button>
+        <button class="act small" data-do="tunnel-check">Проверить обход</button>
+        <button class="act small" data-do="tunnel-off">Выключить</button>
+        <button class="act small risky" data-do="tunnel-forget">Забыть ключ</button>
+      </div>
+      <div class="account" id="tunnel-state"></div>
+      <div class="hint">
+        Вставь сюда ключ от своего VPN или ссылку на подписку — приложение само
+        скачает всё нужное, переберёт серверы и оставит тот, через который
+        Spotify отвечает. Никаких отдельных программ и консолей запускать не
+        надо.
+        <br><br>
+        <b>Ссылок можно вставить несколько — через пробел.</b> Сервисы подписки
+        обычно дают запасные адреса на случай, если основной заблокируют.
+        Приложение обходит их по очереди и берёт первый, который ответил. А
+        если не ответил ни один — поднимет обход по списку серверов,
+        запомненному в прошлый раз.
+        <br><br>
+        Через обход пойдут <b>только запросы этого приложения к Spotify</b>.
+        Twitch, чат, донаты, игра и загрузка стрима останутся на прямом
+        канале — в отличие от VPN, который уводит туда же весь компьютер.
+        <br><br>
+        <b>Ключ никому не виден.</b> Он ложится в хранилище паролей Windows,
+        в настройках и в архиве диагностики его нет, в панели он больше не
+        показывается — ни целиком, ни звёздочками. Если ключ сменился, вставь
+        новый поверх; кнопка «Забыть ключ» стирает его совсем.
+        <br><br>
+        <b>Вход в Spotify всё равно один раз через VPN.</b> Кнопка «Подключить
+        Spotify» открывает страницу входа, а она идёт мимо обхода. Включи VPN,
+        войди, выключи VPN — дальше приложение живёт на обходе само.
+      </div>
+
+      <label class="field" style="margin-top:16px">
+        <span>Прокси для Spotify — если обход поднимаешь сам, своей программой</span>
+        <input type="text" id="proxy" spellcheck="false" autocomplete="off"
+               placeholder="socks5://адрес:порт">
+      </label>
+      <div class="acts">
+        <button class="act small key" data-do="proxy-detect">Найти автоматически</button>
+        <button class="act small" id="save-proxy">Сохранить</button>
+        <button class="act small" data-do="check">Проверить связь</button>
+      </div>
+      <div class="hint">
+        Это старый путь, для тех, у кого обход уже поднят своей программой:
+        Psiphon, свой клиент VPN, что угодно, что даёт локальный прокси.
+        Вписанный сюда адрес работает так же, как обход выше, — только его
+        приложение не поднимает и не следит, жив ли он.
+        <br><br>
+        <b>Включён обход выше — он главнее.</b> Двух посредников подряд не
+        бывает, поэтому пока обход работает, это поле не используется.
+        <br><br>
+        <b>Стало медленно везде?</b> Значит твоя программа обхода увела за
+        собой весь компьютер, а не только нас. У Psiphon это системный прокси
+        Windows: <b>Win+I → Сеть и Интернет → Прокси</b> → «Использовать
+        прокси-сервер» выключить. У остальных — режим «весь трафик через VPN»
+        в их же настройках. Нам это не нужно, мы ходим на 127.0.0.1 сами.
+        <br><br>
+        <b>Программе Spotify посредник не нужен.</b> Она ходит другими
+        адресами, и если музыка у тебя играет без VPN — в ней ничего менять не
+        надо. Блокируют обычно только адреса, по которым работают приложения
+        вроде этого.
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="kicker">Twitch</div>
+      <label class="field">
+        <span>Client ID — из инструкции по Twitch, шаг 3</span>
+        <input type="text" id="twitch-id" spellcheck="false" autocomplete="off"
+               placeholder="набор букв и цифр">
+      </label>
+      <div class="acts">
+        <button class="act small" id="save-twitch-id">Сохранить</button>
+        <button class="act small key" data-do="twitch-login">Подключить Twitch</button>
+        <button class="act small risky" data-do="twitch-logout">Отключить</button>
+      </div>
+      <div class="account" id="twitch-account"></div>
+    </div>
+
+  </div>
+
+  <div class="grid tab-pane" id="tab-orders" hidden>
+
+    <div class="col">
+      <div class="kicker">Правила заказа</div>
+      <label class="field">
+        <span>Название награды на Twitch</span>
+        <input type="text" id="reward-title" spellcheck="false" autocomplete="off"
+               placeholder="Заказ музыки">
+      </label>
+      <label class="field">
+        <span>Сколько стоит, баллов</span>
+        <input type="number" id="reward-cost" min="1" step="1" inputmode="numeric">
+      </label>
+      <label class="check">
+        <input type="checkbox" id="auto-reward">
+        Создать награду самому
+      </label>
+      <div class="hint">Название и цена уезжают на канал сразу, как только ты их
+        здесь поменяешь. Править их на самом Twitch бесполезно — приложение
+        вернёт своё.
+        <br>Сними галочку, если хочешь завести награду сам: тогда приложение
+        не будет её создавать.</div>
+
+      <div class="kicker" style="margin-top:24px">Заказ плейлиста</div>
+      <label class="check">
+        <input type="checkbox" id="pl-on">
+        Вторая награда — за плейлист
+      </label>
+      <div class="hint">Отдельная награда на канале: зритель кидает ссылку на
+        плейлист или альбом Spotify либо Яндекс.Музыки. Сама в эфир она не
+        идёт — ждёт, пока ты или модератор её одобрит.</div>
+
+      <div id="pl-fields" hidden>
+        <label class="field" style="margin-top:12px">
+          <span>Название награды на Twitch</span>
+          <input type="text" id="pl-title" spellcheck="false" autocomplete="off"
+                 placeholder="Заказ плейлиста">
+        </label>
+
+        <label class="field">
+          <span>Сколько треков берём из плейлиста</span>
+          <input type="number" id="pl-max" min="1" max="20" step="1" inputmode="numeric">
+        </label>
+        <div class="hint">Остальные не попадут в очередь вовсе. Зрителю в чате
+          пишется, сколько взяли и из скольких.</div>
+
+        <label class="field" style="margin-top:12px">
+          <span>Выгоднее поштучного заказа, на <b id="pl-off-val">20%</b></span>
+          <input type="range" id="pl-off" min="0" max="90" step="5">
+        </label>
+
+        <div class="sum" id="pl-sum"></div>
+
+        <label class="check" style="margin-top:12px">
+          <input type="checkbox" id="pl-own-cost">
+          Своя цена вместо посчитанной
+        </label>
+        <label class="field" id="pl-cost-field" hidden>
+          <span>Сколько стоит плейлист, баллов</span>
+          <input type="number" id="pl-cost" min="1" step="1" inputmode="numeric">
+        </label>
+      </div>
+
+      <label class="field" style="margin-top:16px">
+        <span>Не длиннее, минут</span>
+        <input type="number" id="max-minutes" min="1" max="60" step="1" inputmode="numeric">
+      </label>
+      <div class="hint">Отсекает часовые лупы и концерты целиком. Баллы за такой
+        заказ возвращаются зрителю.</div>
+
+      <label class="field" style="margin-top:16px">
+        <span>Сколько заказов держит один зритель</span>
+        <input type="number" id="max-per-user" min="1" max="20" step="1" inputmode="numeric">
+      </label>
+      <div class="hint">Считаются только те, что ещё стоят в очереди.
+        Отыгравшие место не занимают.</div>
+
+      <label class="check" style="margin-top:16px">
+        <input type="checkbox" id="donation-priority">
+        Донаты вперёд баллов
+      </label>
+
+      <label class="check" style="margin-top:16px">
+        <input type="checkbox" id="wait-current">
+        Не обрывать трек, который сейчас играет
+      </label>
+      <div class="hint">Заказ дождётся конца твоего трека и только потом заиграет.
+        Ждать может минуты — если надоело ждать, нажми «Скипнуть» или сними галочку.</div>
+
+      <label class="field" style="margin-top:16px">
+        <span>Стоп-слова</span>
+        <textarea id="reject-words" rows="3" spellcheck="false"
+                  placeholder="по одному в строке"></textarea>
+      </label>
+      <div class="hint">Заказ с таким словом в названии не пройдёт, баллы вернутся.
+        Регистр и раскладка значения не имеют.</div>
+    </div>
+
+    <div class="col">
+      <div class="kicker">Донаты</div>
+      <label class="field">
+        <span>Client ID DonationAlerts</span>
+        <input type="text" id="da-id" spellcheck="false" autocomplete="off"
+               placeholder="из инструкции по донатам">
+      </label>
+      <div class="acts">
+        <button class="act small" id="save-da-id">Сохранить</button>
+        <button class="act small key" data-do="da-login">Подключить DonationAlerts</button>
+        <button class="act small risky" data-do="da-logout">Отключить</button>
+      </div>
+
+      <label class="field" style="margin-top:16px">
+        <span>Ключ DonatePay — из профиля DonatePay</span>
+        <input type="text" id="dp-key" spellcheck="false" autocomplete="off"
+               placeholder="вставь ключ">
+      </label>
+      <div class="acts">
+        <button class="act small" id="save-dp-key">Сохранить</button>
+      </div>
+
+      <label class="field" style="margin-top:16px">
+        <span>Ключ DonateX — личный кабинет, Настройки → Api</span>
+        <input type="text" id="dx-key" spellcheck="false" autocomplete="off"
+               placeholder="вставь ключ">
+      </label>
+      <div class="acts">
+        <button class="act small" id="save-dx-key">Сохранить</button>
+      </div>
+
+      <label class="field" style="margin-top:16px">
+        <span>Заказ за донат от какой суммы</span>
+        <input type="text" id="donation-min" spellcheck="false" autocomplete="off">
+      </label>
+      <div class="hint">Донаты меньше этой суммы просто показываются в хронике —
+        заказом они не становятся. Деньги в любом случае остаются у тебя.</div>
+    </div>
+
+    <div class="col">
+      <div class="kicker">Кому закрыт заказ музыки</div>
+      <div class="hint" style="margin-top:0">Отдельный список от бана в чате.</div>
+      <div id="banlist"></div>
+      <div class="acts">
+        <input type="text" id="ban-login" class="inline-input" placeholder="ник"
+               spellcheck="false" autocomplete="off">
+        <button class="act small risky" id="ban-add">Закрыть заказы</button>
+      </div>
+
+    </div>
+
+    <!-- Справочник во всю ширину, отдельной строкой: он готовый текст с
+         выровненным столбиком команд, и в узкой колонке строки обрезались бы
+         посередине. Команды в чате есть с самого начала, но узнать о них было
+         неоткуда — инструкции в docs/ написаны для стримера и про настройку, а
+         модератор в них не заглядывает. Показываем ровно то, что уйдёт файлом:
+         стример должен видеть, что именно он отправляет. -->
+    <div class="col wide">
+      <div class="kicker">Команды для модераторов</div>
+      <div class="hint" style="margin-top:0">Работают у тебя и у модераторов
+        канала. Зрителям недоступны: музыку заказывают только за баллы или
+        донат. Сохрани файл и перешли его модераторам.</div>
+
+      <label class="field" style="max-width:320px">
+        <span>Знак команд</span>
+        <input type="text" id="command-prefix" spellcheck="false" autocomplete="off"
+               maxlength="4" placeholder="!">
+      </label>
+      <div class="acts">
+        <button class="act small" id="save-prefix">Сохранить</button>
+      </div>
+      <div class="hint">Меняй, только если «!» на канале занял другой бот:
+        тогда ваши команды перебивают друг друга. Справочник ниже подстроится
+        сам.</div>
+      <pre class="sheet-text thin-scroll" id="mods-text">…</pre>
+      <div class="acts">
+        <a class="act small key" href="/api/mods?save=1">
+          <svg aria-hidden="true"><use href="#i-download"></use></svg>
+          Сохранить файл для модераторов
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="grid tab-pane" id="tab-fallback" hidden>
+
+    <div class="col">
+      <div class="kicker">Запасной вариант</div>
+      <div class="hint" style="margin-top:0">Что включить, если вернуть музыку на место не вышло.</div>
+      <div class="modes">
+        <label class="mode">
+          <input type="radio" name="resume" value="nothing">
+          <span>
+            <span class="name">Ничего не включать</span>
+            <span class="why">Просто уведомление в панели. Тишина, пока не включишь сам.</span>
+          </span>
+        </label>
+        <label class="mode">
+          <input type="radio" name="resume" value="playlist">
+          <span>
+            <span class="name">Включить запасной плейлист</span>
+            <span class="why">Самый предсказуемый вариант: заранее знаешь, что заиграет.</span>
+          </span>
+        </label>
+        <label class="mode">
+          <input type="radio" name="resume" value="radio">
+          <span>
+            <span class="name">Включить музыку последнего артиста</span>
+            <span class="why">Ближе всего к тому, что играло. Настоящее радио Spotify через
+              API недоступно, поэтому берём популярные треки этого артиста.</span>
+          </span>
+        </label>
+      </div>
+
+      <label class="field">
+        <span>Запасной плейлист</span>
+        <select id="playlist"><option value="">— не выбран —</option></select>
+      </label>
+      <div class="hint" id="playlist-hint"></div>
+    </div>
+
+  </div>
+
+  <div class="grid tab-pane" id="tab-misc" hidden>
+
+    <div class="col">
+      <div class="kicker">Первая настройка</div>
+      <div class="hint">
+        Пошаговый мастер: обход блокировок, Spotify, Twitch, награда, виджет для
+        OBS. Тот самый, что открывается при первом запуске. Что-то сломалось или
+        настраиваешь заново на другом компьютере — пройди его ещё раз, ничего не
+        потеряется.
+      </div>
+      <div class="acts">
+        <button class="act small key" id="setup-again">Пройти настройку заново</button>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="kicker">Обновления</div>
+      <div class="hint">
+        Приложение само в интернет не ходит — проверяет только по этой кнопке.
+        Найдётся новая версия, появится кнопка «Обновить»: она скачает сборку,
+        подменит программу и запустит её заново. Настройки, очередь и входы
+        останутся на месте — они лежат в отдельной папке.
+      </div>
+      <label class="field" style="margin-top:12px">
+        <span>Репозиторий на GitHub</span>
+        <input type="text" id="upd-repo" spellcheck="false" autocomplete="off"
+               placeholder="имя/репозиторий">
+        <span class="hint">Оттуда берутся выпуски. Пишется как в адресе:
+          часть после github.com. Выпуски должны быть публичными, иначе
+          скачивание попросит пароль.</span>
+      </label>
+      <div class="sum" id="upd-sum"></div>
+      <div class="acts">
+        <button class="act small" id="upd-check">Проверить обновления</button>
+        <button class="act small key" id="upd-install" hidden>Обновить</button>
+        <a class="act small" id="upd-page" target="_blank" rel="noopener" hidden>Открыть страницу выпусков</a>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="kicker">Диагностика</div>
+      <div class="hint">
+        Подробный лог пишется всегда — ничего включать не нужно. Если что-то
+        сломалось, повтори это и нажми кнопку: в архив попадут лог, история
+        заказов с возвратами баллов, действия в панели и настройки. Ключи
+        доступа, Client ID и почта из архива вырезаются.
+      </div>
+      <div class="acts">
+        <a class="act small" href="/api/diag/export">
+          <svg aria-hidden="true"><use href="#i-download"></use></svg>
+          Сохранить лог и историю
+        </a>
+      </div>
+
+  </div>
+
+</section>
+
+<!-- YouTube. Отдельный раздел с 11.10: друг владельца жаловался, что заказ,
+     которого нет в Spotify, «играл непонятно где», а настроить это было
+     нельзя — настройки лежали внизу вкладки «Если трека нет». Здесь всё про
+     второй проигрыватель в одном месте: что играет, как решать, куда звук. -->
+<section class="panel" id="youtube" hidden>
+  <div class="grid">
+
+    <div class="col">
+      <div class="kicker">Если трека нет в Spotify</div>
+      <div class="hint" style="margin-top:0">Что делать, когда трек нашёлся только на YouTube.</div>
+      <div class="modes">
+        <label class="mode">
+          <input type="radio" name="yt-mode" value="ask">
+          <span>
+            <span class="name">Каждый раз спрашивать</span>
+            <span class="why">В панели появится заказ с кнопками «Включить» и «Отклонить».</span>
+          </span>
+        </label>
+        <label class="mode">
+          <input type="radio" name="yt-mode" value="auto">
+          <span>
+            <span class="name">Включать с YouTube сам</span>
+            <span class="why">Сразу в очередь. В панели — уведомление, зрителю — строчка в чате.</span>
+          </span>
+        </label>
+        <label class="mode">
+          <input type="radio" name="yt-mode" value="off">
+          <span>
+            <span class="name">Не играть</span>
+            <span class="why">Заказ отклоняется, баллы возвращаются, зритель видит почему.</span>
+          </span>
+        </label>
+      </div>
+
+      <div id="yt-ask-opts">
+        <label class="field" style="margin-top:14px">
+          <span>Сколько ждать решения</span>
+          <select id="yt-ask-seconds">
+            <option value="30">30 секунд</option>
+            <option value="60">1 минуту</option>
+            <option value="120">2 минуты</option>
+            <option value="300">5 минут</option>
+            <option value="0">пока не решу</option>
+          </select>
+        </label>
+        <label class="field" style="margin-top:14px">
+          <span>Если не успел решить</span>
+          <select id="yt-ask-else">
+            <option value="skip">пропустить и вернуть баллы</option>
+            <option value="play">включить</option>
+          </select>
+        </label>
+      </div>
+      <div class="hint">Применяется к следующему заказу, перезапуск не нужен.</div>
+
+      <div class="kicker" style="margin-top:22px">Недавно с YouTube</div>
+      <div id="yt-recent"></div>
+    </div>
+
+    <div class="col">
+      <div class="kicker">Проигрыватель YouTube</div>
+      <div class="account" id="yt-status"></div>
+      <label class="field" style="margin-top:14px">
+        <span>Браузер, из которого брать доступ к YouTube</span>
+        <select id="yt-browser">
+          <option value="">выбрать самому</option>
+          <option value="chrome">Chrome</option>
+          <option value="edge">Edge</option>
+          <option value="firefox">Firefox</option>
+          <option value="yandex">Яндекс.Браузер</option>
+          <option value="opera">Opera</option>
+          <option value="brave">Brave</option>
+          <option value="vivaldi">Vivaldi</option>
+        </select>
+        <span class="hint">YouTube иногда требует подтвердить, что запросы не от
+          робота. Тогда приложение берёт доступ из браузера, в котором ты вошёл в
+          YouTube — само перебирает те, что стоят на этом компьютере. Указывать
+          браузер вручную нужно редко.
+          <br><br>
+          Помогает это редко: Chrome, Edge, Brave и Яндекс.Браузер держат файл с
+          куками заблокированным, пока открыты, — а закрывать браузер ради заказа
+          никто не будет. Проверка «я не бот» у YouTube временная, приложение само
+          ждёт и пробует ещё раз. Firefox отдаёт куки и на ходу.
+          Применяется к следующему заказу, перезапуск не нужен.</span>
+      </label>
+
+      <label class="field" style="margin-top:14px">
+        <span>Громкость заказов с YouTube — <b id="yt-volume-val">100%</b></span>
+        <input type="range" id="yt-volume" min="1" max="100" step="1">
+        <span class="hint">Считается <b>от громкости Spotify</b>: сто процентов —
+          заказ звучит ровно как музыка стримера, пятьдесят — вдвое тише. Меняется
+          на лету, даже посреди играющего трека. Тот же ползунок есть на карточке
+          «В эфире», когда играет заказ с YouTube.</span>
+      </label>
+
+      <label class="field" style="margin-top:14px">
+        <span>Куда выводить звук с YouTube</span>
+        <select id="yt-device"><option value="">системное устройство</option></select>
+        <span class="acts" style="margin-top:8px">
+          <button class="act small" data-do="yt-test"><svg aria-hidden="true"><use href="#i-volume-2"></use></svg>Проверить звук</button>
+        </span>
+        <span class="hint">Отдельное устройство нужно, чтобы в OBS это был отдельный
+          источник звука: его можно приглушить в записи и дать зрителям громкость
+          отдельно от фоновой музыки.</span>
+      </label>
+    </div>
+
+  </div>
+</section>
+
+<section class="panel" id="widget" hidden>
+  <div class="wx">
+
+    <div class="wx-left">
+      <div class="wx-stage" id="wx-stage" data-scene="dark">
+        <div class="wx-scene"></div>
+        <!-- Сетка точек привязки. Видна только пока плашку тащат: постоянная
+             разметка поверх кадра мешала бы смотреть на сам виджет. -->
+        <div class="wx-grid" id="wx-grid" aria-hidden="true"></div>
+        <div class="slot" id="wx-slot">
+          <div class="card show" id="wx-card">
+            <div class="art" id="wx-art"></div>
+            <div class="text">
+              <div class="title" id="wx-title">Bohemian Rhapsody</div>
+              <div class="artist" id="wx-artist">Queen</div>
+              <div class="by" id="wx-by">заказал zritel</div>
+              <div class="bar"><i id="wx-bar"></i></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wx-stage-bar">
+        <div class="chips" id="wx-source-pick">
+          <button data-source="order" class="on">заказ</button>
+          <button data-source="own">своя музыка</button>
+        </div>
+        <div class="chips" id="wx-scene-pick">
+          <button data-scene="dark" class="on">тёмная сцена</button>
+          <button data-scene="light">светлая</button>
+          <button data-scene="busy">пёстрая</button>
+        </div>
+        <button class="link-btn" id="wx-play">появление</button>
+        <button class="link-btn" id="wx-leave">уход</button>
+        <button class="link-btn" id="wx-next">следующий трек</button>
+      </div>
+
+      <div class="hint">Так плашка выглядит в кадре, в натуральную величину.
+        Правки видны в OBS сразу — адрес переклеивать не нужно.</div>
+
+      <label class="field" style="margin-top:16px">
+        <span>Адрес для OBS — один раз и навсегда</span>
+        <input type="text" id="wx-url" readonly spellcheck="false">
+      </label>
+      <div class="acts">
+        <button class="act small key" id="wx-copy">Скопировать адрес</button>
+        <a class="act small" id="wx-open" target="_blank" rel="noopener">Открыть в браузере</a>
+      </div>
+    </div>
+
+    <div class="wx-right">
+      <div class="kicker">Как поставить</div>
+
+      <div class="field">
+        <span>Место в кадре</span>
+        <!-- Девять точек вместо четырёх углов: «сверху по центру» и «слева
+             посередине» раньше приходилось изображать огромным отступом от
+             угла, и на другом разрешении кадра плашка уезжала не туда. -->
+        <div class="wx-anchors" id="wx-anchors">
+          <button data-pos="left-top"      title="Слева сверху"></button>
+          <button data-pos="center-top"    title="Сверху по центру"></button>
+          <button data-pos="right-top"     title="Справа сверху"></button>
+          <button data-pos="left-middle"   title="Слева посередине"></button>
+          <button data-pos="center-middle" title="Ровно посередине"></button>
+          <button data-pos="right-middle"  title="Справа посередине"></button>
+          <button data-pos="left-bottom"   title="Слева снизу"></button>
+          <button data-pos="center-bottom" title="Снизу по центру"></button>
+          <button data-pos="right-bottom"  title="Справа снизу"></button>
+        </div>
+        <span class="hint" id="wx-pos-hint">Плашку можно просто перетащить
+          мышью прямо по кадру — точка привязки и отступы подставятся сами.</span>
+      </div>
+
+      <label class="field">
+        <span>Текст внутри плашки</span>
+        <select id="wx-align">
+          <option value="auto">Как встанет — по стороне кадра</option>
+          <option value="left">Прижать влево</option>
+          <option value="center">По центру</option>
+          <option value="right">Прижать вправо</option>
+        </select>
+        <span class="hint">Плашка стоит справа — текст упирается в правый край,
+          слева — в левый. Обложка при этом остаётся на своём месте.</span>
+      </label>
+
+      <label class="field">
+        <span>Размер <b id="wx-scale-val">100%</b></span>
+        <input type="range" id="wx-scale" min="50" max="200" step="5">
+      </label>
+
+      <label class="field">
+        <span>Отступ слева-справа <b id="wx-gapx-val">40 px</b></span>
+        <input type="range" id="wx-gapx" min="0" max="320" step="2">
+      </label>
+
+      <label class="field">
+        <span>Отступ сверху-снизу <b id="wx-gapy-val">40 px</b></span>
+        <input type="range" id="wx-gapy" min="0" max="320" step="2">
+      </label>
+
+      <label class="field">
+        <span>Прозрачность <b id="wx-op-val">100%</b></span>
+        <input type="range" id="wx-op" min="10" max="100" step="5">
+        <span class="hint">Вся плашка целиком, вместе с текстом и обложкой.</span>
+      </label>
+
+      <div class="kicker" style="margin-top:24px">Что показывать</div>
+      <label class="check"><input type="checkbox" id="wx-art-on"> Обложку</label>
+      <label class="check"><input type="checkbox" id="wx-by-on"> Ник заказчика</label>
+      <label class="check"><input type="checkbox" id="wx-bar-on"> Полосу времени</label>
+      <label class="check"><input type="checkbox" id="wx-motion-on"> Движение</label>
+      <div class="hint">Сними, если анимация мешает — плашка станет неподвижной,
+        но останется на месте.</div>
+
+      <label class="check" style="margin-top:12px"><input type="checkbox" id="wx-own-on"> Свою музыку тоже</label>
+      <div class="hint">Виджет показывает и то, что ты слушаешь сам, а не только
+        заказы. Под артистом всегда написано, откуда трек: «заказал ник» или
+        «музыка канала». Сними галочку, если свой плейлист светить не хочешь —
+        тогда и в панели «В эфире» будет только во время заказов.</div>
+
+      <div class="kicker" style="margin-top:24px">Когда показывать</div>
+
+      <label class="field">
+        <span>Как держится в кадре</span>
+        <select id="wx-mode">
+          <option value="always">Висит всё время</option>
+          <option value="flash">Всплывает и уходит</option>
+        </select>
+        <span class="hint" id="wx-mode-hint"></span>
+      </label>
+
+      <div id="wx-flash" hidden>
+        <label class="check"><input type="checkbox" id="wx-onchange"> Всплывать при смене трека</label>
+        <div class="hint">Главный повод показать плашку: заиграло что-то новое.</div>
+
+        <label class="field" style="margin-top:12px">
+          <span>Держать на экране <b id="wx-hold-val">15 с</b></span>
+          <input type="range" id="wx-hold" min="3" max="60" step="1">
+        </label>
+
+        <label class="field">
+          <span>Напоминать <b id="wx-every-val">не напоминать</b></span>
+          <input type="range" id="wx-every" min="0" max="30" step="1">
+          <span class="hint">Плашка всплывает снова через этот срок — чтобы
+            зашедший в середине трека тоже узнал, что играет. Появление и уход
+            с той же анимацией, что и обычно.</span>
+        </label>
+
+        <button class="act small" id="wx-flash-try">Показать, как это выглядит</button>
+      </div>
+
+      <div class="kicker" style="margin-top:24px">
+        Своими руками
+        <button class="link-btn" id="wx-reset" style="margin-left:auto">вернуть как в наборе</button>
+      </div>
+      <div class="hint" style="margin-top:0">Поверх выбранного набора. Что не тронул —
+        остаётся как в наборе.</div>
+      <div id="wx-tweaks"></div>
+    </div>
+
+  </div>
+
+  <div class="wx-gallery" id="wx-gallery"></div>
+</section>
+
+<section class="panel" id="log" hidden>
+  <div class="grid two">
+
+    <div class="col">
+      <div class="kicker">Что заказывали</div>
+      <div class="sheet-find" style="margin-top:var(--s3)">
+        <input type="text" id="hist-q" spellcheck="false" autocomplete="off"
+               placeholder="ник, артист или название">
+      </div>
+      <div class="hint" id="hist-note"></div>
+      <ul class="rows log-rows" id="hist"></ul>
+    </div>
+
+    <div class="col">
+      <div class="kicker">Что делали модераторы</div>
+      <div class="hint" style="margin-top:var(--s3)">Скипы, удаления и запреты —
+        видно, кто и когда.</div>
+      <ul class="rows log-rows" id="modlog"></ul>
+    </div>
+
+  </div>
+</section>
+
+    </div>
+  </div>
+</div>
+
+<div id="fix" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="fix-head">
+    <div class="sheet-head">
+      <div>
+        <div class="kicker" id="fix-head">Не тот трек</div>
+        <div class="sheet-sub">Зритель просил: <b id="fix-asked"></b></div>
+        <div class="sheet-sub">Сейчас стоит: <b id="fix-was"></b></div>
+      </div>
+      <button class="icon-btn" id="fix-close" title="Закрыть (Esc)">
+        <svg aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+
+    <div class="sheet-find">
+      <input type="text" id="fix-query" spellcheck="false" autocomplete="off"
+             placeholder="артист и название или ссылка Spotify">
+      <button class="act small key" id="fix-find">Искать</button>
+    </div>
+
+    <div class="hint" id="fix-note"></div>
+    <ul class="picks" id="fix-results"></ul>
+
+    <div class="hint">Выбранный трек запомнится: такой же заказ впредь
+      найдётся сразу и правильно, у любого зрителя.</div>
+  </div>
+</div>
+
+<!-- Заставка. Показывается один раз за запуск приложения (не за загрузку
+     страницы, иначе она играла бы на каждое F5) и уходит сама. -->
+<div class="intro" id="intro" hidden>
+  <div class="intro-inner">
+    <div class="intro-eq"><i></i><i></i><i></i><i></i><i></i></div>
+    <h1><span>Заказ</span> <span>музыки</span></h1>
+    <div class="sub">зрители заказывают — играет твой Spotify</div>
+    <div class="line"></div>
+  </div>
+</div>
+
+<!-- Мастер первой настройки. Слева дорожка шагов, справа один шаг за раз. -->
+<div class="setup" id="setup" hidden>
+  <div class="setup-progress"><i id="setup-progress-line"></i></div>
+  <aside class="setup-rail">
+    <h2>Настройка</h2>
+    <div class="rail-sub">Один раз, минут пятнадцать. Любой шаг можно пропустить
+      и вернуться к нему потом.</div>
+    <div id="setup-rail-steps"></div>
+    <div class="rail-tail">
+      <button data-act="finish">закрыть и настроить потом</button>
+    </div>
+  </aside>
+  <div class="setup-body">
+    <div class="setup-card" id="setup-card"></div>
+  </div>
+</div>
+
+<footer id="status" class="offline">Подключаюсь к приложению…</footer>
+<script src="/static/widget-presets.js"></script>
+<script src="/static/app.js"></script>
+<script src="/static/setup.js"></script>
+</body>
+</html>

@@ -1,0 +1,1681 @@
+/* Панель «Эфир».
+   Одна краска — кислотный лайм, цвет «в эфире». Он означает ровно две вещи:
+   идёт эфир и «нажми сюда». Всё остальное — оттенки серого, плюс красный на
+   поломки. Экран строится типографикой; главный сценарий — стример
+   альт-табнулся из игры на две секунды, глянул и вернулся. */
+
+:root {
+  color-scheme: dark;
+
+  --bg:      #08090a;
+  --raise:   #101214;
+  --line:    #1c1f22;
+  --line-2:  #282c30;
+  --text:    #f2f4f5;
+  --dim:     #99a1a8;
+  /* Самый тусклый серый, которым ещё можно набирать текст: на фоне панели
+     это 4.4:1. Всё, что глуше, годится только линиям. */
+  --dimmer:  #6f777e;
+  --faint:   #3b4147;
+  /* --faint красит линии, засечки и выключенные кнопки. Текстом его набирать
+     нельзя: на нашем фоне это контраст около 1.9:1 при норме 4.5. Раньше им
+     были набраны двенадцать мест подряд, и самые обидные — «Не настроено» в
+     ленте подключений (первое, что человек должен увидеть на первом запуске),
+     исходный текст зрителя рядом с найденным треком и время в хронике. Для
+     тусклого текста есть --dimmer. */
+  --lime:    #c8f751;
+  --lime-lo: #4e5f22;
+  --bad:     #ff4d4d;
+  --ink:     #0d1204;
+  --hover:   rgba(255, 255, 255, .04);
+
+  /* Шкала отступов. Промежуточных значений нет специально: разнобой в
+     полпикселя не замечают осознанно, но он читается как неаккуратность. */
+  --s1:  4px;
+  --s2:  8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s7: 32px;
+  --edge: 40px;
+
+  /* Три кегля на всю мелкую типографику, три на крупную. */
+  --t-xs: 11px;
+  --t-sm: 13px;
+  --t-md: 15px;
+
+  /* Один трекинг для надзаголовков, один для чипов и кодов. */
+  --track-caps: .18em;
+  --track-chip: .06em;
+
+  --ease: cubic-bezier(.2, .7, .3, 1);
+  /* Кривая для появления окон: быстрый старт и долгое мягкое торможение —
+     движение читается как вещь, которая подъехала и встала на место, а не как
+     переключённый свет. */
+  --ease-soft: cubic-bezier(.32, .72, 0, 1);
+  --fast: .14s;
+  --slow: .28s;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding-bottom: var(--edge);
+  background: var(--bg);
+  color: var(--text);
+  font: var(--t-md)/1.5 Manrope, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Приложение молчит — показанное уже неправда, и это должно быть видно.
+   Гасим содержимое, но не строку внизу: там единственное сообщение, которое
+   в этот момент обязано читаться. */
+main, .status-bar, .panel { transition: opacity var(--slow) var(--ease); }
+body.stale main,
+body.stale .status-bar,
+body.stale .menu,
+body.stale .panel { opacity: .4; pointer-events: none; }
+
+h1 { font-family: Unbounded, Manrope, sans-serif; font-weight: 600; }
+
+button { font-family: Manrope, system-ui, sans-serif; color: inherit; }
+
+:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+::selection { background: var(--lime); color: var(--ink); }
+::placeholder { color: var(--dimmer); }
+
+/* ── Лента подключений ──────────────────────────────────────────────────
+   Пока всё исправно, она должна быть незаметной: никаких горящих точек в
+   ряд. Внимание привлекает только поломка — красной заливкой ячейки. */
+
+.status-bar {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--line);
+  background: var(--raise);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+/* Одна иконка вместо ленты из пяти ячеек.
+
+   Лента занимала всю ширину полосы и каждую секунду эфира сообщала то, что
+   человек и так знает: «Не настроено», «Не настроено», «Не настроено». При
+   этом единственное, ради чего она нужна, — заметить поломку. Поэтому от неё
+   осталась одна точка на иконке, а подробности переехали в окошко. */
+.conn-slot { position: relative; display: flex; align-items: stretch; }
+
+.conn-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: var(--s3) var(--s4);
+  background: none; border: 0; border-right: 1px solid var(--line);
+  color: var(--dimmer); cursor: pointer;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.conn-btn:hover { color: var(--text); background: var(--hover); }
+.conn-btn.on { color: var(--lime); background: var(--hover); }
+.conn-btn svg { width: 16px; height: 16px; }
+
+/* Точка — весь смысл свёртки. Лайм: всё на месте. Серый: что-то не настроено,
+   но это не поломка. Красный с ореолом: что-то отвалилось прямо сейчас, и
+   заметить это нужно из другого конца комнаты. */
+.conn-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--lime); flex: none;
+  transition: background var(--slow) var(--ease), box-shadow var(--slow) var(--ease);
+}
+.conn-btn.idle .conn-dot { background: var(--faint); }
+.conn-btn.bad .conn-dot { background: var(--bad); box-shadow: 0 0 0 3px rgba(255, 77, 77, .18); }
+
+.bar-gap { flex: 1; min-width: 0; }
+
+/* Окошко подключений. Маленькое и у самой иконки: сюда заглядывают на секунду,
+   посреди эфира, чтобы понять, что именно отвалилось. */
+.conn-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: var(--s2);
+  width: 320px;
+  max-width: calc(100vw - 2 * var(--s4));
+  padding: var(--s3);
+  background: var(--raise);
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, .55);
+  z-index: 20;
+  transform-origin: top left;
+  animation: pop-in .18s var(--ease-soft);
+}
+.conn-pop[hidden] { display: none; }
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(.96) translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.conn-pop-head {
+  font-size: var(--t-xs); font-weight: 700;
+  letter-spacing: var(--track-caps); text-transform: uppercase;
+  color: var(--dimmer);
+  padding: var(--s1) var(--s2) var(--s3);
+}
+
+.conns { display: flex; flex-direction: column; gap: 2px; }
+
+.st {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: var(--s2) var(--s3);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--dimmer);
+  white-space: nowrap;
+  min-width: 0;
+  transition: background var(--slow) var(--ease), color var(--slow) var(--ease);
+}
+.st-name { flex: none; }
+.st b {
+  font-weight: 500; margin-left: auto;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Засечка вместо кружка: она не светится и не притягивает взгляд. */
+.st .led {
+  width: 3px; height: 14px; border-radius: 1px;
+  background: var(--faint); flex: none;
+  transition: background var(--slow) var(--ease);
+}
+.st.on { color: var(--dim); }
+.st.on .led { background: var(--lime); }
+.st.on b { color: var(--text); }
+
+/* Неисправность — единственное, что кричит. */
+.st.off { background: var(--bad); color: #1a0000; }
+.st.off .led { background: #1a0000; }
+.st.off b { color: #1a0000; font-weight: 700; }
+
+.st.idle { color: var(--dimmer); }
+.st.idle .led { background: var(--faint); }
+
+.bar-tail {
+  display: flex; align-items: center; gap: var(--s1);
+  padding: 0 var(--s3) 0 var(--s2);
+  border-left: 1px solid var(--line);
+  flex: none;
+}
+
+.tail-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; cursor: pointer;
+  color: var(--dimmer); text-decoration: none;
+  font-size: 12px; padding: var(--s2); border-radius: 2px;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.tail-btn:hover { color: var(--text); background: var(--hover); }
+.tail-btn:active { transform: translateY(1px); }
+.tail-btn.active { color: var(--lime); }
+.tail-btn svg { width: 14px; height: 14px; }
+
+.ver {
+  font-size: var(--t-xs); color: var(--dimmer);
+  padding-left: var(--s2); font-variant-numeric: tabular-nums;
+}
+
+/* ── Код для входа в Twitch ─────────────────────────────────────────────
+   Пока код не введён, работать нечем: он занимает всю ширину и набран так,
+   чтобы прочитать его с телефона в вытянутой руке. */
+
+#banner {
+  display: flex; align-items: center; gap: var(--s6); flex-wrap: wrap;
+  padding: var(--s5) var(--edge);
+  background: var(--lime); color: var(--ink);
+  animation: drop var(--slow) var(--ease);
+}
+/* Без этого правила display:flex перебивает атрибут hidden, и под шапкой
+   постоянно висит пустая лаймовая полоса. */
+#banner[hidden] { display: none; }
+
+#banner .what { font-size: var(--t-sm); font-weight: 700; line-height: 1.45; max-width: 420px; }
+#banner .what a { color: var(--ink); }
+#banner .code {
+  font-family: Unbounded, monospace;
+  font-size: 34px; font-weight: 700; letter-spacing: .22em;
+  user-select: all;
+}
+#banner .left { margin-left: auto; font-size: 12px; font-weight: 700; opacity: .75; }
+/* Лаймовый фокус на лаймовом фоне не виден. */
+#banner :focus-visible { outline-color: var(--ink); }
+#banner ::selection { background: var(--ink); color: var(--lime); }
+
+@keyframes drop {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Эфир ───────────────────────────────────────────────────────────── */
+
+.stage {
+  padding: var(--s7) var(--edge) var(--s6);
+  border-bottom: 1px solid var(--line);
+  animation: appear var(--slow) var(--ease);
+}
+
+@keyframes appear { from { opacity: 0; } to { opacity: 1; } }
+
+.eyebrow {
+  display: flex; align-items: center; gap: var(--s2);
+  font-size: var(--t-xs); font-weight: 700;
+  letter-spacing: var(--track-caps); text-transform: uppercase;
+  color: var(--lime);
+  margin-bottom: var(--s4);
+}
+.eyebrow .live { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); flex: none; }
+.eyebrow .sep { color: var(--dimmer); letter-spacing: 0; }
+.eyebrow .where { color: var(--dim); font-weight: 500; letter-spacing: var(--track-chip); }
+.eyebrow.quiet { color: var(--dimmer); }
+.eyebrow.quiet .live { background: var(--faint); }
+.eyebrow.alarm { color: var(--bad); }
+.eyebrow.alarm .live { background: var(--bad); }
+
+.stage-row { display: flex; gap: var(--s6); align-items: flex-start; }
+.stage-text { min-width: 0; flex: 1; }
+
+.art {
+  width: 120px; height: 120px; flex: none;
+  border: 1px solid var(--line-2); border-radius: 2px;
+  background: var(--raise);
+  display: grid; place-items: center;
+  overflow: hidden;
+}
+.art img { width: 100%; height: 100%; object-fit: cover; }
+.art svg { width: 34px; height: 34px; color: var(--faint); }
+
+/* Unbounded широкий, и длинные названия с «(feat. …)» обрезались бы почти
+   всегда — то есть самый важный элемент экрана не влезал бы систематически.
+   Поэтому кегль подвижный, а строк две. */
+.headline {
+  font-size: clamp(28px, 3.2vw, 40px);
+  line-height: 1.08; letter-spacing: -.02em;
+  margin: 0 0 var(--s2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.subhead {
+  font-size: 20px; color: var(--dim); font-weight: 500; margin-bottom: var(--s4);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.credit { display: flex; align-items: center; gap: var(--s2); font-size: var(--t-sm); color: var(--dim); }
+.credit b { color: var(--text); font-weight: 700; }
+.credit svg { width: 15px; height: 15px; color: var(--dimmer); flex: none; }
+
+.meter { margin-top: var(--s5); display: flex; align-items: center; gap: var(--s3); }
+.meter .bar { flex: 1; height: 2px; background: var(--line-2); position: relative; }
+/* Единственная плавность, отражающая настоящее время. */
+.meter .bar i { position: absolute; inset: 0 auto 0 0; background: var(--lime); transition: width .9s linear; }
+.meter .t { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+/* Полоса, за которую можно взяться.
+
+   Сама полоса в две точки высотой — по ней не попасть мышью, поэтому область
+   нажатия делается прозрачной подкладкой сверху и снизу, а видимая толщина
+   остаётся прежней. Под рукой полоса становится заметнее: без этого непонятно,
+   схватилась она или нет. */
+.meter.seekable .bar {
+  cursor: pointer;
+  padding: 9px 0;
+  height: auto;
+  background: none;
+  touch-action: none;
+}
+.meter.seekable .bar::before {
+  content: "";
+  position: absolute; left: 0; right: 0; top: 50%;
+  height: 2px; margin-top: -1px;
+  background: var(--line-2);
+}
+.meter.seekable .bar i {
+  top: 50%; bottom: auto; height: 2px; margin-top: -1px;
+}
+.meter.seekable .bar:hover i,
+.meter.seekable .bar:active i { height: 4px; margin-top: -2px; }
+/* Пока тянут — плавность мешает: полоса обязана быть там, где палец. */
+.meter.seekable .bar:active i { transition: none; }
+
+/* ── Плеер ─────────────────────────────────────────────────────────────
+
+   Управление тем, что играет прямо сейчас: в начало, пауза, дальше и
+   громкость. Только заказами: своей музыкой стримера приложение не
+   распоряжается, и кнопок для неё здесь нет.
+
+   Ряд намеренно скромный. Главное на этом экране — что играет и кто заказал;
+   кнопки нужны в тот момент, когда что-то пошло не так, и притягивать взгляд
+   всё остальное время им незачем. */
+.player {
+  display: flex; align-items: center; gap: var(--s2);
+  margin-top: var(--s5);
+  flex-wrap: wrap;
+}
+
+.pbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px;
+  background: none;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  color: var(--dim);
+  cursor: pointer;
+  transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease),
+              background var(--fast) var(--ease);
+}
+.pbtn:hover { color: var(--text); border-color: var(--dimmer); background: var(--hover); }
+.pbtn:active { transform: translateY(1px); }
+.pbtn svg { width: 15px; height: 15px; }
+
+/* Пуск и пауза — главная кнопка ряда, поэтому она одна крашеная. */
+.pbtn.key {
+  width: 40px; height: 40px;
+  background: var(--lime); border-color: var(--lime); color: var(--ink);
+}
+.pbtn.key:hover { background: #d6ff6b; border-color: #d6ff6b; color: var(--ink); }
+.pbtn.key svg { width: 17px; height: 17px; }
+
+.pvol {
+  display: inline-flex; align-items: center; gap: var(--s2);
+  margin-left: var(--s3);
+}
+.pvol input[type="range"] { width: 120px; accent-color: var(--lime); cursor: pointer; }
+.pvol b {
+  font-size: 12px; color: var(--dim); font-weight: 500;
+  font-variant-numeric: tabular-nums; min-width: 34px;
+}
+
+/* Куда вернётся музыка — это стример читает перед тем, как пустить заказы. */
+.recall {
+  margin-top: var(--s5);
+  border-left: 2px solid var(--lime-lo);
+  padding: 2px 0 2px var(--s3);
+  max-width: 560px;
+}
+.recall .label {
+  display: block;
+  font-size: var(--t-xs); font-weight: 700;
+  letter-spacing: var(--track-caps); text-transform: uppercase;
+  color: var(--dimmer); margin-bottom: var(--s1);
+}
+.recall .what { display: block; font-size: var(--t-sm); color: var(--text); }
+.recall .when { display: block; font-size: 12px; color: var(--dimmer); margin-top: 2px; }
+
+/* Последний игравший трек — в тишине, на месте карточки «В эфире».
+
+   Главный вопрос после того, как музыка стихла, — «а что это только что
+   было». Раньше ответ был только в хронике: строчка текста без обложки,
+   вперемешку с отказами и скипами, да ещё и за два клика. Теперь он лежит
+   там же, где человек и смотрел, — и переживает перезапуск приложения. */
+.last {
+  display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap;
+  margin: 0 0 var(--s6);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  max-width: 640px;
+}
+.last-art {
+  width: 48px; height: 48px; flex: none;
+  border: 1px solid var(--line-2); border-radius: 2px;
+  background: var(--raise);
+  display: grid; place-items: center;
+  overflow: hidden;
+}
+.last-art img { width: 100%; height: 100%; object-fit: cover; }
+.last-art svg { width: 18px; height: 18px; color: var(--faint); }
+
+.last-text { min-width: 0; flex: 1 1 180px; }
+.last-kicker {
+  font-size: var(--t-xs); font-weight: 700;
+  letter-spacing: var(--track-caps); text-transform: uppercase;
+  color: var(--dimmer); margin-bottom: 2px;
+}
+.last-title {
+  font-size: var(--t-md); color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.last-sub {
+  font-size: var(--t-sm); color: var(--dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.last-marks { margin-left: auto; font-size: 12px; color: var(--dimmer); }
+.last .act { flex: none; }
+
+/* Ещё ничего не играло. Карточка та же, только приглушённая: место занято
+   честно, а не выдуманным треком. */
+.last.empty { border-style: dashed; }
+.last.empty .last-title { color: var(--dim); }
+.last.empty .last-sub { color: var(--dimmer); }
+
+/* ── Кнопки ─────────────────────────────────────────────────────────── */
+
+.acts { display: flex; gap: var(--s2); margin-top: var(--s6); flex-wrap: wrap; align-items: center; }
+
+/* Поломка не прячет карточку играющего трека, а живёт полосой под ней —
+   вместе со своей кнопкой починки. */
+.stage-alarm {
+  display: flex; align-items: flex-start; gap: var(--s3); flex-wrap: wrap;
+  margin-top: var(--s4); padding: var(--s3) var(--s4);
+  border: 1px solid var(--bad); border-radius: 2px;
+  background: #170808;
+}
+.stage-alarm svg { width: 16px; height: 16px; color: var(--bad); flex: none; margin-top: 2px; }
+.stage-alarm > div { flex: 1 1 200px; }
+.stage-alarm b { color: var(--bad); font-size: var(--t-sm); }
+.stage-alarm .hint { margin: 0; }
+
+.act {
+  display: inline-flex; align-items: center; gap: var(--s2);
+  border: 1px solid var(--line-2); background: transparent; color: var(--text);
+  padding: var(--s3) var(--s4); border-radius: 2px; cursor: pointer;
+  font: 600 var(--t-sm)/1 Manrope, system-ui, sans-serif;
+  text-decoration: none;
+  transition: border-color var(--fast) var(--ease),
+              background var(--fast) var(--ease),
+              color var(--fast) var(--ease),
+              transform var(--fast) var(--ease);
+}
+.act:hover { border-color: var(--dim); background: var(--hover); }
+.act:active { transform: translateY(1px); }
+.act svg { width: 16px; height: 16px; }
+
+.act.key { background: var(--lime); border-color: var(--lime); color: var(--ink); }
+.act.key:hover { background: #d5ff6b; border-color: #d5ff6b; }
+
+.act.small { padding: var(--s2) var(--s3); font-size: 12px; }
+.act.small svg { width: 14px; height: 14px; }
+
+.act.risky:hover { border-color: var(--bad); color: var(--bad); background: rgba(255, 77, 77, .06); }
+
+/* Пока запрос в пути — кнопка недоступна и с мыши, и с клавиатуры. */
+.act[disabled] { opacity: .45; pointer-events: none; }
+
+/* ── Нижняя половина ────────────────────────────────────────────────── */
+
+.lower {
+  display: grid;
+  /* Хроника заметно уже заказов: она справочная, а не рабочая. */
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  align-items: start;
+}
+@media (max-width: 1000px) { .lower { grid-template-columns: 1fr; } }
+
+.orders { padding: var(--s6) var(--edge) var(--edge); border-right: 1px solid var(--line); min-width: 0; }
+.side { padding: var(--s6) var(--edge) var(--edge); min-width: 0; }
+@media (max-width: 1000px) {
+  .orders { border-right: none; border-bottom: 1px solid var(--line); }
+}
+
+.kicker {
+  font-size: var(--t-xs); font-weight: 700;
+  letter-spacing: var(--track-caps); text-transform: uppercase;
+  color: var(--dimmer);
+  margin-bottom: var(--s3);
+  display: flex; align-items: center; gap: var(--s2);
+}
+.kicker .cnt {
+  color: var(--ink); background: var(--lime);
+  border-radius: 2px; padding: 1px 6px;
+  font-size: var(--t-xs); letter-spacing: var(--track-chip);
+  font-variant-numeric: tabular-nums;
+  transition: background var(--slow) var(--ease), color var(--slow) var(--ease);
+}
+.kicker .cnt.zero { background: var(--line-2); color: var(--dim); }
+
+/* ── Список заказов ─────────────────────────────────────────────────── */
+
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows li {
+  display: grid; grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center; gap: var(--s3);
+  padding: var(--s3) 0; border-bottom: 1px solid var(--line);
+}
+.rows li:last-child { border-bottom: none; }
+
+.rows .idx {
+  font-family: Unbounded, sans-serif; font-size: var(--t-sm); font-weight: 600;
+  color: var(--dimmer); font-variant-numeric: tabular-nums;
+}
+.rows li:first-child .idx { color: var(--dim); }
+.rows .body { min-width: 0; }
+.rows .ttl {
+  display: block; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rows .sub {
+  display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
+  font-size: 12px; color: var(--dimmer); margin-top: var(--s1);
+}
+
+/* Кнопки заказа приглушены, но читаемы: при взгляде на две секунды они
+   должны быть видны, а не проявляться только под курсором. */
+.rows .deal { display: flex; gap: var(--s1); opacity: .7; transition: opacity var(--fast) var(--ease); }
+.rows li:hover .deal, .rows li:focus-within .deal { opacity: 1; }
+
+/* Цена — служебное. Лайм тут перебивал бы названия треков, ради которых
+   в список и смотрят. */
+.chip {
+  font-size: 12px; flex: none;
+  color: var(--text); font-variant-numeric: tabular-nums;
+}
+
+/* Заказ за донат — платный и идёт вперёд бесплатных. Раньше класс money
+   рисовался в разметке, а правил под него не было ни одного: слово «донат»
+   набиралось обычным белым текстом и терялось среди соседних значков. */
+.chip.money {
+  color: var(--lime);
+  border: 1px solid var(--lime-lo);
+  border-radius: 2px;
+  padding: 1px 5px;
+  font-size: var(--t-xs); font-weight: 700;
+  letter-spacing: var(--track-chip); text-transform: uppercase;
+}
+
+.muted { color: var(--dimmer); }
+
+/* Заказ приезжает коротким сдвигом — видно, что список изменился,
+   без пульсаций и переливов. */
+@keyframes land {
+  from { transform: translateX(-6px); background: rgba(200, 247, 81, .10); }
+  to   { transform: none; background: transparent; }
+}
+.rows li.fresh { animation: land var(--slow) var(--ease); }
+
+/* ── Хроника ────────────────────────────────────────────────────────── */
+
+.feed { list-style: none; margin: 0; padding: 0; font-size: var(--t-sm); }
+.feed li {
+  display: flex; gap: var(--s2);
+  padding: var(--s2) 0; border-bottom: 1px solid var(--line);
+  color: var(--dimmer);
+}
+.feed li:last-child { border-bottom: none; }
+.feed .when {
+  color: var(--dimmer); font-size: var(--t-xs); flex: none;
+  padding-top: 2px; font-variant-numeric: tabular-nums;
+}
+.feed .what { min-width: 0; overflow-wrap: anywhere; }
+.feed .lvl-error .what { color: var(--bad); }
+.feed .lvl-warn .what { color: var(--dim); }
+
+.feed .fcode, .feed .wcode {
+  font-weight: 700; font-size: var(--t-xs); letter-spacing: var(--track-chip);
+  padding: 0 4px; margin-right: var(--s1); white-space: nowrap;
+}
+.feed .fcode { color: var(--bad); border: 1px solid rgba(255, 77, 77, .4); }
+/* Предупреждение — не «хорошо», поэтому не лаймом. */
+.feed .wcode { color: var(--dim); border: 1px solid var(--line-2); }
+
+/* Повторы схлопнуты в счётчик: пять одинаковых строк подряд — это шум. */
+.feed .times {
+  margin-left: var(--s1); font-size: var(--t-xs); font-weight: 700;
+  color: var(--dimmer); font-variant-numeric: tabular-nums;
+}
+
+.more {
+  margin-top: var(--s2);
+  background: none; border: none; cursor: pointer;
+  color: var(--dimmer); font: 600 12px/1 Manrope, system-ui, sans-serif;
+  padding: var(--s2) 0;
+  transition: color var(--fast) var(--ease);
+}
+.more:hover { color: var(--text); }
+.more:active { transform: translateY(1px); }
+
+/* ── Пустые состояния ───────────────────────────────────────────────────
+   Их стример видит почти всё время, поэтому иерархия должна работать и
+   здесь: в эфире — крупно и в полную яркость, в служебных колонках — мельче
+   и приглушённо. */
+
+.void { padding: var(--s7) 0 var(--s6); }
+.void .rule { width: 40px; height: 2px; background: var(--line-2); margin-bottom: var(--s5); }
+.void .mark {
+  font-family: Unbounded, sans-serif; font-weight: 600; letter-spacing: -.01em;
+  font-size: 18px; color: var(--dim); margin-bottom: var(--s2);
+}
+.void .say { font-size: var(--t-sm); color: var(--dimmer); max-width: 460px; line-height: 1.6; }
+
+.stage .void { padding-top: var(--s5); }
+.stage .void .mark { font-size: 30px; color: var(--text); }
+.stage .void .say { font-size: var(--t-md); }
+
+.void.hot .rule { background: var(--bad); }
+.void.hot .mark { color: var(--bad); }
+
+/* ── Разделы меню ───────────────────────────────────────────────────────
+   Раньше каждый раздел был куском страницы, дописанным снизу, и поэтому
+   отбивался сверху линией и своим фоном. Теперь они живут внутри меню, где
+   фон и края даёт само меню, — а здесь остаётся только отступ. */
+
+.panel {
+  padding: var(--s6) var(--edge) var(--edge);
+  animation: unfold var(--slow) var(--ease);
+}
+.panel[hidden] { display: none; }
+
+@keyframes unfold {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: var(--s7);
+  align-items: start;
+}
+.col { min-width: 0; }
+/* Блок во всю ширину сетки: для готового текста, где строки выровнены в
+   столбик и обрезаться посередине не должны. */
+.col.wide { grid-column: 1 / -1; }
+
+.field { display: block; margin-bottom: var(--s3); }
+.field > span { display: block; font-size: 12px; color: var(--dim); margin-bottom: var(--s1); }
+.field input[type="text"], .field input[type="number"], .field textarea, .field select {
+  width: 100%;
+  background: var(--bg); border: 1px solid var(--line-2); border-radius: 2px;
+  color: var(--text); padding: var(--s2) var(--s3); font: inherit; font-size: var(--t-sm);
+  transition: border-color var(--fast) var(--ease);
+}
+.field input:hover, .field textarea:hover, .field select:hover { border-color: var(--dim); }
+.field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: var(--lime); }
+.field textarea { resize: vertical; min-height: 60px; line-height: 1.5; }
+.field input[readonly] { color: var(--dim); }
+/* Числа здесь набирают редко, а стрелки съедают ширину и приглашают
+   крутить значение мышью — для «сколько стоит награда» это лишнее. */
+.field input[type="number"] { -moz-appearance: textfield; }
+.field input[type="number"]::-webkit-outer-spin-button,
+.field input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Готовый текст, который человек отправит как есть: справочник команд для
+   модераторов. Показываем ровно то, что уйдёт файлом, — стример должен видеть,
+   что именно он шлёт, а не верить кнопке на слово. Длинные строки не переносим
+   и не растягиваем блок: в файле они выровнены в столбик, и здесь должны
+   выглядеть так же, поэтому лишнее уезжает в прокрутку. */
+.sheet-text {
+  margin: var(--s3) 0 0;
+  padding: var(--s4);
+  max-height: 320px;
+  overflow: auto;
+  background: var(--raise);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--dim);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre;
+  tab-size: 4;
+}
+
+.hint { font-size: 12px; color: var(--dimmer); margin-top: var(--s2); line-height: 1.5; }
+.hint.warn { color: var(--bad); }
+.hint:empty { display: none; }
+
+/* Режимы возврата — не выпадашка, а три строки: настройка редкая и важная,
+   её читают один раз целиком и выбирают осознанно. */
+.modes { display: flex; flex-direction: column; gap: var(--s1); margin-bottom: var(--s3); }
+.mode {
+  display: flex; gap: var(--s3); align-items: flex-start;
+  padding: var(--s3); border: 1px solid var(--line); border-radius: 2px;
+  cursor: pointer;
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.mode:hover { border-color: var(--line-2); background: var(--hover); }
+.mode:focus-within { border-color: var(--dim); }
+.mode input { margin: 3px 0 0; accent-color: var(--lime); flex: none; }
+.mode.sel { border-color: var(--lime); background: rgba(200, 247, 81, .05); }
+.mode .name { display: block; font-size: var(--t-sm); font-weight: 600; }
+.mode .why { display: block; font-size: 12px; color: var(--dimmer); margin-top: 3px; line-height: 1.45; }
+.mode.broken { border-color: var(--bad); }
+.mode.broken .why { color: var(--bad); }
+
+.check {
+  display: flex; align-items: center; gap: var(--s2);
+  font-size: var(--t-sm); cursor: pointer; margin-bottom: var(--s2);
+  width: fit-content;
+  transition: color var(--fast) var(--ease);
+}
+.check:hover { color: var(--lime); }
+.check input { accent-color: var(--lime); width: 15px; height: 15px; }
+
+/* Карточка аккаунта: половина «у меня не работает» — это вход не тем
+   аккаунтом, и увидеть это надо с одного взгляда. */
+.account {
+  margin-top: var(--s3);
+  border: 1px solid var(--line-2);
+  border-left-width: 3px;
+  border-radius: 2px;
+  padding: var(--s3);
+  transition: border-color var(--slow) var(--ease);
+}
+.account.ok { border-left-color: var(--lime); }
+.account.iffy { border-left-color: var(--dim); }
+.account.bad { border-left-color: var(--bad); }
+
+.account .who { font-weight: 600; font-size: var(--t-md); overflow-wrap: anywhere; }
+.account .mail { font-size: 12px; color: var(--dim); margin-top: 1px; overflow-wrap: anywhere; }
+.account .plan { font-size: 12px; color: var(--dimmer); margin-top: var(--s1); }
+.account.ok .plan { color: var(--lime); }
+.account.bad .plan { color: var(--bad); }
+.account .note {
+  font-size: 12px; color: var(--dim); line-height: 1.5;
+  margin-top: var(--s2); padding-top: var(--s2); border-top: 1px solid var(--line);
+}
+.account .note b { color: var(--text); font-weight: 700; letter-spacing: var(--track-chip); }
+.account.bad .note b { color: var(--bad); }
+
+/* ── Низ окна ───────────────────────────────────────────────────────── */
+
+footer {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  padding: var(--s2) var(--edge);
+  font-size: 12px;
+  background: var(--raise); border-top: 1px solid var(--line);
+  transition: color var(--fast) var(--ease);
+  z-index: 6;
+}
+footer.offline { color: var(--bad); }
+footer.online { color: var(--dimmer); }
+/* Сказать нечего — полосы нет. У неё своя подложка и рамка, и пустая она
+   выглядит как «что-то тут было, да пропало». */
+footer[hidden] { display: none; }
+
+/* Кому анимации мешают — их не будет. Прогресс-полоса и так показывает
+   время, а остальное здесь помогает заметить изменение, не более. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+/* ── Доска готовности ───────────────────────────────────────────────────
+   Пока заказов нет — а это почти всё время на старте, — экран занимает не
+   пустота с серой надписью, а настоящие сведения: что настроено, чего не
+   хватает и куда вернётся музыка. Заодно это и есть инструкция. */
+
+.swap { animation: fade var(--slow) var(--ease); }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.head { max-width: 640px; margin-bottom: var(--s6); }
+
+.big {
+  font-family: Unbounded, sans-serif; font-weight: 600;
+  font-size: clamp(26px, 3vw, 36px); line-height: 1.1; letter-spacing: -.02em;
+  margin: 0 0 var(--s2);
+}
+.head .lead { margin: 0; color: var(--dim); font-size: var(--t-md); line-height: 1.55; }
+
+/* Полоса прогресса настройки: тонкая, во всю ширину, без цифр — сколько
+   осталось, видно и так. */
+.rail {
+  height: 2px; background: var(--line-2);
+  position: relative; margin-bottom: var(--s5);
+}
+.rail i {
+  position: absolute; inset: 0 auto 0 0;
+  background: var(--lime);
+  transition: width var(--slow) var(--ease);
+}
+
+.steps {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  border-top: 1px solid var(--line);
+}
+.step {
+  display: flex; gap: var(--s3);
+  padding: var(--s5) var(--s5) var(--s5) 0;
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  min-width: 0;
+}
+.step:last-child { border-right: none; }
+@media (max-width: 900px) { .step { border-right: none; } }
+
+.no {
+  font-family: Unbounded, sans-serif; font-size: var(--t-xs); font-weight: 600;
+  color: var(--dimmer); flex: none; padding-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.step-body { min-width: 0; }
+.step-name {
+  font-size: var(--t-xs); font-weight: 700;
+  letter-spacing: var(--track-caps); text-transform: uppercase;
+  color: var(--dimmer); margin-bottom: var(--s1);
+}
+.step-value {
+  font-size: var(--t-md); font-weight: 600; color: var(--text);
+  overflow-wrap: anywhere; line-height: 1.35;
+}
+.step-hint { font-size: 12px; color: var(--dimmer); margin-top: var(--s1); line-height: 1.45; }
+.step-acts { display: flex; gap: var(--s2); margin-top: var(--s3); flex-wrap: wrap; }
+
+/* Состояние шага читается по цифре и цвету значения, без иконок-галочек:
+   галочка рядом с каждым пунктом — это и есть вид «сгенерированной формы». */
+.step.done .no { color: var(--lime); }
+.step.done .step-value { color: var(--dim); font-weight: 500; }
+.step.todo .no { color: var(--text); }
+.step.warn .no { color: var(--lime); }
+.step.fail .no { color: var(--bad); }
+.step.fail .step-value { color: var(--bad); }
+.step.wait { opacity: .45; }
+.step.off .step-value { color: var(--dim); font-weight: 500; }
+
+/* ── Как награду видит зритель ──────────────────────────────────────────
+   Пустой список заказов — повод показать, что всё на месте, а не написать
+   «здесь пока ничего». */
+
+.preview { padding: var(--s5) 0 var(--s3); }
+.preview-label {
+  font-size: var(--t-xs); font-weight: 700;
+  letter-spacing: var(--track-caps); text-transform: uppercase;
+  color: var(--dimmer); margin-bottom: var(--s3);
+}
+.preview-card {
+  display: flex; gap: var(--s4); align-items: flex-start;
+  border: 1px solid var(--line-2); border-radius: 2px;
+  padding: var(--s4); max-width: 460px;
+  background: var(--raise);
+}
+.preview-cost {
+  font-family: Unbounded, sans-serif; font-weight: 600; font-size: 20px;
+  color: var(--lime); flex: none; font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.preview-text { min-width: 0; }
+.preview-title { font-weight: 600; font-size: var(--t-md); overflow-wrap: anywhere; }
+.preview-prompt { font-size: 12px; color: var(--dimmer); margin-top: var(--s1); line-height: 1.5; }
+
+/* ── Итоги сессии ───────────────────────────────────────────────────────
+   В тихий вечер это единственное, что на экране вообще меняется. */
+
+.tally {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 1px; background: var(--line);
+  border: 1px solid var(--line); margin-bottom: var(--s6);
+}
+.tally .cell { background: var(--bg); padding: var(--s3); }
+.tally .num {
+  font-family: Unbounded, sans-serif; font-weight: 600; font-size: 18px;
+  color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+.tally .lab {
+  font-size: var(--t-xs); color: var(--dimmer); margin-top: 2px;
+  letter-spacing: var(--track-chip);
+}
+
+/* ── Что нашлось по заказу ──────────────────────────────────────────── */
+
+.tag {
+  font-size: 10px; font-weight: 700; letter-spacing: var(--track-chip);
+  text-transform: uppercase; padding: 2px 6px; border-radius: 2px; flex: none;
+}
+.tag.searching { color: var(--dimmer); border: 1px solid var(--line-2); }
+.tag.doubt { color: var(--lime); border: 1px solid var(--lime-lo); }
+.tag.miss { color: var(--bad); border: 1px solid rgba(255, 77, 77, .4); }
+
+/* Исходный текст зрителя рядом с найденным треком: видно, из чего что
+   получилось, и сразу заметно, если подобралось не то. */
+.asked {
+  font-size: 12px; color: var(--dimmer);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%;
+}
+
+/* ── Очередь ────────────────────────────────────────────────────────── */
+
+.kicker .rest { font-weight: 500; letter-spacing: var(--track-chip); color: var(--dimmer); }
+.kicker .queue-tools { margin-left: auto; display: flex; gap: var(--s3); }
+
+.link-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--dimmer); font: 600 var(--t-xs)/1 Manrope, system-ui, sans-serif;
+  letter-spacing: var(--track-chip); text-transform: uppercase;
+  padding: 2px 0;
+  transition: color var(--fast) var(--ease);
+}
+.link-btn:hover { color: var(--text); }
+.link-btn.on { color: var(--lime); }
+.link-btn.danger:hover { color: var(--bad); }
+.link-btn.armed { color: var(--bad); text-transform: none; letter-spacing: 0; }
+
+.queue-rows li { grid-template-columns: 16px 30px minmax(0, 1fr) auto auto; }
+
+/* Ручка перетаскивания: без неё непонятно, что строку можно двигать. */
+.grip {
+  color: var(--faint); cursor: grab; display: grid; place-items: center;
+  opacity: 0; transition: opacity var(--fast) var(--ease);
+}
+.grip svg { width: 14px; height: 14px; }
+.queue-rows li:hover .grip { opacity: 1; }
+.queue-rows li.dragging { opacity: .4; }
+
+/* Заказ, ждущий конца трека стримера: он уже не в очереди и кнопок не имеет,
+   но на экране быть обязан. */
+.queue-rows li.waiting-row .grip { opacity: 1; color: var(--lime); cursor: default; }
+.queue-rows li.waiting-row .ttl { color: var(--dim); }
+.queue-rows li.over { box-shadow: inset 0 2px 0 var(--lime); }
+
+.icon-btn {
+  background: none; border: none; cursor: pointer; color: var(--dimmer);
+  padding: var(--s1); display: grid; place-items: center; border-radius: 2px;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.icon-btn:hover { color: var(--text); background: var(--hover); }
+.icon-btn.kill:hover { color: var(--bad); }
+.icon-btn svg { width: 15px; height: 15px; }
+
+/* ── Бан-лист ───────────────────────────────────────────────────────── */
+
+.bans { list-style: none; margin: var(--s3) 0 0; padding: 0; font-size: var(--t-sm); }
+.bans li {
+  display: flex; align-items: baseline; gap: var(--s2);
+  padding: var(--s2) 0; border-bottom: 1px solid var(--line);
+}
+.bans li:last-child { border-bottom: none; }
+.bans .who { font-weight: 600; }
+.bans .why { color: var(--dimmer); font-size: 12px; flex: 1; overflow-wrap: anywhere; }
+
+.inline-input {
+  background: var(--bg); border: 1px solid var(--line-2); border-radius: 2px;
+  color: var(--text); padding: var(--s2) var(--s3); font: inherit; font-size: 12px;
+  width: 120px;
+  transition: border-color var(--fast) var(--ease);
+}
+.inline-input:focus { outline: none; border-color: var(--lime); }
+
+
+/* ── «не тот трек» ─────────────────────────────────────────────────────
+   Единственное окно поверх панели во всём приложении. Оно здесь оправдано:
+   выбор из списка требует внимания целиком, а всё остальное в это время
+   всё равно не трогают. */
+#fix[hidden] { display: none; }
+#fix {
+  position: fixed; inset: 0; z-index: 40;
+  display: grid; place-items: start center;
+  padding: 8vh var(--s5) var(--s5);
+  background: rgba(4, 5, 6, .72);
+  backdrop-filter: blur(3px);
+  animation: fadeIn var(--slow) var(--ease);
+}
+/* Своё имя, а не второй «fade»: одноимённые @keyframes глобальны, и этот
+   молча отменял сдвиг у .swap — то есть плавная подмена содержимого,
+   ради которой .swap и написан, превращалась в голое затухание, а по
+   коду это было не увидеть: правило на месте и выглядит рабочим. */
+@keyframes fadeIn { from { opacity: 0 } }
+
+.sheet {
+  width: min(560px, 100%);
+  background: var(--raise); border: 1px solid var(--line-2); border-radius: 3px;
+  padding: var(--s5);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .6);
+  animation: rise var(--slow) var(--ease);
+}
+@keyframes rise { from { opacity: 0; transform: translateY(-8px) } }
+
+.sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s4); }
+.sheet-sub { font-size: var(--t-sm); color: var(--dim); margin-top: var(--s1); }
+.sheet-sub b { color: var(--text); font-weight: 600; }
+
+.sheet-find { display: flex; gap: var(--s2); margin: var(--s4) 0 0; }
+.sheet-find input {
+  flex: 1; min-width: 0;
+  background: var(--bg); border: 1px solid var(--line-2); border-radius: 2px;
+  color: var(--text); padding: var(--s2) var(--s3); font: inherit; font-size: var(--t-sm);
+  transition: border-color var(--fast) var(--ease);
+}
+.sheet-find input:focus { outline: none; border-color: var(--lime); }
+
+.picks { list-style: none; margin: var(--s3) 0 0; padding: 0; max-height: 46vh; overflow-y: auto; }
+.picks li + li { border-top: 1px solid var(--line); }
+.pick {
+  display: flex; align-items: center; gap: var(--s3); width: 100%;
+  padding: var(--s2); background: none; border: 0; border-radius: 2px;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: background var(--fast) var(--ease);
+}
+.pick:hover, .pick:focus-visible { background: var(--hover); outline: none; }
+.pick:disabled { opacity: .4; cursor: default; }
+
+.pick-art {
+  width: 40px; height: 40px; flex: none; border-radius: 2px; overflow: hidden;
+  background: var(--line);
+}
+.pick-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pick-text { min-width: 0; flex: 1; }
+.pick-title { display: block; font-size: var(--t-sm); font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick-sub { display: block; font-size: 12px; color: var(--dim); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick-len { font-size: 12px; color: var(--dimmer); font-variant-numeric: tabular-nums; flex: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  #fix, .sheet { animation: none; }
+}
+
+/* ── Хроника ───────────────────────────────────────────────────────────
+   Тот же список, что и очередь, но без номеров и кнопок: здесь ничего не
+   делают, сюда приходят читать. */
+.grid.two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+
+.log-rows { margin-top: var(--s3); max-height: 62vh; overflow-y: auto; }
+.log-rows li { grid-template-columns: minmax(0, 1fr) auto; }
+.log-rows .len { font-size: 12px; color: var(--dimmer); font-variant-numeric: tabular-nums; }
+.log-rows .ttl { font-size: var(--t-sm); }
+.log-rows .asked { max-width: 60%; }
+.log-rows li.none {
+  display: block; border: 0; color: var(--dimmer); font-size: var(--t-sm);
+  padding: var(--s3) 0;
+}
+
+.tag.ok   { color: var(--dim);  border: 1px solid var(--line-2); }
+.tag.warn { color: var(--lime); border: 1px solid var(--lime-lo); }
+.tag.bad  { color: var(--bad);  border: 1px solid rgba(255, 77, 77, .4); }
+
+/* ── Раздел «Виджет» ───────────────────────────────────────────────────
+   Слева кадр с настоящей плашкой, справа ручки, ниже галерея наборов.
+   Плашка в кадре нарисована тем же widget.css, что и виджет в OBS: своей
+   «похожей» вёрстки здесь нет намеренно — она разошлась бы с настоящей
+   в первый же день. */
+
+.wx {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--s7);
+  align-items: start;
+}
+
+/* Кадр всегда тёмный или светлый по выбору, а не по теме панели: это не
+   часть интерфейса, а изображение — то, что увидят зрители. */
+.wx-stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  background: #0b0d0e;
+  isolation: isolate;
+}
+
+.wx-scene { position: absolute; inset: 0; }
+.wx-scene::before, .wx-scene::after { content: ""; position: absolute; inset: 0; }
+
+.wx-stage[data-scene="dark"] .wx-scene {
+  background: radial-gradient(120% 90% at 72% 18%, #24313d 0%, #131a20 45%, #0b0d0e 100%);
+}
+.wx-stage[data-scene="dark"] .wx-scene::before {
+  background:
+    radial-gradient(38% 46% at 24% 74%, rgba(88, 132, 160, .3), transparent 70%),
+    radial-gradient(30% 34% at 82% 62%, rgba(150, 96, 70, .26), transparent 70%);
+  filter: blur(6px);
+}
+
+.wx-stage[data-scene="light"] .wx-scene {
+  background: radial-gradient(120% 95% at 40% 12%, #e2e8ec 0%, #b9c6cd 48%, #8fa2ad 100%);
+}
+.wx-stage[data-scene="light"] .wx-scene::before {
+  background:
+    radial-gradient(34% 40% at 78% 74%, rgba(255, 255, 255, .75), transparent 70%),
+    radial-gradient(40% 46% at 18% 30%, rgba(255, 240, 205, .55), transparent 70%);
+  filter: blur(8px);
+}
+
+/* Пёстрая сцена — главная проверка: оформление без подложки читается
+   далеко не на всякой картинке, и увидеть это надо здесь, а не на стриме. */
+.wx-stage[data-scene="busy"] .wx-scene {
+  background:
+    repeating-linear-gradient(58deg, #7d3f8c 0 42px, #2b6ea8 42px 84px, #d0763a 84px 126px),
+    #333;
+}
+.wx-stage[data-scene="busy"] .wx-scene::before {
+  background:
+    radial-gradient(45% 55% at 70% 30%, rgba(255, 255, 255, .55), transparent 70%),
+    radial-gradient(40% 50% at 20% 80%, rgba(0, 0, 0, .55), transparent 70%);
+  filter: blur(10px);
+}
+
+.wx-scene::after {
+  background: radial-gradient(100% 100% at 50% 45%, transparent 55%, rgba(0, 0, 0, .35) 100%);
+}
+
+.wx-stage-bar {
+  display: flex; align-items: center; gap: var(--s4);
+  padding: var(--s3) 0;
+  border-bottom: 1px solid var(--line);
+}
+.wx-stage-bar .link-btn { margin-left: auto; }
+
+.chips { display: flex; gap: var(--s1); }
+.chips button {
+  font: 500 12px/1 inherit;
+  color: var(--dimmer); background: none;
+  border: 1px solid var(--line); border-radius: 2px;
+  padding: 6px 10px; cursor: pointer;
+  transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.chips button:hover { color: var(--text); border-color: var(--line-2); }
+.chips button.on { color: var(--lime); border-color: var(--lime-lo); }
+.chips button:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+
+.wx-right .kicker { display: flex; align-items: baseline; }
+
+/* Девять точек привязки.
+   ─────────────────────────────────────────────────────────────────────────
+   Сама сетка и есть картинка кадра: где кнопка, там и встанет плашка.
+   Подписи тут не нужны — они были бы длиннее самого выбора. */
+.wx-anchors {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  margin-top: var(--s2);
+  padding: 4px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+.wx-anchors button {
+  position: relative;
+  border: 0; background: none; padding: 0; cursor: pointer;
+  transition: background var(--fast) var(--ease);
+}
+/* Точка внутри клетки — то самое место, куда прижмётся плашка. */
+.wx-anchors button::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: 4px; height: 4px; margin: -2px 0 0 -2px;
+  background: var(--dimmer); border-radius: 50%;
+  transition: background var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.wx-anchors button:hover::after { background: var(--text); }
+.wx-anchors button.on::after { background: var(--lime); transform: scale(1.9); }
+.wx-anchors button:focus-visible { outline: 2px solid var(--lime); outline-offset: 1px; }
+/* У тикера бок не выбирается — он во всю ширину. Гасим средний столбец
+   и левый с правым, оставляя видимым только смысл «верх или низ». */
+.wx-anchors.narrow button:nth-child(3n+1)::after,
+.wx-anchors.narrow button:nth-child(3n)::after { opacity: .25; }
+
+/* Плашку в образце можно таскать мышью. */
+.wx-stage .slot { cursor: grab; touch-action: none; }
+.wx-stage.dragging .slot { cursor: grabbing; }
+.wx-stage.dragging { user-select: none; }
+
+/* Разметка кадра — видна только пока тащат. Постоянная сетка поверх кадра
+   мешала бы смотреть на сам виджет, ради которого сюда и приходят. */
+.wx-grid {
+  position: absolute; inset: 0; pointer-events: none;
+  opacity: 0; transition: opacity var(--fast) var(--ease);
+  background:
+    linear-gradient(to right,
+      transparent calc(100% / 3 - 1px), rgba(200, 247, 81, .28) calc(100% / 3 - 1px),
+      rgba(200, 247, 81, .28) calc(100% / 3), transparent calc(100% / 3),
+      transparent calc(200% / 3 - 1px), rgba(200, 247, 81, .28) calc(200% / 3 - 1px),
+      rgba(200, 247, 81, .28) calc(200% / 3), transparent calc(200% / 3)),
+    linear-gradient(to bottom,
+      transparent calc(100% / 3 - 1px), rgba(200, 247, 81, .28) calc(100% / 3 - 1px),
+      rgba(200, 247, 81, .28) calc(100% / 3), transparent calc(100% / 3),
+      transparent calc(200% / 3 - 1px), rgba(200, 247, 81, .28) calc(200% / 3 - 1px),
+      rgba(200, 247, 81, .28) calc(200% / 3), transparent calc(200% / 3));
+}
+.wx-stage.dragging .wx-grid { opacity: 1; }
+
+/* Ползунки. Родной вид у них разный в каждом браузере, поэтому дорожку
+   и бегунок задаём сами — иначе панель в Chrome и Firefox выглядит
+   по-разному именно там, где настраивают внешний вид. */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 18px; background: none; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 2px; background: var(--line-2); border-radius: 2px;
+}
+input[type="range"]::-moz-range-track {
+  height: 2px; background: var(--line-2); border-radius: 2px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 13px; height: 13px; margin-top: -5.5px;
+  background: var(--lime); border-radius: 50%; border: 0;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 13px; height: 13px;
+  background: var(--lime); border-radius: 50%; border: 0;
+}
+input[type="range"]:focus-visible { outline: 2px solid var(--lime); outline-offset: 4px; }
+input[type="range"]:disabled { opacity: .35; cursor: default; }
+input[type="range"]:disabled::-webkit-slider-thumb { background: var(--dimmer); }
+input[type="range"]:disabled::-moz-range-thumb { background: var(--dimmer); }
+
+.field > span b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ── ручная настройка ─────────────────────────────────────────────── */
+
+#wx-tweaks { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s3); }
+
+.tweak {
+  display: flex; align-items: center; gap: var(--s2);
+  font-size: var(--t-sm); color: var(--dim);
+  cursor: pointer;
+}
+.tweak.wide { flex-direction: column; align-items: stretch; gap: var(--s1); cursor: default; }
+.tweak-name { display: flex; align-items: center; gap: var(--s2); flex: 1; }
+.tweak-name b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Тронутое руками помечено: иначе через неделю не вспомнить, что здесь
+   набор, а что своя правка. */
+.tweak.set .tweak-name { color: var(--lime); }
+
+.tweak input[type="color"] {
+  -webkit-appearance: none; appearance: none;
+  width: 30px; height: 24px; padding: 0; flex: none; cursor: pointer;
+  background: none; border: 1px solid var(--line-2); border-radius: 2px;
+}
+.tweak input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+.tweak input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 1px; }
+.tweak input[type="color"]::-moz-color-swatch { border: 0; border-radius: 1px; }
+
+.tweak-off {
+  background: none; border: 0; color: var(--dimmer);
+  font-size: 15px; line-height: 1; padding: 0 2px; cursor: pointer;
+  transition: color var(--fast) var(--ease);
+}
+.tweak-off:hover { color: var(--bad); }
+.tweak-off:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+
+/* ── галерея наборов ──────────────────────────────────────────────── */
+
+.wx-gallery { margin-top: var(--s7); display: flex; flex-direction: column; gap: var(--s7); }
+
+.fam { display: flex; flex-direction: column; gap: var(--s3); }
+.fam-head { display: flex; align-items: baseline; gap: var(--s4); flex-wrap: wrap; }
+.fam-head h3 {
+  margin: 0; font-family: Unbounded, sans-serif; font-size: var(--t-sm);
+  font-weight: 600; letter-spacing: var(--track-chip);
+}
+.fam-head p { margin: 0; font-size: 12px; color: var(--dimmer); flex: 1; min-width: 200px; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--s3); }
+
+.tile {
+  display: flex; flex-direction: column; gap: var(--s2);
+  padding: 0; background: none; border: 0; color: inherit;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.tile-stage {
+  display: block; position: relative; overflow: hidden;
+  aspect-ratio: 16 / 7;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(120% 100% at 70% 20%, #26333f 0%, #141b21 50%, #0c0e10 100%);
+  transition: border-color var(--fast) var(--ease);
+}
+/* Плитка — не сцена, а образец: плашка стоит по центру, а не в углу. */
+.tile-stage .card {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 92%;
+}
+.tile-stage .card.show { transform: translate(-50%, -50%); }
+/* Тикер тянется во всю ширину и по горизонтали не центрируется: сдвиг на
+   половину увёл бы его за край плитки. */
+.tile-stage .card[data-family="ticker"],
+.tile-stage .card[data-family="ticker"].show { transform: translate(0, -50%); }
+/* Постоянные анимации в плитках оставлены: пластинка крутится, катушки
+   идут, каретка мигает — ради этого на них и смотрят. А вот появление в
+   плитках не играет: сорок штук разом — это припадок, а не показ.
+   Появление смотрят в кадре наверху, по кнопке. */
+.tile-stage .card { animation: none !important; }
+
+.tile-name {
+  font-size: 12px; color: var(--dimmer);
+  transition: color var(--fast) var(--ease);
+}
+.tile:hover .tile-stage { border-color: var(--line-2); }
+.tile:hover .tile-name { color: var(--text); }
+.tile:focus-visible .tile-stage { outline: 2px solid var(--lime); outline-offset: 2px; }
+
+.tile.on .tile-stage { border-color: var(--lime); }
+.tile.on .tile-name { color: var(--lime); }
+.tile.on .tile-name::after { content: " · выбран"; color: var(--dimmer); }
+
+@media (max-width: 900px) {
+  .wx { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Метка «сохранено». Поля настроек сохраняются сами, как только уходит фокус,
+   и без метки это выглядит так, будто ничего не произошло: человек правит
+   цену награды, ничего не видит и решает, что настройка сломана. */
+.field, .check { position: relative; }
+
+.field.saved > span::after,
+.check.saved::after {
+  content: "сохранено";
+  margin-left: var(--s2);
+  font-size: 11px; font-weight: 600;
+  letter-spacing: var(--track-chip);
+  color: var(--lime);
+  animation: savedMark 1.8s var(--ease) forwards;
+}
+
+@keyframes savedMark {
+  0%   { opacity: 0; transform: translateX(-4px); }
+  12%  { opacity: 1; transform: none; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .field.saved > span::after, .check.saved::after { animation: none; opacity: 1; }
+}
+
+/* Выключенный список должен выглядеть выключенным. Без этого правила базовый
+   цвет текста перебивает вид браузера, и «Угол кадра» у тикера выглядит
+   рабочим, хотя не нажимается. */
+.field select:disabled,
+.field input:disabled {
+  color: var(--dimmer);
+  border-color: var(--line);
+  cursor: not-allowed;
+}
+.field input[type="range"]:disabled { cursor: not-allowed; }
+
+/* Приложение умерло — гаснет всё, включая баннер с кодом входа и окно
+   «не тот трек». Раньше они горели поверх серого и отвечали «приложение не
+   ответило» на любое нажатие. */
+body.stale #banner,
+body.stale #fix { opacity: .35; pointer-events: none; }
+
+/* ── Меню разделов ──────────────────────────────────────────────────────
+
+   Что было: кнопки «виджет», «хроника» и «настройки» просто прокручивали
+   страницу вниз, к трём длинным кускам, дописанным под главным экраном.
+   Человек терял место, куда смотрел, а возвращаться приходилось прокруткой.
+
+   Что стало: меню поверх страницы. Слева разделы, справа один раздел за раз,
+   позади затемнение — по нему видно, что главный экран никуда не делся и
+   ждёт. Устроено так же, как мастер первой настройки: рельс плюс тело, —
+   чтобы в приложении не было двух разных представлений об одном и том же. */
+
+.menu {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s6);
+}
+.menu[hidden] { display: none; }
+
+/* Полосу заголовка меню не закрывает: свернуть и закрыть окно человек должен
+   мочь в любой момент, в том числе стоя в настройках. Правило то же, что у
+   мастера настройки. */
+body.has-titlebar .menu { top: 38px; }
+
+.menu-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 5, 6, .62);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--slow) var(--ease-soft);
+}
+.menu.on .menu-scrim { opacity: 1; }
+
+/* Меню — окно в центре, а не полотно во всю ширину.
+   По краям нарочно остаётся виден задний экран: так сразу понятно, что
+   очередь и эфир никуда не делись и до них один клик. Появление — лёгкий
+   масштаб вместе с проявлением, без рывка. */
+.menu-sheet {
+  position: relative;
+  width: min(1200px, 100%);
+  height: min(880px, 100%);
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .55), 0 2px 10px rgba(0, 0, 0, .45);
+  opacity: 0;
+  transform: scale(.965);
+  transition: opacity .26s var(--ease-soft), transform .34s var(--ease-soft);
+}
+.menu.on .menu-sheet { opacity: 1; transform: scale(1); }
+
+/* Пока меню открыто, страница позади не прокручивается. Иначе на экране
+   две полосы прокрутки рядом — своя у меню и чужая у страницы, и колесом
+   мыши над краем ездит то, что под меню. */
+body.menu-open { overflow: hidden; }
+
+/* Дорожка разделов */
+.menu-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  border-right: 1px solid var(--line);
+  background: var(--raise);
+  padding: var(--s5) var(--s4);
+  overflow-y: auto;
+}
+
+.menu-back {
+  display: inline-flex; align-items: center; gap: var(--s2);
+  align-self: flex-start;
+  background: none; border: 0; cursor: pointer;
+  color: var(--dim);
+  font-size: var(--t-sm);
+  padding: var(--s2);
+  margin-bottom: var(--s4);
+  border-radius: 8px;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.menu-back:hover { color: var(--text); background: var(--hover); }
+.menu-back svg { width: 15px; height: 15px; }
+
+.menu-nav { display: flex; flex-direction: column; gap: var(--s1); }
+
+.menu-item {
+  display: flex; align-items: center; gap: var(--s3);
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  padding: var(--s3) var(--s3);
+  color: var(--dim);
+  font-size: var(--t-md);
+  cursor: pointer;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.menu-item:hover { color: var(--text); background: var(--hover); }
+.menu-item svg { width: 17px; height: 17px; flex: none; }
+
+/* Открытый раздел красится лаймом — тем же цветом, что и активная кнопка в
+   верхней полосе, чтобы связь между ними читалась без объяснений. */
+.menu-item.on {
+  color: var(--lime);
+  background: rgba(200, 247, 81, .07);
+}
+
+.menu-tail {
+  margin-top: auto;
+  padding: var(--s3);
+  color: var(--dimmer);
+  font-size: var(--t-xs);
+}
+
+.menu-body { overflow-y: auto; }
+
+/* Полоса прокрутки.
+
+   Серая полоса справа — единственное место в панели, которое рисовала
+   сама Windows, и выглядела она чужой. Теперь полоса прозрачная, а ползунок
+   проявляется только на время прокрутки (класс scrolling вешает app.js) и сам
+   уходит. Место под неё занято всегда (scrollbar-gutter): иначе текст бы вздрагивал
+   каждый раз, когда ползунок появляется. */
+.thin-scroll { scrollbar-gutter: stable; }
+.thin-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
+.thin-scroll::-webkit-scrollbar-corner { background: transparent; }
+.thin-scroll::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  transition: background-color .35s var(--ease);
+}
+.thin-scroll.scrolling::-webkit-scrollbar-thumb { background-color: rgba(242, 244, 245, .30); }
+.thin-scroll::-webkit-scrollbar-thumb:hover { background-color: rgba(242, 244, 245, .34); }
+
+/* ── Вкладки внутри раздела ────────────────────────────────────────────
+   Второй уровень для настроек: девять блоков подряд не читаются никак, а
+   человек обычно приходит за одним из них. Липкая полоса — чтобы при
+   прокрутке длинной вкладки было видно, где стоишь. */
+
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  margin: calc(var(--s6) * -1) calc(var(--edge) * -1) var(--s6);
+  padding: var(--s4) var(--edge);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 7px var(--s4);
+  color: var(--dim);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease),
+              border-color var(--fast) var(--ease);
+}
+.tab:hover { color: var(--text); background: var(--hover); }
+.tab.on {
+  color: var(--lime);
+  border-color: var(--lime-lo);
+  background: rgba(200, 247, 81, .07);
+}
+
+.tab-pane { animation: unfold var(--slow) var(--ease); }
+.tab-pane[hidden] { display: none; }
+
+/* Окно бывает и узким: тогда рельс уезжает наверх строкой, а не съедает
+   половину ширины под три пункта. */
+@media (max-width: 860px) {
+  .menu { padding: var(--s2); }
+  .menu-sheet { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); border-radius: 12px; }
+  .menu-rail { flex-direction: row; align-items: center; border-right: 0; border-bottom: 1px solid var(--line); }
+  .menu-back { margin: 0; }
+  .menu-nav { flex-direction: row; }
+  .menu-tail { display: none; }
+  .panel { padding: var(--s5) var(--s5) var(--s6); }
+  .tabs { margin: calc(var(--s5) * -1) calc(var(--s5) * -1) var(--s5); padding: var(--s3) var(--s5); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-scrim, .menu-sheet { transition: none; }
+  .menu-sheet { transform: none; }
+  .tab-pane, .panel { animation: none; }
+}
+
+/* Кнопка обновления в верхней полосе. Лаймовая, потому что это единственное
+   место, где приложение само просит что-то сделать. */
+.tail-btn.go { color: var(--ink); background: var(--lime); border-color: var(--lime); }
+.tail-btn.go:hover { filter: brightness(1.06); }
+.tail-btn.go:disabled { opacity: .6; cursor: default; filter: none; }
+.tail-btn[hidden] { display: none; }
+
+/* Что изменилось в новой версии. Моноширинным нарочно: это список правок,
+   а не проза, и в нём бывают номера версий и имена файлов. */
+.upd-notes {
+  margin-top: var(--s3);
+  max-height: 180px; overflow: auto;
+  white-space: pre-wrap;
+  font-size: 12px; line-height: 1.5;
+}
+.upd-notes[hidden] { display: none; }
+
+/* ── плейлисты, ждущие решения ─────────────────────────────────────────
+   Блок стоит между эфиром и очередью: это то, что требует действия
+   человека, а очередь идёт сама. Пусто — блока нет вовсе. */
+
+/* В этой панели у многих блоков задан display, и атрибут hidden сам по себе
+   их не прячет: правило display в классе сильнее. Поэтому каждый прячущийся
+   блок гасится явно — так же, как .panel, .tab-pane и остальные выше. */
+.pls[hidden], #pl-fields[hidden], #pl-cost-field[hidden] { display: none; }
+
+.pls {
+  margin: 0 0 var(--s7);
+  padding: var(--s5) var(--s6) var(--s6);
+  border: 1px solid var(--lime-lo);
+  background: var(--raise);
+}
+.pls .kicker { display: flex; align-items: center; gap: var(--s3); }
+
+.pl + .pl { margin-top: var(--s5); padding-top: var(--s5); border-top: 1px solid var(--line); }
+.pl { margin-top: var(--s4); }
+
+.pl-head { display: flex; align-items: flex-start; gap: var(--s4); }
+.pl-title {
+  font-family: Unbounded, Manrope, sans-serif;
+  font-size: 17px; font-weight: 600; line-height: 1.2;
+}
+.pl-sub {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  margin-top: 4px; font-size: 13px; color: var(--dimmer);
+}
+.pl-sub svg { width: 14px; height: 14px; }
+.pl-sub b { color: var(--text); font-weight: 600; }
+.pl-more { color: var(--dim); }
+
+/* Главное число для решения — не количество треков, а сколько это займёт
+   эфира. «Пять треков» не говорит ничего, «19 минут» говорит всё. */
+.pl-time {
+  margin-left: auto; flex: none;
+  font-family: Unbounded, Manrope, sans-serif;
+  font-size: 15px; color: var(--lime);
+  white-space: nowrap;
+}
+
+.pl-tracks {
+  margin: var(--s4) 0 var(--s4);
+  padding-left: 22px;
+  font-size: 13px; color: var(--dimmer);
+  line-height: 1.7;
+}
+.pl-tracks li::marker { color: var(--dim); }
+
+/* ── сводка цены плейлиста в настройках ───────────────────────────────
+   Стример должен видеть, что он предлагает зрителю, а не верить слову
+   «скидка»: сравнение с поштучной ценой и есть весь смысл этой награды. */
+.sum {
+  margin-top: var(--s4);
+  border: 1px solid var(--line);
+  background: var(--raise);
+}
+.sum-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s4);
+  padding: 7px 12px;
+  font-size: 13px; color: var(--dimmer);
+}
+.sum-row + .sum-row { border-top: 1px solid var(--line); }
+.sum-row b { color: var(--text); font-weight: 600; }
+.sum-row.good b { color: var(--lime); }
+.sum-row.bad b { color: var(--dim); }

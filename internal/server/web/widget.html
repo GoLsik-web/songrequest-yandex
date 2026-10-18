@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Заказ музыки — виджет</title>
+<link rel="stylesheet" href="/static/fonts/fonts.css">
+<link rel="stylesheet" href="/static/widget.css">
+<style>
+/* Виджет для OBS. Прозрачный фон обязателен: это Browser Source поверх
+   картинки. Здесь только сцена; всё оформление плашки живёт в widget.css,
+   потому что тот же файл использует предпросмотр в панели — иначе панель
+   показывала бы одно, а стрим другое. */
+
+html, body { margin: 0; background: transparent; overflow: hidden; }
+body { -webkit-font-smoothing: antialiased; }
+</style>
+</head>
+<body>
+
+<!-- Место плашки в кадре задаёт обёртка, а не сама плашка.
+     Причина простая: у плашки transform занят анимациями — въездом, уходом,
+     покачиванием винила, дрожью терминала. Прижать её к середине кадра можно
+     только через translate(-50%), и он затирался бы первой же анимацией.
+     Обёртка держит место, плашка внутри живёт своей жизнью. -->
+<div class="slot" id="slot">
+  <div class="card" id="card">
+    <div class="art" id="art"></div>
+    <div class="text">
+      <div class="title" id="title"></div>
+      <div class="artist" id="artist"></div>
+      <div class="by" id="by"></div>
+      <div class="bar"><i id="bar"></i></div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/widget-presets.js"></script>
+<script>
+// Виджет живёт на том же сокете, что и панель: отдельного опроса нет.
+//
+// Оформление тоже приезжает по сокету вместе с состоянием. Это осознанно:
+// иначе каждая правка в панели означала бы «скопируй новый адрес и вставь
+// его в OBS заново». Адрес один и навсегда, а вид меняется на лету.
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const card = $("card");
+  const slot = $("slot");
+
+  // Без `??`: OBS возит с собой свой браузер, и в старых сборках это не
+  // «не поддерживается», а ошибка разбора — тогда не выполняется весь
+  // скрипт виджета целиком, и в кадре остаётся пустой прозрачный
+  // прямоугольник. Ни ошибки, ни следа в логе.
+  const esc = (s) => String(s === null || s === undefined ? "" : s).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+
+  // Обложку берём не со склада Spotify напрямую, а у самого приложения.
+  //
+  // Браузер внутри OBS ходит в интернет сам по себе и про обход блокировок,
+  // поднятый приложением, не знает: в панели обложка была видна, а в кадре —
+  // нет. Приложение качает её через тот же обход и отдаёт со 127.0.0.1, а если
+  // не смогло — переводит браузер на прямой адрес, как было раньше.
+  const coverSrc = (u) => "/cover?u=" + encodeURIComponent(u);
+
+  const NOTE = `<svg class="no" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/>
+      <circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+
+  // ── оформление ─────────────────────────────────────────────────────
+
+  let applied = "";
+  // Показывать ли ник заказчика. Строка под артистом есть всегда: она
+  // отвечает на вопрос «это заказали или стример сам поставил», и без неё
+  // зритель решит, что заказы заняты на полчаса вперёд.
+  let showNick = true;
+  // Настройки показа, которыми пользуется расписание. Держим отдельно, чтобы
+  // не разбирать их заново на каждый тик.
+  let plan = { hold: 0, every: 0, onChange: true };
+
+  function dress(w) {
+    if (!w) return;
+
+    // Сравниваем целиком: перерисовывать плашку на каждом обновлении
+    // состояния нельзя — сбросится анимация и дрогнет картинка в кадре.
+    const signature = JSON.stringify(w);
+    if (signature === applied) return;
+    const first = applied === "";
+    applied = signature;
+
+    const { family, variant } = widgetPreset(w.preset);
+    card.dataset.family = family.id;
+    card.dataset.variant = variant.id;
+    card.dataset.art = w.show_art === false ? "off" : "on";
+    showNick = w.show_requester !== false;
+    card.dataset.bar = w.show_bar === false ? "off" : "on";
+    // Без этого галочка «Движение» работала только в предпросмотре панели,
+    // а в OBS плашка продолжала дёргаться.
+    card.dataset.motion = w.motion === false ? "off" : "on";
+
+    card.style.setProperty("--scale", Number(w.scale) || 1);
+
+    // Прозрачность всей плашки. Отдельным слоем на обёртке, а не через
+    // opacity самой плашки: у той opacity занята появлением и уходом, и
+    // полупрозрачная плашка больше не смогла бы доехать до конца анимации.
+    const op = Number.isFinite(w.opacity) ? w.opacity : 100;
+    slot.style.opacity = Math.min(100, Math.max(10, op)) / 100;
+
+    place(w, family);
+    align(w);
+
+    // Ручная настройка поверх набора. Значения уже проверены приложением,
+    // но список ключей сверяем и здесь: страница не должна зависеть от того,
+    // что кто-то поправил config.json руками.
+    const allowed = new Set(WIDGET_TWEAKS.map((t) => t.key));
+    for (const t of WIDGET_TWEAKS) card.style.removeProperty(t.key);
+    for (const [key, value] of Object.entries(w.tweaks || {})) {
+      if (allowed.has(key)) card.style.setProperty(key, value);
+    }
+
+    // Расписание показа. Пересобираем его на каждой правке настроек, иначе
+    // стример ставит «убирать через 15 секунд», плашка прячется, он
+    // передумывает и ставит «не убирать» — а на текущем треке ничего не
+    // происходит, и выглядит это как «настройка не работает».
+    plan = {
+      hold: Math.max(0, Number(w.hold_seconds) || 0),
+      every: Math.max(0, Number(w.show_every) || 0),
+      onChange: w.show_on_change !== false,
+    };
+    if (!first && shownTrack) schedule(true);
+  }
+
+  // place ставит обёртку в нужное место кадра.
+  //
+  // Девять точек вместо четырёх углов: «сверху по центру» и «слева
+  // посередине» изображались раньше огромным отступом от угла — и на другом
+  // разрешении кадра плашка уезжала не туда.
+  function place(w, family) {
+    const pos = w.position || "left-bottom";
+    const parts = pos.split("-");
+    const h = parts[0] || "left";     // left | center | right
+    const v = parts[1] || "bottom";   // top | middle | bottom
+    const gx = (Number.isFinite(w.gap_x) ? w.gap_x : 40) + "px";
+    const gy = (Number.isFinite(w.gap_y) ? w.gap_y : 40) + "px";
+    const ticker = family.id === "ticker";
+
+    slot.dataset.family = family.id;
+    slot.dataset.h = ticker ? "wide" : h;
+    slot.dataset.v = v;
+
+    slot.style.left = slot.style.right = slot.style.top = slot.style.bottom = "";
+
+    if (ticker) {
+      // Тикер занимает всю ширину кадра: боковые отступы ему только мешают,
+      // а к краю он прижимается вплотную — так он и читается как строка
+      // новостей, а не как плашка во всю ширину.
+      slot.style.left = "0px";
+      slot.style.right = "0px";
+      slot.style[v === "top" ? "top" : "bottom"] = "0px";
+      card.dataset.pos = (v === "top" ? "left-top" : "left-bottom");
+      return;
+    }
+
+    if (h === "center") slot.style.left = "50%";
+    else slot.style[h] = gx;
+
+    if (v === "middle") slot.style.top = "50%";
+    else slot.style[v] = gy;
+
+    // Оформление наборов смотрит на data-pos, чтобы въезжать с ближайшего
+    // края кадра. Про середину оно не знает, поэтому середину показываем ему
+    // как ближайший понятный угол: анимация от этого только выигрывает.
+    card.dataset.pos = (h === "center" ? "left" : h) + "-" + (v === "middle" ? "bottom" : v);
+  }
+
+  // align прижимает текст внутри плашки к стороне.
+  //
+  // Просьба владельца: «если слева — текст от левой стороны, если справа —
+  // текст упирается в правую». Это выключка строк, а не переворот плашки:
+  // обложка остаётся там же, где была в наборе.
+  function align(w) {
+    let a = w.align || "auto";
+    if (a === "auto") {
+      const h = (w.position || "left-bottom").split("-")[0];
+      a = h === "right" ? "right" : h === "center" ? "center" : "left";
+    }
+    card.dataset.align = a;
+  }
+
+  // ── трек ───────────────────────────────────────────────────────────
+
+  let shownTrack = null;
+  let progressTimer = null;
+  let hideTimer = null;
+  let holdTimer = null;
+  let everyTimer = null;
+  let leaveTimer = null;
+  let stateTimer = null;
+  let swapTimer = null;
+
+  // Появление, смена трека и уход — три разных состояния с разными
+  // анимациями. Класс обязательно снимается после проигрыша: пока он висит,
+  // его правила по специфичности глушат постоянные анимации — дыхание
+  // неона, покачивание снимка, аберрацию импланта.
+  const STATES = ["enter", "swap-out", "swap-in", "leave"];
+
+  function play(kind) {
+    clearTimeout(stateTimer);
+    clearTimeout(leaveTimer);
+    card.classList.remove(...STATES);
+    void card.offsetWidth;      // без сброса анимация второй раз не сыграет
+    card.classList.add("show", kind);
+    if (kind !== "leave") {
+      stateTimer = setTimeout(() => card.classList.remove(kind), 1600);
+    }
+  }
+
+  // Смена трека идёт в две фазы: старое содержимое уходит, только потом
+  // подменяется текст, и уже новое приходит. Одной фазой глаз успевает
+  // заметить подмену до анимации — и вся она выглядит подделкой.
+  //
+  // Сколько длится уход, знает само оформление: у терминала это забой на
+  // 240 мс, у полосы — 130. Держать это расписание вторым списком в коде
+  // значило бы однажды разъехаться с ним.
+  function swapTrack(fill) {
+    const out = parseFloat(getComputedStyle(card).getPropertyValue("--swap-out")) || 150;
+    play("swap-out");
+    clearTimeout(swapTimer);
+    swapTimer = setTimeout(() => {
+      fill();
+      play("swap-in");
+    }, out);
+  }
+
+  const visible = () => card.classList.contains("show");
+
+  // appear показывает плашку. Уже висит — ничего не делаем: повторный въезд
+  // посреди стрима выглядел бы дёрганьем.
+  function appear() {
+    if (visible()) return;
+    play("enter");
+  }
+
+  // schedule — всё расписание показа в одном месте.
+  //
+  // Три случая, и они разные по смыслу:
+  //
+  //   держать всегда   (hold = 0) — плашка висит весь трек, как раньше;
+  //   показать и убрать (hold > 0) — короткое объявление в начале трека;
+  //   напоминать       (every > 0) — то же объявление время от времени,
+  //                                  чтобы зашедший в середине трека тоже
+  //                                  узнал, что играет.
+  //
+  // fresh=true означает «трек только что сменился»: только тогда показ
+  // заводится заново от нуля. Иначе (правка настроек) расписание просто
+  // пересобирается, не дёргая плашку.
+  function schedule(settingsChanged) {
+    clearTimeout(holdTimer);
+    clearInterval(everyTimer);
+
+    if (plan.hold <= 0) {
+      appear();
+      return;
+    }
+
+    // Напоминание идёт своим чередом независимо от того, показали ли плашку
+    // сейчас: интервал ровный, и от смены настроек он не сбивается.
+    if (plan.every > 0) {
+      everyTimer = setInterval(() => {
+        appear();
+        armHide();
+      }, plan.every * 1000);
+    }
+
+    if (settingsChanged) {
+      // Настройки правили на живом треке. Показывать плашку заново незачем,
+      // а вот убрать её по новому сроку надо — иначе она осталась бы висеть
+      // после того, как человек включил «убирать через 15 секунд».
+      if (visible()) armHide();
+      return;
+    }
+
+    if (plan.onChange) {
+      appear();
+      armHide();
+    } else {
+      hide();
+    }
+  }
+
+  function armHide() {
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(hide, plan.hold * 1000);
+  }
+
+  function show(now) {
+    const key = now.title + "|" + now.artist + "|" + now.requester;
+    if (key !== shownTrack) {
+      const firstTime = shownTrack === null;
+      shownTrack = key;
+
+      const fill = () => {
+        card.dataset.source = now.source === "own" ? "own" : "order";
+        $("title").textContent = now.title;
+        $("artist").textContent = now.artist;
+        $("by").textContent = byLine(now);
+        $("art").innerHTML = now.cover_url ? `<img src="${esc(coverSrc(now.cover_url))}" alt="">` : NOTE;
+      };
+
+      // Плашка уже висела — значит трек просто сменился, заново выезжать
+      // ей неоткуда: меняется содержимое, а не сама вещь.
+      if (visible() && !firstTime) {
+        swapTrack(fill);
+        clearTimeout(holdTimer);
+        if (plan.hold > 0) armHide();
+        if (plan.every > 0) schedule(true);
+      } else {
+        fill();
+        schedule(false);
+      }
+    }
+
+    // Полосу двигаем сами: приложение присылает состояние только при
+    // изменениях, а прогресс должен идти плавно.
+    clearInterval(progressTimer);
+    if (now.duration_ms > 0) {
+      const started = Date.now() - now.position_ms;
+      const tick = () => {
+        const done = Math.min(1, (Date.now() - started) / now.duration_ms);
+        $("bar").style.width = (done * 100) + "%";
+        // Тем же числом живёт тонарм у винила: он ползёт к центру по
+        // настоящему прогрессу, а не по отдельному таймеру.
+        card.style.setProperty("--progress", done.toFixed(4));
+      };
+      tick();
+      progressTimer = setInterval(tick, 1000);
+    } else {
+      // Длительность неизвестна (так бывает у заказов с YouTube). Полосу
+      // надо обнулить, а не оставлять там, где её бросил прошлый трек:
+      // иначе зритель видит «трек почти кончился» в самом его начале.
+      $("bar").style.width = "0%";
+      card.style.setProperty("--progress", "0");
+    }
+  }
+
+  // Откуда трек — это отдельная мысль, и сказать её надо словами: цветом
+  // или значком зритель не поймёт, а подписи «музыка канала» достаточно.
+  //
+  // Заказ с YouTube помечаем так же словами: звук у него идёт другим
+  // проигрывателем, и стримеру, глядящему в кадр, важно это видеть сразу.
+  function byLine(now) {
+    if (now.source === "own") return "музыка канала";
+    var tail = now.provider === "youtube" ? " · YouTube" : "";
+    if (showNick && now.requester) return "заказал " + now.requester + tail;
+    return "заказ зрителя" + tail;
+  }
+
+  function hide() {
+    clearTimeout(holdTimer);
+    clearTimeout(swapTimer);
+    if (!visible()) return;
+
+    // Уход тоже анимирован, поэтому прячем не сразу, а когда доиграет.
+    play("leave");
+    clearTimeout(leaveTimer);
+    leaveTimer = setTimeout(() => {
+      card.classList.remove("show", "leave");
+    }, 340);
+  }
+
+  // stop — музыка кончилась совсем: убираем плашку и забываем расписание.
+  function stop() {
+    clearInterval(progressTimer);
+    clearInterval(everyTimer);
+    shownTrack = null;
+    hide();
+  }
+
+  function render(state) {
+    dress(state.widget);
+    if (state.now) {
+      show(state.now);
+      return;
+    }
+    stop();
+  }
+
+  // ── демо ───────────────────────────────────────────────────────────
+
+  // Выставить виджет в OBS иначе можно только во время настоящего заказа —
+  // то есть уже на стриме, при зрителях. Показываем вымышленный трек, чтобы
+  // позицию и размер проверяли заранее и спокойно.
+  const demo = params.get("demo") === "1";
+
+  function demoTrack(widget) {
+    dress(widget);
+    // В образце плашка висит всегда: человек в этот момент двигает ползунки
+    // и должен видеть, что двигает. Прятать её по расписанию здесь значило
+    // бы отвечать на правку исчезновением.
+    plan = { hold: 0, every: 0, onChange: true };
+    show({
+      title: "Bohemian Rhapsody", artist: "Queen", requester: "zritel",
+      source: "order", cover_url: "", duration_ms: 354000, position_ms: 149000,
+    });
+  }
+
+  // ── связь ──────────────────────────────────────────────────────────
+
+  let delay = 1000;
+
+  function connect() {
+    const socket = new WebSocket(`ws://${location.host}/ws`);
+
+    socket.onopen = () => {
+      delay = 1000;
+      clearTimeout(hideTimer);
+    };
+
+    socket.onmessage = (e) => {
+      const state = JSON.parse(e.data);
+      // В демо-режиме настоящее состояние не должно стирать образец, но
+      // оформление подхватывать надо: иначе в панели крутят настройки, а
+      // предпросмотр в OBS остаётся прежним.
+      if (demo) demoTrack(state.widget);
+      else render(state);
+    };
+
+    socket.onclose = () => {
+      // Приложение перезапустили или сеть моргнула — трек при этом играть не
+      // перестал. Убирать плашку сразу значило бы мигать ею на стриме,
+      // поэтому ждём: не вернулись за пять секунд — тогда прячем.
+      if (!demo) {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(stop, 5000);
+      }
+      // Виджет висит в OBS сутками: долбиться каждую секунду нельзя.
+      setTimeout(connect, delay);
+      delay = Math.min(delay * 2, 15000);
+    };
+  }
+
+  connect();
+})();
+</script>
+</body>
+</html>

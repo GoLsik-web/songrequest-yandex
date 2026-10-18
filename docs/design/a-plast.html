@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A · Пласт</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#121110; --panel:#1b1a18; --line:#2a2825; --text:#f3efe6; --dim:#8f8a80;
+  --acc:#ffcc00; --acc-ink:#1a1400; --bad:#ff6a4d; --ok:#7bd88f;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.45 Onest,system-ui,sans-serif;min-height:100vh}
+.app{max-width:1180px;margin:0 auto;padding:20px 24px 40px;display:grid;grid-template-columns:1fr 380px;gap:20px}
+header{grid-column:1/-1;display:flex;align-items:center;gap:16px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.02em}
+.logo i{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle,var(--acc) 0 22%,#000 23% 30%,var(--acc) 31%);display:block}
+.conns{margin-left:auto;display:flex;gap:8px}
+.chip{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--dim)}
+.chip b{width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.chip.warn b{background:var(--bad)}
+.btn{border:0;border-radius:12px;padding:10px 16px;font:600 14px Onest;cursor:pointer;background:var(--panel);color:var(--text);border:1px solid var(--line)}
+.btn.acc{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:28px;display:grid;grid-template-columns:240px 1fr;gap:28px;align-items:center;position:relative;overflow:hidden}
+.stage::after{content:"";position:absolute;right:-140px;top:-140px;width:420px;height:420px;border-radius:50%;
+  background:repeating-radial-gradient(circle,#0000 0 6px,#ffffff08 6px 7px);pointer-events:none}
+.cover{width:240px;height:240px;border-radius:18px;background:linear-gradient(135deg,#ff8a3d,#c2185b 60%,#3b1c6e);box-shadow:0 20px 50px #0008}
+.tag{display:inline-block;background:var(--acc);color:var(--acc-ink);font-weight:700;font-size:12px;padding:4px 10px;border-radius:99px;text-transform:uppercase;letter-spacing:.06em}
+.title{font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1.05;margin:14px 0 6px}
+.artist{font-size:18px;color:var(--dim)}
+.by{margin-top:18px;font-size:14px;color:var(--dim)}
+.by b{color:var(--text)}
+.bar{margin-top:22px;height:6px;border-radius:9px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:42%;background:var(--acc)}
+.time{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:6px;font-variant-numeric:tabular-nums}
+.ctrls{display:flex;gap:8px;margin-top:18px}
+
+.side{display:flex;flex-direction:column;gap:20px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px}
+.card h3{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);font-weight:600;display:flex;justify-content:space-between;margin-bottom:12px}
+.card h3 a{color:var(--acc);text-decoration:none;text-transform:none;letter-spacing:0}
+.q{display:grid;grid-template-columns:22px 44px 1fr auto;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.q:first-of-type{border-top:0}
+.q .n{color:var(--dim);font-variant-numeric:tabular-nums}
+.q .c{width:44px;height:44px;border-radius:10px}
+.q .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q .s{font-size:13px;color:var(--dim)}
+.q .d{font-size:13px;color:var(--dim)}
+.feed .q{grid-template-columns:44px 1fr auto}
+.pill{font-size:12px;padding:3px 8px;border-radius:99px;background:#ff6a4d22;color:var(--bad)}
+.pill.ok{background:#7bd88f22;color:var(--ok)}
+.main{display:flex;flex-direction:column;gap:20px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px}
+.stat b{font-size:30px;font-weight:800;display:block;letter-spacing:-.02em}
+.stat span{color:var(--dim);font-size:13px}
+@media (max-width:900px){.app{grid-template-columns:1fr}.stage{grid-template-columns:1fr}.cover{width:100%;height:auto;aspect-ratio:1}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo"><i></i>Заказ · Яндекс Музыка</div>
+    <div class="conns">
+      <span class="chip"><b></b>Яндекс</span>
+      <span class="chip"><b></b>Twitch</span>
+      <span class="chip warn"><b></b>Ynison: плейлист</span>
+    </div>
+    <button class="btn">Настройки</button>
+  </header>
+
+  <div class="main">
+    <section class="stage">
+      <div class="cover"></div>
+      <div>
+        <span class="tag">Заказ зрителя</span>
+        <div class="title">Розовое вино</div>
+        <div class="artist">Элджей, Feduk</div>
+        <div class="by">заказал <b>kotik_228</b> · 300 баллов</div>
+        <div class="bar"><i></i></div>
+        <div class="time"><span>1:31</span><span>3:37</span></div>
+        <div class="ctrls">
+          <button class="btn acc">Скип</button>
+          <button class="btn">Пауза</button>
+          <button class="btn">Вернуть баллы</button>
+          <button class="btn">Бан трека</button>
+        </div>
+      </div>
+    </section>
+    <div class="stats">
+      <div class="stat"><b>14</b><span>заказов за стрим</span></div>
+      <div class="stat"><b>2</b><span>возврата баллов</span></div>
+      <div class="stat"><b>4 200</b><span>баллов потрачено</span></div>
+    </div>
+    <section class="card feed">
+      <h3>Лента <a href="#">весь лог</a></h3>
+      <div class="q"><div class="c" style="background:linear-gradient(135deg,#2bd2ff,#2b6bff)"></div><div><div class="t">«мияги тамада» → Мияги, Эндшпиль — Тамада</div><div class="s">dimon_tv · текст</div></div><span class="pill ok">в очереди</span></div>
+      <div class="q"><div class="c" style="background:#333"></div><div><div class="t">open.spotify.com/track/4uLU6h…</div><div class="s">zxc_ghoul · ссылка Spotify</div></div><span class="pill">нет в Яндексе · возврат</span></div>
+      <div class="q"><div class="c" style="background:linear-gradient(135deg,#a8ff78,#078c58)"></div><div><div class="t">youtu.be/dQw4w9 → Rick Astley — Never Gonna…</div><div class="s">anna_s · ссылка YouTube</div></div><span class="pill ok">в очереди</span></div>
+    </section>
+  </div>
+
+  <aside class="side">
+    <section class="card">
+      <h3>Очередь · 4 <a href="#">пауза приёма</a></h3>
+      <div class="q"><span class="n">1</span><div class="c" style="background:linear-gradient(135deg,#2bd2ff,#2b6bff)"></div><div><div class="t">Тамада</div><div class="s">Мияги · dimon_tv</div></div><span class="d">3:45</span></div>
+      <div class="q"><span class="n">2</span><div class="c" style="background:linear-gradient(135deg,#a8ff78,#078c58)"></div><div><div class="t">Never Gonna Give You Up</div><div class="s">Rick Astley · anna_s</div></div><span class="d">3:33</span></div>
+      <div class="q"><span class="n">3</span><div class="c" style="background:linear-gradient(135deg,#f7971e,#ffd200)"></div><div><div class="t">Кукла колдуна</div><div class="s">Король и Шут · gena</div></div><span class="d">3:24</span></div>
+      <div class="q"><span class="n">4</span><div class="c" style="background:linear-gradient(135deg,#8e2de2,#4a00e0)"></div><div><div class="t">Blinding Lights</div><div class="s">The Weeknd · lex</div></div><span class="d">3:20</span></div>
+    </section>
+    <section class="card">
+      <h3>После очереди</h3>
+      <div class="q" style="grid-template-columns:44px 1fr"><div class="c" style="background:linear-gradient(135deg,#444,#111)"></div><div><div class="t">Моя волна</div><div class="s">вернётся сюда же, на 2:10</div></div></div>
+    </section>
+  </aside>
+</div>
+</body>
+</html>

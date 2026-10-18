@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B · Газета</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=Literata:opsz,wght@7..72,600;7..72,800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f3ec;--paper:#fffdf8;--ink:#14130f;--dim:#6f6a5f;--line:#e2ddd1;--acc:#ffcc00;--bad:#c4361b;--ok:#2f7d4a}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 "Golos Text",system-ui,sans-serif}
+.app{max-width:1120px;margin:0 auto;padding:24px}
+header{display:flex;align-items:baseline;gap:20px;border-bottom:3px solid var(--ink);padding-bottom:12px}
+h1{font:800 30px Literata,serif;letter-spacing:-.02em}
+h1 span{background:var(--acc);padding:0 6px}
+.status{margin-left:auto;font-size:13px;color:var(--dim);display:flex;gap:18px}
+.status b{font-weight:600;color:var(--ink)}
+.status .x{color:var(--bad)}
+nav{display:flex;gap:22px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+nav a{color:var(--dim);text-decoration:none}nav a.on{color:var(--ink);font-weight:600;box-shadow:inset 0 -2px var(--acc)}
+.grid{display:grid;grid-template-columns:1.4fr 1fr;gap:32px;margin-top:24px}
+.now{display:grid;grid-template-columns:200px 1fr;gap:24px}
+.cover{aspect-ratio:1;background:linear-gradient(135deg,#ff8a3d,#c2185b 60%,#3b1c6e)}
+.kicker{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim)}
+.title{font:800 44px/1 Literata,serif;letter-spacing:-.03em;margin:8px 0}
+.artist{font-size:18px}
+.by{margin-top:14px;color:var(--dim);font-size:14px}.by mark{background:var(--acc);padding:0 4px}
+.bar{margin-top:18px;height:3px;background:var(--line)}.bar i{display:block;height:100%;width:42%;background:var(--ink)}
+.time{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:4px;font-variant-numeric:tabular-nums}
+.acts{display:flex;gap:16px;margin-top:16px;font-size:14px}
+.acts button{background:none;border:0;font:600 14px "Golos Text";cursor:pointer;padding:0;border-bottom:1px solid var(--ink)}
+.acts .main{background:var(--ink);color:var(--paper);padding:8px 14px;border:0}
+h2{font:600 22px Literata,serif;margin:32px 0 8px;display:flex;justify-content:space-between;align-items:baseline}
+h2 small{font:13px "Golos Text";color:var(--dim)}
+.row{display:grid;grid-template-columns:28px 1fr auto;gap:12px;padding:10px 0;border-top:1px solid var(--line);align-items:baseline}
+.row .n{font:600 18px Literata,serif;color:var(--dim)}
+.row .t{font-weight:600}.row .s{font-size:13px;color:var(--dim)}
+.row .d{font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums}
+.box{background:var(--paper);border:1px solid var(--line);padding:18px}
+.box h2{margin-top:0}
+.log .row{grid-template-columns:52px 1fr}
+.log .tm{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.no{color:var(--bad);font-size:13px}.yes{color:var(--ok);font-size:13px}
+.big{display:flex;gap:28px;margin-top:20px;border-top:3px solid var(--ink);padding-top:12px}
+.big div b{font:800 32px Literata,serif;display:block}.big div span{font-size:13px;color:var(--dim)}
+@media (max-width:860px){.grid,.now{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Заказ <span>музыки</span></h1>
+    <div class="status"><span>Яндекс <b>на связи</b></span><span>Twitch <b>на связи</b></span><span class="x">Ynison отвалился → пишем в плейлист</span></div>
+  </header>
+  <nav><a class="on" href="#">Эфир</a><a href="#">Правила</a><a href="#">Виджет</a><a href="#">Подключения</a><a href="#">Журнал</a></nav>
+
+  <div class="grid">
+    <div>
+      <div class="now">
+        <div class="cover"></div>
+        <div>
+          <div class="kicker">Сейчас в эфире · заказ</div>
+          <div class="title">Розовое вино</div>
+          <div class="artist">Элджей, Feduk</div>
+          <div class="by">заказал <mark>kotik_228</mark> за 300 баллов</div>
+          <div class="bar"><i></i></div>
+          <div class="time"><span>1:31</span><span>3:37</span></div>
+          <div class="acts"><button class="main">Скип</button><button>Пауза</button><button>Вернуть баллы</button><button>Запретить трек</button></div>
+        </div>
+      </div>
+
+      <h2>Очередь <small>4 трека · 13 мин · <a href="#">закрыть приём</a></small></h2>
+      <div class="row"><span class="n">1</span><div><div class="t">Тамада — Мияги, Эндшпиль</div><div class="s">dimon_tv · по тексту «мияги тамада»</div></div><span class="d">3:45</span></div>
+      <div class="row"><span class="n">2</span><div><div class="t">Never Gonna Give You Up — Rick Astley</div><div class="s">anna_s · ссылка YouTube</div></div><span class="d">3:33</span></div>
+      <div class="row"><span class="n">3</span><div><div class="t">Кукла колдуна — Король и Шут</div><div class="s">gena · ссылка VK Музыки</div></div><span class="d">3:24</span></div>
+      <div class="row"><span class="n">4</span><div><div class="t">Blinding Lights — The Weeknd</div><div class="s">lex · ссылка Apple Music</div></div><span class="d">3:20</span></div>
+      <div class="row"><span class="n">↩</span><div><div class="t">Потом — Моя волна</div><div class="s">вернётся на то же место</div></div><span class="d"></span></div>
+    </div>
+
+    <div>
+      <div class="box log">
+        <h2>Журнал <small>сегодня</small></h2>
+        <div class="row"><span class="tm">21:42</span><div><div class="t">dimon_tv: «мияги тамада»</div><div class="yes">нашёлся, в очереди</div></div></div>
+        <div class="row"><span class="tm">21:40</span><div><div class="t">zxc_ghoul: open.spotify.com/track/…</div><div class="no">нет в Яндексе — 300 баллов вернули</div></div></div>
+        <div class="row"><span class="tm">21:37</span><div><div class="t">anna_s: youtu.be/dQw4w9</div><div class="yes">нашёлся, в очереди</div></div></div>
+        <div class="row"><span class="tm">21:31</span><div><div class="t">lex: !skip</div><div class="s">не модератор — проигнорировано</div></div></div>
+      </div>
+      <div class="big">
+        <div><b>14</b><span>заказов</span></div>
+        <div><b>2</b><span>возврата</span></div>
+        <div><b>4 200</b><span>баллов</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

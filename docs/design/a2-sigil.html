@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A2 · Сигил</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tektur:wght@500;700&family=Onest:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e0e0d; --panel:#141413; --line:#2b2a27; --line2:#3d3b37;
+  --text:#ecebe6; --dim:#85827b; --acc:#ffcc00; --bad:#e5533d;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.45 Onest,system-ui,sans-serif;min-height:100vh}
+svg.s{fill:none;stroke:currentColor;stroke-width:1;stroke-linecap:round;stroke-linejoin:round}
+
+.app{max-width:1180px;margin:0 auto;padding:20px 24px 48px;display:grid;grid-template-columns:1fr 380px;gap:20px}
+header{grid-column:1/-1;display:flex;align-items:center;gap:18px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.logo{display:flex;align-items:center;gap:12px;font:700 17px Tektur;letter-spacing:.04em;text-transform:uppercase}
+.logo svg{width:30px;height:30px;color:var(--acc)}
+.conns{margin-left:auto;display:flex;gap:18px;font-size:13px;color:var(--dim)}
+.conns span::before{content:"";display:inline-block;width:6px;height:6px;transform:rotate(45deg);background:var(--text);margin-right:8px;vertical-align:1px}
+.conns .w{color:var(--bad)}.conns .w::before{background:var(--bad)}
+.btn{background:none;color:var(--text);border:1px solid var(--line2);padding:9px 16px;font:500 14px Onest;cursor:pointer;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+.btn:hover{border-color:var(--text)}
+.btn.acc{background:var(--acc);color:#141000;border-color:var(--acc);font-weight:600}
+
+.frame{position:relative;border:1px solid var(--line);background:var(--panel)}
+.frame>.k{position:absolute;width:22px;height:22px;color:var(--line2)}
+.k.tl{left:-1px;top:-1px}.k.tr{right:-1px;top:-1px;transform:scaleX(-1)}
+.k.bl{left:-1px;bottom:-1px;transform:scaleY(-1)}.k.br{right:-1px;bottom:-1px;transform:scale(-1)}
+
+.main{display:flex;flex-direction:column;gap:20px}
+.stage{padding:30px;display:grid;grid-template-columns:240px 1fr;gap:30px;align-items:center;overflow:hidden}
+.stage .orn{position:absolute;right:-60px;top:50%;width:360px;height:360px;transform:translateY(-50%);color:#ffffff10;pointer-events:none}
+.cover{width:240px;height:240px;background:#1f1d1a;position:relative;outline:1px solid var(--line2);outline-offset:6px}
+.cover span{position:absolute;inset:0;background:linear-gradient(160deg,#6b2d2d,#2a1733);mix-blend-mode:normal}
+.tag{font:500 12px Tektur;letter-spacing:.18em;text-transform:uppercase;color:var(--acc);display:flex;align-items:center;gap:10px}
+.tag svg{width:40px;height:10px}
+.title{font:700 44px/1 Tektur;letter-spacing:-.01em;margin:14px 0 8px}
+.artist{font-size:18px;color:var(--dim)}
+.by{margin-top:18px;font-size:14px;color:var(--dim)}.by b{color:var(--text);font-weight:600}
+.bar{margin-top:24px;position:relative;height:1px;background:var(--line2)}
+.bar i{position:absolute;left:0;top:-1px;height:3px;width:42%;background:var(--acc)}
+.bar i::after{content:"";position:absolute;right:-5px;top:-3px;width:9px;height:9px;background:var(--acc);transform:rotate(45deg)}
+.time{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-top:10px;font-variant-numeric:tabular-nums}
+.ctrls{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr)}
+.stat{padding:16px 20px;border-left:1px solid var(--line)}.stat:first-child{border-left:0}
+.stat b{font:700 30px Tektur;display:block}.stat span{color:var(--dim);font-size:13px}
+
+.card{padding:18px 20px}
+.card h3{font:500 12px Tektur;text-transform:uppercase;letter-spacing:.16em;color:var(--dim);display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.card h3 .ln{flex:1;height:10px;color:var(--line2)}
+.card h3 a{color:var(--acc);text-decoration:none;text-transform:none;letter-spacing:0;font:500 13px Onest}
+.q{display:grid;grid-template-columns:22px 40px 1fr auto;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.q:first-of-type{border-top:0}
+.q .n{color:var(--dim);font:500 13px Tektur}
+.q .c{width:40px;height:40px;background:#24221f}
+.q .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q .s{font-size:13px;color:var(--dim)}
+.q .d{font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums}
+.feed .q{grid-template-columns:40px 1fr auto}
+.st{font-size:12px;color:var(--text);white-space:nowrap}
+.st.no{color:var(--bad)}
+.side{display:flex;flex-direction:column;gap:20px}
+@media (max-width:900px){.app{grid-template-columns:1fr}.stage{grid-template-columns:1fr}.cover{width:100%;height:auto;aspect-ratio:1}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <!-- уголок рамки: тонкий шип -->
+    <symbol id="corner" viewBox="0 0 22 22"><path d="M1 21V1h20M1 1l7 7M5 1c0 3 1 4 4 4" /></symbol>
+    <!-- разделитель с ромбом -->
+    <symbol id="rule" viewBox="0 0 200 10" preserveAspectRatio="none"><path d="M0 5h92M108 5h92M100 1l4 4-4 4-4-4z"/></symbol>
+    <symbol id="thorn" viewBox="0 0 40 10"><path d="M0 5h30M30 5l10-4M30 5l10 4M24 5c2-3 4-4 6-4"/></symbol>
+    <!-- сам сигил -->
+    <symbol id="sigil" viewBox="0 0 100 100">
+      <path d="M50 4v92M50 4l-6 18M50 4l6 18M50 96l-6-18M50 96l6-18"/>
+      <path d="M50 30c-14 0-22 8-22 20s8 20 22 20 22-8 22-20-8-20-22-20z"/>
+      <path d="M28 50H8M72 50h20M8 50l8-6M8 50l8 6M92 50l-8-6M92 50l-8 6"/>
+      <path d="M50 38c-6 6-6 18 0 24 6-6 6-18 0-24z"/>
+      <path d="M34 26c-4-8-12-12-20-12 4 6 8 10 16 14M66 26c4-8 12-12 20-12-4 6-8 10-16 14M34 74c-4 8-12 12-20 12 4-6 8-10 16-14M66 74c4 8 12 12 20 12-4-6-8-10-16-14"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <header>
+    <div class="logo"><svg class="s"><use href="#sigil"/></svg>Заказ · Яндекс Музыка</div>
+    <div class="conns"><span>Яндекс</span><span>Twitch</span><span class="w">Ynison — пишем в плейлист</span></div>
+    <button class="btn">Виджет</button>
+    <button class="btn">Настройки</button>
+  </header>
+
+  <div class="main">
+    <section class="frame stage">
+      <svg class="k tl s"><use href="#corner"/></svg><svg class="k tr s"><use href="#corner"/></svg>
+      <svg class="k bl s"><use href="#corner"/></svg><svg class="k br s"><use href="#corner"/></svg>
+      <svg class="orn s"><use href="#sigil"/></svg>
+      <div class="cover"><span></span></div>
+      <div>
+        <div class="tag"><svg class="s"><use href="#thorn"/></svg>заказ зрителя</div>
+        <div class="title">Розовое вино</div>
+        <div class="artist">Элджей, Feduk</div>
+        <div class="by">заказал <b>kotik_228</b> · 300 баллов</div>
+        <div class="bar"><i></i></div>
+        <div class="time"><span>1:31</span><span>3:37</span></div>
+        <div class="ctrls">
+          <button class="btn acc">Скип</button><button class="btn">Пауза</button>
+          <button class="btn">Вернуть баллы</button><button class="btn">Бан трека</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="frame stats">
+      <div class="stat"><b>14</b><span>заказов за стрим</span></div>
+      <div class="stat"><b>2</b><span>возврата баллов</span></div>
+      <div class="stat"><b>4 200</b><span>баллов потрачено</span></div>
+    </section>
+
+    <section class="frame card feed">
+      <h3>Лента<svg class="ln s"><use href="#rule"/></svg><a href="#">весь лог</a></h3>
+      <div class="q"><div class="c"></div><div><div class="t">«мияги тамада» → Мияги, Эндшпиль — Тамада</div><div class="s">dimon_tv · текст</div></div><span class="st">в очереди</span></div>
+      <div class="q"><div class="c"></div><div><div class="t">open.spotify.com/track/4uLU6h…</div><div class="s">zxc_ghoul · Spotify</div></div><span class="st no">нет в Яндексе · возврат</span></div>
+      <div class="q"><div class="c"></div><div><div class="t">youtu.be/dQw4w9 → Rick Astley — Never Gonna…</div><div class="s">anna_s · YouTube</div></div><span class="st">в очереди</span></div>
+    </section>
+  </div>
+
+  <aside class="side">
+    <section class="frame card">
+      <svg class="k tl s"><use href="#corner"/></svg><svg class="k br s"><use href="#corner"/></svg>
+      <h3>Очередь · 4<svg class="ln s"><use href="#rule"/></svg><a href="#">пауза приёма</a></h3>
+      <div class="q"><span class="n">01</span><div class="c"></div><div><div class="t">Тамада</div><div class="s">Мияги · dimon_tv</div></div><span class="d">3:45</span></div>
+      <div class="q"><span class="n">02</span><div class="c"></div><div><div class="t">Never Gonna Give You Up</div><div class="s">Rick Astley · anna_s</div></div><span class="d">3:33</span></div>
+      <div class="q"><span class="n">03</span><div class="c"></div><div><div class="t">Кукла колдуна</div><div class="s">Король и Шут · gena</div></div><span class="d">3:24</span></div>
+      <div class="q"><span class="n">04</span><div class="c"></div><div><div class="t">Blinding Lights</div><div class="s">The Weeknd · lex</div></div><span class="d">3:20</span></div>
+    </section>
+    <section class="frame card">
+      <h3>После очереди<svg class="ln s"><use href="#rule"/></svg></h3>
+      <div class="q" style="grid-template-columns:40px 1fr"><div class="c"></div><div><div class="t">Моя волна</div><div class="s">вернётся сюда же, на 2:10</div></div></div>
+    </section>
+  </aside>
+</div>
+</body>
+</html>

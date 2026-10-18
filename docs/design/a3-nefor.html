@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A3 · Нефор</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=JetBrains+Mono:wght@400;600&family=Onest:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c0c0c; --panel:#111; --line:#363532; --text:#d6d3cb; --dim:#75736d; --mute:#262626;
+  --acc:#ffcc00; --bad:#ff3b30;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font:15px/1.45 Onest,system-ui,sans-serif;min-height:100vh;position:relative}
+/* зерно ксерокопии */
+body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.07;z-index:5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.mono{font-family:"JetBrains Mono",monospace}
+
+.app{max-width:1180px;margin:0 auto;padding:22px 24px 48px;display:grid;grid-template-columns:1fr 380px;gap:22px}
+header{grid-column:1/-1;display:flex;align-items:center;gap:16px;border-bottom:2px solid var(--line);padding-bottom:14px}
+.logo{font:24px "Dela Gothic One";text-transform:uppercase;letter-spacing:-.01em}
+.logo em{font-style:normal;background:var(--acc);color:#000;padding:0 6px;margin-left:4px;display:inline-block;transform:rotate(-2deg)}
+.conns{margin-left:auto;display:flex;gap:16px;font:12px "JetBrains Mono";text-transform:uppercase;color:var(--dim)}
+.conns b{color:var(--text);font-weight:600}
+.conns .w b{color:var(--bad)}
+.btn{background:var(--bg);color:var(--text);border:2px solid var(--line);padding:8px 14px;font:600 13px "JetBrains Mono";text-transform:uppercase;cursor:pointer;box-shadow:3px 3px 0 var(--line);transition:transform .05s}
+.btn:active{transform:translate(3px,3px);box-shadow:none}
+.btn.acc{background:var(--acc);color:#000;border-color:var(--acc);box-shadow:3px 3px 0 var(--line)}
+
+.box{border:2px solid var(--line);background:var(--panel)}
+.main{display:flex;flex-direction:column;gap:22px}
+.stage{padding:28px;display:grid;grid-template-columns:240px 1fr;gap:30px;align-items:center;position:relative}
+.cover{width:240px;height:240px;background:#2b2b2b;filter:grayscale(1) contrast(1.3);position:relative;transform:rotate(-1.5deg);border:2px solid var(--line)}
+.cover::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,#777,#222)}
+.tape{position:absolute;left:30px;top:16px;width:90px;height:24px;background:#ffcc00cc;transform:rotate(-8deg);z-index:2}
+.tag{font:600 12px "JetBrains Mono";text-transform:uppercase;letter-spacing:.1em;color:var(--dim)}
+.tag b{color:var(--acc)}
+.title{font:52px/.95 "Dela Gothic One";text-transform:uppercase;margin:12px 0 10px;letter-spacing:-.01em}
+.artist{font-size:18px}
+.by{margin-top:16px;font:13px "JetBrains Mono";color:var(--dim)}.by b{color:var(--text);background:var(--mute);padding:1px 6px}
+.bar{margin-top:22px;height:14px;border:2px solid var(--line);position:relative}
+.bar i{position:absolute;left:0;top:0;bottom:0;width:42%;background:repeating-linear-gradient(-45deg,var(--acc) 0 6px,#000 6px 9px)}
+.time{display:flex;justify-content:space-between;font:12px "JetBrains Mono";color:var(--dim);margin-top:6px}
+.ctrls{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr)}
+.stat{padding:14px 18px;border-left:2px solid var(--line)}.stat:first-child{border-left:0}
+.stat b{font:34px "Dela Gothic One";display:block}.stat span{font:12px "JetBrains Mono";color:var(--dim);text-transform:uppercase}
+
+.card{padding:16px 18px}
+.card h3{font:20px "Dela Gothic One";text-transform:uppercase;display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+.card h3 small{font:12px "JetBrains Mono";color:var(--dim);text-transform:uppercase}
+.card h3 a{margin-left:auto;font:600 12px "JetBrains Mono";color:var(--acc);text-transform:uppercase}
+.q{display:grid;grid-template-columns:28px 40px 1fr auto;gap:12px;align-items:center;padding:9px 0;border-top:1px dashed #444}
+.q:first-of-type{border-top:0}
+.q .n{font:600 13px "JetBrains Mono";color:var(--dim)}
+.q .c{width:40px;height:40px;background:#333;filter:grayscale(1)}
+.q .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q .s{font:12px "JetBrains Mono";color:var(--dim)}
+.q .d{font:12px "JetBrains Mono";color:var(--dim)}
+.feed .q{grid-template-columns:40px 1fr auto}
+.q.rej .t{text-decoration:line-through;text-decoration-color:var(--bad);text-decoration-thickness:2px;color:var(--dim)}
+.stamp{font:600 11px "JetBrains Mono";text-transform:uppercase;border:2px solid var(--bad);color:var(--bad);padding:2px 6px;transform:rotate(-4deg);white-space:nowrap}
+.ok{font:600 11px "JetBrains Mono";text-transform:uppercase;color:var(--text);white-space:nowrap}
+.side{display:flex;flex-direction:column;gap:22px}
+@media (max-width:900px){.app{grid-template-columns:1fr}.stage{grid-template-columns:1fr}.cover{width:100%;height:auto;aspect-ratio:1}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">заказ<em>ЯМ</em></div>
+    <div class="conns"><span>яндекс <b>ок</b></span><span>twitch <b>ок</b></span><span class="w">ynison <b>упал → плейлист</b></span></div>
+    <button class="btn">Виджет</button>
+    <button class="btn">Настройки</button>
+  </header>
+
+  <div class="main">
+    <section class="box stage">
+      <div class="tape"></div>
+      <div class="cover"></div>
+      <div>
+        <div class="tag">сейчас играет · <b>заказ зрителя</b></div>
+        <div class="title">Розовое вино</div>
+        <div class="artist">Элджей, Feduk</div>
+        <div class="by">от <b>kotik_228</b> · 300 баллов</div>
+        <div class="bar"><i></i></div>
+        <div class="time"><span>1:31</span><span>3:37</span></div>
+        <div class="ctrls">
+          <button class="btn acc">Скип</button><button class="btn">Пауза</button>
+          <button class="btn">Вернуть баллы</button><button class="btn">Бан</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="box stats">
+      <div class="stat"><b>14</b><span>заказов</span></div>
+      <div class="stat"><b>2</b><span>возврата</span></div>
+      <div class="stat"><b>4200</b><span>баллов</span></div>
+    </section>
+
+    <section class="box card feed">
+      <h3>Лента <small>сегодня</small><a href="#">весь лог →</a></h3>
+      <div class="q"><div class="c"></div><div><div class="t">«мияги тамада» → Мияги, Эндшпиль — Тамада</div><div class="s">dimon_tv · текст</div></div><span class="ok">в очереди</span></div>
+      <div class="q rej"><div class="c"></div><div><div class="t">open.spotify.com/track/4uLU6h…</div><div class="s">zxc_ghoul · spotify</div></div><span class="stamp">нет в ям · возврат</span></div>
+      <div class="q"><div class="c"></div><div><div class="t">youtu.be/dQw4w9 → Rick Astley — Never Gonna…</div><div class="s">anna_s · youtube</div></div><span class="ok">в очереди</span></div>
+    </section>
+  </div>
+
+  <aside class="side">
+    <section class="box card">
+      <h3>Очередь <small>4 · 13 мин</small><a href="#">стоп приём</a></h3>
+      <div class="q"><span class="n">01</span><div class="c"></div><div><div class="t">Тамада</div><div class="s">мияги · dimon_tv</div></div><span class="d">3:45</span></div>
+      <div class="q"><span class="n">02</span><div class="c"></div><div><div class="t">Never Gonna Give You Up</div><div class="s">rick astley · anna_s</div></div><span class="d">3:33</span></div>
+      <div class="q"><span class="n">03</span><div class="c"></div><div><div class="t">Кукла колдуна</div><div class="s">король и шут · gena</div></div><span class="d">3:24</span></div>
+      <div class="q"><span class="n">04</span><div class="c"></div><div><div class="t">Blinding Lights</div><div class="s">the weeknd · lex</div></div><span class="d">3:20</span></div>
+    </section>
+    <section class="box card">
+      <h3>Потом</h3>
+      <div class="q" style="grid-template-columns:40px 1fr"><div class="c"></div><div><div class="t">Моя волна</div><div class="s">вернётся на 2:10</div></div></div>
+    </section>
+  </aside>
+</div>
+</body>
+</html>
