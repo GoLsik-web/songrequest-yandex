@@ -1,0 +1,247 @@
+/* Оформление «Нефор».
+
+   Ложится поверх app.css и setup.css: те задают раскладку и поведение,
+   а этот файл — характер. Тёмная ксерокопия: толстые рамки, жёсткие тени
+   без размытия, заголовки рубленым капсом, всё служебное — моноширинным,
+   как набрано на машинке. Одна краска — жёлтый. Он значит ровно две вещи:
+   «идёт эфир» и «нажми сюда». Красный — только поломки и отказы.
+
+   Шрифты: Dela Gothic One (заголовки), Onest (текст), JetBrains Mono
+   (время, ники, коды, статусы). Все лежат в /static/fonts и вшиты в
+   программу — панель работает без интернета. */
+
+:root {
+  --bg:      #0c0c0c;
+  --raise:   #121212;
+  --line:    #262624;
+  --line-2:  #363532;
+  --text:    #d6d3cb;
+  --dim:     #8f8c84;
+  --dimmer:  #75736d;
+  --faint:   #2f2e2b;
+  --lime:    #ffcc00;
+  --lime-lo: #5c4a00;
+  --bad:     #ff3b30;
+  --ink:     #0c0c0c;
+  --hover:   rgba(255, 255, 255, .035);
+
+  --f-head: "Dela Gothic One", Onest, system-ui, sans-serif;
+  --f-body: Onest, system-ui, sans-serif;
+  --f-mono: "JetBrains Mono Var", "JetBrains Mono", Consolas, monospace;
+
+  /* Жёсткая тень — смещение без размытия, как у вырезанной из бумаги
+     плашки. Размытая тень здесь читалась бы как глянец. */
+  --shadow: 3px 3px 0 var(--line-2);
+  --shadow-acc: 3px 3px 0 #6b5600;
+}
+
+body {
+  font-family: var(--f-body);
+  background: var(--bg);
+}
+
+/* Зерно ксерокопии. Еле видно — его замечают, только если убрать. */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  opacity: .06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── заголовки и служебный текст ─────────────────────────────────── */
+
+.headline, .big, .menu-body h2, .setup-rail h2, .setup-card h1, .setup-card h2, .intro h1 {
+  font-family: var(--f-head);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: -.005em;
+}
+.headline { font-size: clamp(30px, 3.4vw, 48px); line-height: .98; }
+.big { font-size: clamp(26px, 3vw, 38px); line-height: 1; }
+
+.subhead { font-size: 18px; color: var(--text); font-weight: 500; }
+
+.eyebrow, .kicker, .meter .t, .ver, .credit, .tag, .chip, .cnt,
+.account .mail, .account .plan, .feed time, .feed .at, .tally,
+.status-bar .tail-btn, .menu-tail, .hint code, .conn-pop-head, .rail-sub {
+  font-family: var(--f-mono);
+}
+
+.eyebrow {
+  font-weight: 600; font-size: 12px;
+  letter-spacing: .12em;
+  color: var(--dim);
+}
+.eyebrow .live { border-radius: 0; transform: rotate(45deg); width: 7px; height: 7px; }
+.eyebrow .where { color: var(--lime); }
+
+.kicker {
+  font-family: var(--f-head);
+  font-size: 18px; font-weight: 400;
+  letter-spacing: 0;
+  color: var(--text);
+}
+.kicker .cnt {
+  font-family: var(--f-mono); font-weight: 600;
+  border-radius: 0;
+  color: #000;
+}
+.kicker .cnt.zero { background: var(--faint); color: var(--dim); }
+
+.credit b {
+  background: var(--faint);
+  color: var(--text);
+  padding: 1px 6px;
+}
+
+/* ── кнопки ──────────────────────────────────────────────────────── */
+
+.act, .s-btn {
+  border: 2px solid var(--line-2);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--f-mono);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  box-shadow: var(--shadow);
+  transition: transform .05s, box-shadow .05s, border-color var(--fast) var(--ease),
+              color var(--fast) var(--ease);
+}
+.act:hover, .s-btn:hover { border-color: var(--dim); background: var(--bg); }
+.act:active, .s-btn:active { transform: translate(3px, 3px); box-shadow: none; }
+
+.act.key, .s-btn.key {
+  background: var(--lime);
+  border-color: var(--lime);
+  color: #000;
+  box-shadow: var(--shadow-acc);
+}
+.act.key:hover, .s-btn.key:hover { background: #ffd84d; border-color: #ffd84d; }
+
+.act.risky:hover { border-color: var(--bad); color: var(--bad); background: var(--bg); }
+
+.link-btn { font-family: var(--f-mono); text-transform: uppercase; font-size: 11px; }
+
+/* Кнопки плеера: квадраты, без кружков. */
+.pbtn {
+  border-radius: 0;
+  border: 2px solid var(--line-2);
+  color: var(--text);
+}
+.pbtn.key { color: #000; box-shadow: var(--shadow-acc); }
+.pbtn.key:active { transform: translate(3px, 3px); box-shadow: none; }
+
+.tab {
+  border-radius: 0;
+  border: 2px solid transparent;
+  font-family: var(--f-mono);
+  text-transform: uppercase;
+  font-size: 12px;
+}
+.tab.on {
+  color: #000;
+  background: var(--lime);
+  border-color: var(--lime);
+}
+
+/* ── поля ────────────────────────────────────────────────────────── */
+
+.field input[type="text"], .field input[type="number"], .field input[type="password"],
+.field textarea, .field select, .setup-field input, .setup-field select,
+.sheet-find input, .inline-input {
+  border: 2px solid var(--line-2) !important;
+  border-radius: 0 !important;
+  background: var(--bg) !important;
+  font-family: var(--f-mono);
+}
+.field input:focus, .field textarea:focus, .field select:focus,
+.setup-field input:focus, .sheet-find input:focus {
+  border-color: var(--lime) !important;
+  outline: none;
+}
+.check input, .mode input { accent-color: var(--lime); }
+
+/* ── большие блоки ──────────────────────────────────────────────── */
+
+.status-bar, .titlebar { border-bottom: 2px solid var(--line-2); }
+.stage { border-bottom: 2px solid var(--line-2); }
+.orders { border-right: 2px solid var(--line-2); }
+@media (max-width: 1000px) {
+  .orders { border-right: none; border-bottom: 2px solid var(--line-2); }
+}
+
+/* Обложка в эфире — фото, приклеенное скотчем: слегка повёрнута, с рамкой. */
+.stage .art {
+  position: relative;
+  border: 2px solid var(--line-2);
+  border-radius: 0;
+  transform: rotate(-1.5deg);
+  overflow: visible;
+  width: 150px; height: 150px;
+}
+.stage .art img { filter: contrast(1.08) saturate(.9); }
+.stage .art::before {
+  content: "";
+  position: absolute;
+  left: 18px; top: -10px;
+  width: 64px; height: 18px;
+  background: rgba(255, 204, 0, .78);
+  transform: rotate(-8deg);
+  z-index: 2;
+}
+.art { border-radius: 0; }
+
+/* Полоса времени: толстая, в рамке, с жёлто-чёрной штриховкой. */
+.meter .bar {
+  height: 14px;
+  border: 2px solid var(--line-2);
+  background: var(--bg);
+}
+.meter .bar i {
+  background: repeating-linear-gradient(-45deg, var(--lime) 0 6px, #000 6px 9px);
+}
+.meter.seekable .bar { padding: 0; height: 14px; }
+.meter.seekable .bar::before { display: none; }
+
+/* Карточки аккаунтов: толстая рамка, слева метка состояния. */
+.account {
+  border: 2px solid var(--line-2);
+  border-left-width: 6px;
+  border-radius: 0;
+}
+
+/* Окна поверх страницы. */
+.menu-sheet, .conn-pop, .sheet {
+  border: 2px solid var(--line-2) !important;
+  border-radius: 0 !important;
+  box-shadow: 6px 6px 0 #000 !important;
+}
+
+/* Отказ — печать: красная рамка, чуть набок. */
+.tag.bad, .chip.bad, .st.bad, .refunded {
+  font-family: var(--f-mono);
+  text-transform: uppercase;
+  color: var(--bad);
+  border: 2px solid var(--bad);
+  background: none;
+  border-radius: 0;
+  transform: rotate(-3deg);
+  display: inline-block;
+}
+
+/* Скроллбар — тоже квадратный. */
+.thin-scroll::-webkit-scrollbar-thumb { border-radius: 0; }
+
+/* Заставка при запуске: эквалайзер жёлтыми квадратами. */
+.intro-eq i { border-radius: 0 !important; background: var(--lime) !important; }
+
+h1 { font-weight: 400; }
+.account[hidden] { display: none; }
+
+/* Мастер: схемы и номера шагов — без скруглений. */
+.scheme, .scheme svg rect { border-radius: 0; }
+.rail-step.on { background: var(--raise); border-left: 3px solid var(--lime); border-radius: 0; }

@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Заказ музыки</title>
+<title>Заказ музыки · Яндекс</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/fonts/fonts.css">
 <link rel="stylesheet" href="/static/widget.css">
 <link rel="stylesheet" href="/static/app.css">
 <link rel="stylesheet" href="/static/setup.css">
+<link rel="stylesheet" href="/static/theme.css">
 </head>
 <body>
 
@@ -88,7 +89,7 @@
        вовсе, чтобы он не занимал место в обычный вечер. -->
   <section class="pls" id="playlists" hidden></section>
 
-  <!-- Заказы, которых нет в Spotify и которые ждут решения: играть ли их с
+  <!-- Заказы, которых нет в Яндексе и которые ждут решения: играть ли их с
        YouTube. Появляются только в режиме «спрашивать» (вкладка «YouTube»).
        Раньше такой заказ включался молча, и стример не понимал, откуда звук. -->
   <section class="pls" id="ytasks" hidden></section>
@@ -171,90 +172,38 @@
   <div class="grid tab-pane" id="tab-conn">
 
     <div class="col">
-      <div class="kicker">Spotify</div>
-      <label class="field">
-        <span>Client ID — из инструкции, шаг 3</span>
-        <input type="text" id="client-id" spellcheck="false" autocomplete="off"
-               placeholder="набор букв и цифр">
-      </label>
+      <div class="kicker">Яндекс Музыка</div>
       <div class="acts">
-        <button class="act small" id="save-id">Сохранить</button>
-        <button class="act small key" data-do="login">Подключить Spotify</button>
-        <button class="act small" data-do="check">Проверить связь</button>
-        <button class="act small" data-do="probe">Проверить поиск</button>
-        <button class="act small risky" data-do="logout">Отключить</button>
+        <button class="act small key" data-do="ym-login">Войти в Яндекс</button>
+        <button class="act small" data-do="ym-check">Проверить связь</button>
+        <button class="act small risky" data-do="ym-logout">Отключить</button>
       </div>
       <div class="account" id="account"></div>
-      <div class="hint" id="redirect"></div>
-      <div class="hint" id="probe-out"></div>
+      <div class="account" id="ynison-state"></div>
 
       <label class="field" style="margin-top:16px">
-        <span>Обход блокировок — ключ от VPN или ссылка на подписку</span>
-        <input type="password" id="tunnel-key" spellcheck="false" autocomplete="off"
-               placeholder="vless://… , trojan://… , ss://… или https://…">
+        <span>Токен вручную — если окно входа не открылось</span>
+        <input type="password" id="ym-token" spellcheck="false" autocomplete="off"
+               placeholder="адрес из браузера после входа или сам токен">
       </label>
       <div class="acts">
-        <button class="act small key" data-do="tunnel-on">Включить обход</button>
-        <button class="act small" data-do="tunnel-check">Проверить обход</button>
-        <button class="act small" data-do="tunnel-off">Выключить</button>
-        <button class="act small risky" data-do="tunnel-forget">Забыть ключ</button>
-      </div>
-      <div class="account" id="tunnel-state"></div>
-      <div class="hint">
-        Вставь сюда ключ от своего VPN или ссылку на подписку — приложение само
-        скачает всё нужное, переберёт серверы и оставит тот, через который
-        Spotify отвечает. Никаких отдельных программ и консолей запускать не
-        надо.
-        <br><br>
-        <b>Ссылок можно вставить несколько — через пробел.</b> Сервисы подписки
-        обычно дают запасные адреса на случай, если основной заблокируют.
-        Приложение обходит их по очереди и берёт первый, который ответил. А
-        если не ответил ни один — поднимет обход по списку серверов,
-        запомненному в прошлый раз.
-        <br><br>
-        Через обход пойдут <b>только запросы этого приложения к Spotify</b>.
-        Twitch, чат, донаты, игра и загрузка стрима останутся на прямом
-        канале — в отличие от VPN, который уводит туда же весь компьютер.
-        <br><br>
-        <b>Ключ никому не виден.</b> Он ложится в хранилище паролей Windows,
-        в настройках и в архиве диагностики его нет, в панели он больше не
-        показывается — ни целиком, ни звёздочками. Если ключ сменился, вставь
-        новый поверх; кнопка «Забыть ключ» стирает его совсем.
-        <br><br>
-        <b>Вход в Spotify всё равно один раз через VPN.</b> Кнопка «Подключить
-        Spotify» открывает страницу входа, а она идёт мимо обхода. Включи VPN,
-        войди, выключи VPN — дальше приложение живёт на обходе само.
-      </div>
-
-      <label class="field" style="margin-top:16px">
-        <span>Прокси для Spotify — если обход поднимаешь сам, своей программой</span>
-        <input type="text" id="proxy" spellcheck="false" autocomplete="off"
-               placeholder="socks5://адрес:порт">
-      </label>
-      <div class="acts">
-        <button class="act small key" data-do="proxy-detect">Найти автоматически</button>
-        <button class="act small" id="save-proxy">Сохранить</button>
-        <button class="act small" data-do="check">Проверить связь</button>
+        <button class="act small" id="save-ym-token">Сохранить токен</button>
       </div>
       <div class="hint">
-        Это старый путь, для тех, у кого обход уже поднят своей программой:
-        Psiphon, свой клиент VPN, что угодно, что даёт локальный прокси.
-        Вписанный сюда адрес работает так же, как обход выше, — только его
-        приложение не поднимает и не следит, жив ли он.
+        Кнопка «Войти в Яндекс» открывает окно входа. После входа оно само
+        заберёт токен и закроется — больше ничего делать не надо.
         <br><br>
-        <b>Включён обход выше — он главнее.</b> Двух посредников подряд не
-        бывает, поэтому пока обход работает, это поле не используется.
+        <b>Окно не открылось?</b> Нажми кнопку ещё раз — откроется браузер.
+        Войди, и когда браузер перекинет на music.yandex.ru, скопируй адрес
+        из строки браузера целиком и вставь в поле выше.
         <br><br>
-        <b>Стало медленно везде?</b> Значит твоя программа обхода увела за
-        собой весь компьютер, а не только нас. У Psiphon это системный прокси
-        Windows: <b>Win+I → Сеть и Интернет → Прокси</b> → «Использовать
-        прокси-сервер» выключить. У остальных — режим «весь трафик через VPN»
-        в их же настройках. Нам это не нужно, мы ходим на 127.0.0.1 сами.
+        <b>Заказы играют в твоём приложении Яндекс Музыки.</b> Оно должно быть
+        открыто и играть любой трек — заказ встанет в его очередь сразу за
+        текущим. Если очередь Яндекса недоступна, заказ ляжет в плейлист
+        «Заказы со стрима», и баллы не пропадут.
         <br><br>
-        <b>Программе Spotify посредник не нужен.</b> Она ходит другими
-        адресами, и если музыка у тебя играет без VPN — в ней ничего менять не
-        надо. Блокируют обычно только адреса, по которым работают приложения
-        вроде этого.
+        <b>Токен никому не виден.</b> Он лежит в хранилище паролей Windows, в
+        настройках и в архиве диагностики его нет.
       </div>
     </div>
 
@@ -304,7 +253,7 @@
         Вторая награда — за плейлист
       </label>
       <div class="hint">Отдельная награда на канале: зритель кидает ссылку на
-        плейлист или альбом Spotify либо Яндекс.Музыки. Сама в эфир она не
+        плейлист или альбом Яндекс Музыки. Сама в эфир она не
         идёт — ждёт, пока ты или модератор её одобрит.</div>
 
       <div id="pl-fields" hidden>
@@ -482,8 +431,8 @@
           <input type="radio" name="resume" value="radio">
           <span>
             <span class="name">Включить музыку последнего артиста</span>
-            <span class="why">Ближе всего к тому, что играло. Настоящее радио Spotify через
-              API недоступно, поэтому берём популярные треки этого артиста.</span>
+            <span class="why">Ближе всего к тому, что играло: популярные треки
+              этого артиста из Яндекс Музыки.</span>
           </span>
         </label>
       </div>
@@ -502,7 +451,7 @@
     <div class="col">
       <div class="kicker">Первая настройка</div>
       <div class="hint">
-        Пошаговый мастер: обход блокировок, Spotify, Twitch, награда, виджет для
+        Пошаговый мастер: Яндекс Музыка, Twitch, награда, виджет для
         OBS. Тот самый, что открывается при первом запуске. Что-то сломалось или
         настраиваешь заново на другом компьютере — пройди его ещё раз, ничего не
         потеряется.
@@ -555,15 +504,15 @@
 
 </section>
 
-<!-- YouTube. Отдельный раздел с 11.10: друг владельца жаловался, что заказ,
-     которого нет в Spotify, «играл непонятно где», а настроить это было
+<!-- YouTube. Всё про второй проигрыватель в одном месте: заказ,
+     которого нет в Яндексе, «играл непонятно где», а настроить это было
      нельзя — настройки лежали внизу вкладки «Если трека нет». Здесь всё про
      второй проигрыватель в одном месте: что играет, как решать, куда звук. -->
 <section class="panel" id="youtube" hidden>
   <div class="grid">
 
     <div class="col">
-      <div class="kicker">Если трека нет в Spotify</div>
+      <div class="kicker">Если трека нет в Яндексе</div>
       <div class="hint" style="margin-top:0">Что делать, когда трек нашёлся только на YouTube.</div>
       <div class="modes">
         <label class="mode">
@@ -644,8 +593,8 @@
       <label class="field" style="margin-top:14px">
         <span>Громкость заказов с YouTube — <b id="yt-volume-val">100%</b></span>
         <input type="range" id="yt-volume" min="1" max="100" step="1">
-        <span class="hint">Считается <b>от громкости Spotify</b>: сто процентов —
-          заказ звучит ровно как музыка стримера, пятьдесят — вдвое тише. Меняется
+        <span class="hint">Сто процентов — заказ звучит на полную громкость
+          устройства, пятьдесят — вдвое тише. Меняется
           на лету, даже посреди играющего трека. Тот же ползунок есть на карточке
           «В эфире», когда играет заказ с YouTube.</span>
       </label>
@@ -872,7 +821,7 @@
 
     <div class="sheet-find">
       <input type="text" id="fix-query" spellcheck="false" autocomplete="off"
-             placeholder="артист и название или ссылка Spotify">
+             placeholder="артист и название или ссылка на трек">
       <button class="act small key" id="fix-find">Искать</button>
     </div>
 
@@ -890,7 +839,7 @@
   <div class="intro-inner">
     <div class="intro-eq"><i></i><i></i><i></i><i></i><i></i></div>
     <h1><span>Заказ</span> <span>музыки</span></h1>
-    <div class="sub">зрители заказывают — играет твой Spotify</div>
+    <div class="sub">зрители заказывают — играет твоя Яндекс Музыка</div>
     <div class="line"></div>
   </div>
 </div>

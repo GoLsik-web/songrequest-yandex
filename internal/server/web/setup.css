@@ -48,19 +48,19 @@ body.has-titlebar .status-bar { top: 38px; }
   height: 7px;
   border-radius: 50%;
   background: var(--lime);
-  box-shadow: 0 0 0 0 rgba(200, 247, 81, .5);
+  box-shadow: 0 0 0 0 rgba(255, 204, 0, .5);
   animation: tb-pulse 2.6s var(--ease) infinite;
   flex: none;
 }
 
 @keyframes tb-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(200, 247, 81, .45); }
-  70%  { box-shadow: 0 0 0 7px rgba(200, 247, 81, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(200, 247, 81, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(255, 204, 0, .45); }
+  70%  { box-shadow: 0 0 0 7px rgba(255, 204, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 204, 0, 0); }
 }
 
 .titlebar .name {
-  font-family: Unbounded, Manrope, sans-serif;
+  font-family: var(--f-head); font-weight: 400; text-transform: uppercase;
   font-size: var(--t-xs);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
@@ -128,7 +128,7 @@ body.has-titlebar .status-bar { top: 38px; }
   width: 900px;
   height: 900px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(200, 247, 81, .13), transparent 62%);
+  background: radial-gradient(circle, rgba(255, 204, 0, .13), transparent 62%);
   animation: intro-glow 3.4s var(--ease) forwards;
 }
 
@@ -257,7 +257,7 @@ body.has-titlebar .setup { top: 38px; }
 
 .setup-rail h2 {
   margin: 0 0 var(--s2);
-  font-family: Unbounded, Manrope, sans-serif;
+  font-family: var(--f-head); font-weight: 400; text-transform: uppercase;
   font-size: var(--t-sm);
   letter-spacing: var(--track-caps);
   text-transform: uppercase;
@@ -293,7 +293,7 @@ body.has-titlebar .setup { top: 38px; }
   flex: none;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
+  border-radius: 0;
   border: 1px solid var(--line-2);
   display: grid;
   place-items: center;
@@ -367,7 +367,7 @@ body.has-titlebar .setup { top: 38px; }
   text-transform: uppercase;
   border: 1px solid var(--line-2);
   color: var(--dimmer);
-  border-radius: 999px;
+  border-radius: 0;
   padding: 3px 10px;
 }
 
@@ -422,7 +422,7 @@ body.has-titlebar .setup { top: 38px; }
   top: 1px;
   width: 22px;
   height: 22px;
-  border-radius: 50%;
+  border-radius: 0;
   border: 1px solid var(--line-2);
   color: var(--dim);
   font-size: var(--t-xs);
@@ -478,7 +478,7 @@ body.has-titlebar .setup { top: 38px; }
   border-radius: 10px;
   padding: 11px var(--s3);
   color: var(--text);
-  font: var(--t-md)/1.4 Manrope, system-ui, sans-serif;
+  font: var(--t-md)/1.4 var(--f-body);
 }
 
 .setup-field input:focus,
@@ -530,7 +530,7 @@ body.has-titlebar .setup { top: 38px; }
 /* Код для входа в Twitch: его переписывают глазами на телефон, поэтому он
    крупный и с разрядкой. */
 .code-big {
-  font-family: Unbounded, Manrope, sans-serif;
+  font-family: var(--f-head); font-weight: 400; text-transform: uppercase;
   font-size: 18px;
   letter-spacing: .12em;
   color: var(--lime);
@@ -589,7 +589,7 @@ body.has-titlebar .setup { top: 38px; }
   border: 1px solid var(--line-2);
   background: transparent;
   color: var(--dim);
-  border-radius: 999px;
+  border-radius: 0;
   padding: 6px 14px;
   font-size: var(--t-sm);
   cursor: pointer;

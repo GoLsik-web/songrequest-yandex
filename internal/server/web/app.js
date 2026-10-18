@@ -216,41 +216,36 @@
 
   // Шаги готовности. Каждый знает, выполнен ли он, что показать и что нажать.
   function steps(s) {
-    const sp = s.spotify;
+    const sp = s.yandex;
     const tw = s.twitch;
 
-    const spotifyStep = () => {
-      if (!sp.has_client_id) {
-        return { state: "todo", value: "Client ID не вставлен",
-                 hint: "Нажми «Провести по шагам» — мастер покажет, где его взять",
-                 button: `<button class="act key small" data-open-settings>Открыть настройки</button>` };
-      }
+    const yandexStep = () => {
       if (!sp.connected) {
         return { state: "todo", value: "Вход не выполнен",
-                 hint: "Разреши доступ на странице Spotify",
-                 button: `<button class="act key small" data-do="login">Подключить Spotify</button>` };
-      }
-      const paused = pauseLeft(sp);
-      if (paused) {
-        const at = paused.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-        return { state: "fail", value: "Spotify просит паузу",
-                 hint: `Ограничил приложение до ${at}: ${pausedParts[sp.paused_part] || "часть возможностей не работает"}`,
-                 button: `<button class="act small" data-do="check">Проверить связь</button>` };
+                 hint: "Войди в аккаунт, где у тебя Плюс",
+                 button: `<button class="act key small" data-do="ym-login">Войти в Яндекс</button>` };
       }
       if (!sp.account) {
-        return { state: "fail", value: "Spotify не отвечает",
-                 hint: "Проверь интернет; если пользуешься VPN — включи его",
-                 button: `<button class="act small" data-do="check">Проверить связь</button>` };
+        return { state: "fail", value: "Яндекс не отвечает",
+                 hint: "Проверь интернет и нажми «Проверить связь»",
+                 button: `<button class="act small" data-do="ym-check">Проверить связь</button>` };
       }
-      if (sp.plan === "free") {
-        return { state: "fail", value: `${sp.account} · без Premium`,
-                 hint: "Управлять музыкой Spotify разрешает только с подпиской",
+      if (sp.plus === "no") {
+        return { state: "fail", value: `${sp.account} · без Плюса`,
+                 hint: "Без Плюса Яндекс играет только отрывки по 30 секунд",
                  button: `<button class="act small" data-open-settings>Посмотреть аккаунт</button>` };
       }
+      if (!sp.ynison) {
+        return { state: "warn", value: sp.account,
+                 hint: sp.ynison_note || "Очередь Яндекса недоступна — заказы пойдут в плейлист" };
+      }
+      if (sp.ynison_note) {
+        return { state: "warn", value: sp.account, hint: sp.ynison_note };
+      }
       return {
-        state: sp.plan === "unknown" ? "warn" : "done",
+        state: "done",
         value: sp.account,
-        hint: sp.plan_label,
+        hint: sp.ynison_device ? `играет на «${sp.ynison_device}»` : "очередь на связи",
       };
     };
 
@@ -289,7 +284,7 @@
     };
 
     const snapshotStep = () => {
-      if (!sp.connected || !sp.account) return { state: "wait", value: "—", hint: "после подключения Spotify" };
+      if (!sp.connected || !sp.account) return { state: "wait", value: "—", hint: "после входа в Яндекс" };
       if (!sp.snapshot_text) {
         return { state: "todo", value: "Не запомнено",
                  hint: "Включи музыку и нажми — приложение вернётся сюда после заказов",
@@ -305,7 +300,7 @@
     };
 
     return [
-      { name: "Spotify", ...spotifyStep() },
+      { name: "Яндекс", ...yandexStep() },
       { name: "Twitch", ...twitchStep() },
       { name: "Награда", ...rewardStep() },
       { name: "Точка возврата", ...snapshotStep() },
@@ -390,7 +385,7 @@
         <div class="eyebrow">
           <i class="live"></i> В эфире
           <span class="sep">/</span>
-          <span class="where">${now.provider === "youtube" ? "YouTube" : "Spotify"}${
+          <span class="where">${now.provider === "youtube" ? "YouTube" : "Яндекс Музыка"}${
             now.via ? " · " + esc(now.via) : ""}${
             own ? " · твоя музыка" : ""}${
             now.uncertain ? " · неточное совпадение" : ""}</span>
@@ -416,7 +411,7 @@
                   title="${now.paused ? "Продолжить" : "Пауза"}">${icon(now.paused ? "play" : "pause")}</button>
           <button class="pbtn" data-play="next"
                   title="${own ? "Следующий трек" : "Следующий заказ"}">${icon("skip-forward")}</button>
-          ${own ? "" : `
+          ${own || !yt ? "" : `
           <span class="pvol">
             <button class="pbtn" data-play="mute" title="Заглушить">${icon("volume-2")}</button>
             <input type="range" id="vol" min="0" max="100" step="1" value="${now.volume ?? 100}">
@@ -426,9 +421,9 @@
         <div class="acts">${own ? `
           <span class="hint" style="margin:0">Это твоя музыка, а не заказ.
             Пауза и переключение работают, а громкость и перемотка живут
-            в самом Spotify — приложение туда не лезет.</span>` : `
+            в самом приложении Яндекс Музыки — сюда они не выведены.</span>` : `
           <button class="act key" data-do="skip">${icon("skip-forward")}Скипнуть</button>
-          <button class="act" data-do="restore">${icon("rotate-cw")}Вернуть Spotify</button>`}
+          <button class="act" data-do="restore">${icon("rotate-cw")}Вернуть мою музыку</button>`}
         </div>
         ${broken.length ? `
         <div class="stage-alarm">
@@ -440,7 +435,7 @@
           ${broken[0].button || ""}
         </div>` : ""}`);
       if (!own) {
-        bindVolume();
+        if (yt) bindVolume();
         bindSeek(now);
       }
       runMeter(now);
@@ -1184,112 +1179,33 @@
   const note = (code, text) =>
     `<div class="note">${code ? `<b>${esc(code)}</b> ` : ""}${esc(text)}</div>`;
 
-  // Пауза, которую объявил сам Spotify. Пока она идёт, не работает ничего:
-  // ни заказы, ни «Запомнить». Живьём это выглядело как поломка всего
-  // приложения сразу после включения обхода блокировок, и чинили не то.
-  //
-  // Время считаем в панели: сервер отдаёт конец паузы, а не остаток —
-  // остаток протухает между обновлениями состояния.
-  function pauseLeft(sp) {
-    if (!sp.paused_until) return null;
-    const until = new Date(sp.paused_until);
-    if (isNaN(until.getTime()) || until <= new Date()) return null;
-    return until;
-  }
-
-  // Что именно закрыто — важно: Spotify считает части по отдельности, и
-  // закрытый плеер при работающем поиске совершенно обычное дело.
-  const pausedParts = {
-    "плеер": "заказы пока не сыграют, а «Запомнить» не сработает",
-    "поиск": "новые заказы пока не найдутся",
-    "аккаунт": "аккаунт пока не проверить",
-    "плейлисты": "список плейлистов пока не обновить",
-  };
-
-  function pauseNote(sp) {
-    const until = pauseLeft(sp);
-    if (!until) return "";
-    const at = until.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-    const what = pausedParts[sp.paused_part] || "часть возможностей пока не работает";
-    return note("SP-08", `Spotify ограничил приложение до ${at}: ${what}. ` +
-      `Это не поломка и не обход блокировок — Spotify снимет ограничение сам. ` +
-      `Кнопка «Проверить связь» пробует ещё раз.`);
-  }
-
-  function renderSpotifyCard(sp) {
+  function renderYandexCard(y) {
     const box = $("account");
-    if (!sp.connected) {
+    if (!y.connected) {
       box.className = "account";
       box.innerHTML = `<div class="who muted">Вход не выполнен</div>`;
-      return;
-    }
-    if (!sp.account) {
+    } else if (!y.account) {
       box.className = "account bad";
       box.innerHTML = `<div class="who">Вход сохранён</div>
-        <div class="plan">но связи со Spotify не было — аккаунт неизвестен</div>
-        ${pauseNote(sp)}`;
-      return;
-    }
-    // Страна аккаунта важнее подписки: в неработающей стране Premium есть,
-    // а поиск пустой — и без этой строки причину не найти.
-    if (sp.country_note) box.className = "account bad";
-    else box.className = "account " + (sp.plan === "free" ? "bad" : sp.plan === "unknown" ? "iffy" : "ok");
-    box.innerHTML = `
-      <div class="who">${esc(sp.account || "аккаунт без имени")}</div>
-      ${sp.email ? `<div class="mail">${esc(sp.email)}</div>` : ""}
-      ${sp.proxy ? `<div class="mail">через ${esc(sp.proxy)}</div>` : ""}
-      <div class="plan">${esc(sp.plan_label)}${
-        sp.country ? ` · страна аккаунта ${esc(sp.country)}` : ""}</div>
-      ${pauseNote(sp)}
-      ${sp.country_note ? note("SP-16", sp.country_note) : ""}
-      ${sp.plan_note ? note(sp.plan_note_code, sp.plan_note) : ""}`;
-  }
-
-  // Карточка обхода блокировок. Ключа здесь нет и не будет: сервер его не
-  // отдаёт, а показывать «vless://11111111-…» на стриме нельзя тем более.
-  function renderTunnel(t) {
-    const box = $("tunnel-state");
-
-    // Поле после включения пустое: ключ уже лежит в хранилище паролей Windows,
-    // и держать его на экране незачем. Но пустое поле читается как «ключ
-    // слетел» — владелец так и решил. Поэтому подсказка внутри поля говорит,
-    // что именно сохранено.
-    const field = $("tunnel-key");
-    if (field && !field.value) {
-      field.placeholder = t.has_key
-        ? `ключ сохранён (${t.hint}) — вставлять заново не надо`
-        : "vless://… , trojan://… , ss://… или https://…";
+        <div class="plan">но связи с Яндексом не было — аккаунт неизвестен</div>`;
+    } else {
+      box.className = "account " + (y.plus === "no" ? "bad" : y.plus === "unknown" ? "iffy" : "ok");
+      box.innerHTML = `
+        <div class="who">${esc(y.account)}</div>
+        ${y.login ? `<div class="mail">${esc(y.login)}</div>` : ""}
+        <div class="plan">${y.plus === "yes" ? "Плюс есть" : y.plus === "no" ? "без Плюса" : "подписка не определена"}</div>
+        ${y.plus_note ? note(y.plus_note_code, y.plus_note) : ""}`;
     }
 
-    if (!t.has_key) {
-      box.className = "account";
-      box.innerHTML = `<div class="who muted">Ключ не вставлен</div>
-        <div class="plan">Spotify идёт напрямую или через прокси ниже</div>
-        ${t.note ? `<div class="plan">${esc(t.note)}</div>` : ""}`;
-      return;
-    }
-
-    // Состояние приходит одним словом (phase) и больше не вычисляется здесь по
-    // трём признакам сразу. Раньше «поднять не вышло» и «поднимать не
-    // понадобилось» выглядели одинаково — ключ есть, обход не работает, — и в
-    // карточке писалось «Обход наготове» ровно тогда, когда всё лежало.
-    const look = {
-      connected:    ["Обход работает", "ok"],
-      connecting:   ["Подключаюсь…", "iffy"],
-      reconnecting: ["Переподключаюсь…", "iffy"],
-      standby:      ["Обход наготове", "ok"],
-      down:         ["Обход недоступен", "bad"],
-      off:          ["Обход выключен", "iffy"],
-    };
-    const [word, mood] = look[t.phase] || look.off;
-
-    box.className = "account " + mood;
-    box.innerHTML = `
-      <div class="who">${word}</div>
-      <div class="mail">ключ сохранён · ${esc(t.hint)}</div>
-      ${t.on && t.server ? `<div class="plan">через ${esc(t.server)}</div>` : ""}
-      ${t.from_cache ? `<div class="plan">список серверов взят из памяти — сервис подписки не ответил</div>` : ""}
-      ${t.note ? `<div class="plan">${esc(t.note)}</div>` : ""}`;
+    const yn = $("ynison-state");
+    if (!yn) return;
+    yn.hidden = !y.connected;
+    if (!y.connected) return;
+    yn.className = "account " + (y.ynison && !y.ynison_note ? "ok" : y.ynison ? "iffy" : "bad");
+    yn.innerHTML = `
+      <div class="who">${y.ynison ? "Очередь Яндекса на связи" : "Очередь Яндекса недоступна"}</div>
+      ${y.ynison_device ? `<div class="mail">играет на «${esc(y.ynison_device)}»</div>` : ""}
+      ${y.ynison_note ? `<div class="plan">${esc(y.ynison_note)}</div>` : ""}`;
   }
 
   function renderTwitchCard(tw) {
@@ -1324,7 +1240,7 @@
     box.className = "account " + (y.ready ? "ok" : "iffy");
     box.innerHTML = y.ready
       ? `<div class="who">Готов</div>
-         <div class="plan">заказы, которых нет в Spotify, заиграют с YouTube</div>`
+         <div class="plan">заказы, которых нет в Яндексе, заиграют с YouTube</div>`
       : `<div class="who">Не готов</div>
          ${y.note ? note(y.note_code, y.note) : `<div class="plan">проверяю программы…</div>`}`;
 
@@ -1376,7 +1292,6 @@
   // playlistsFailed — список не собрался из-за отказа Spotify. Отличать это
   // от «уже собран» нужно, чтобы «Проверить связь» дала второй шанс.
   let playlistsFailed = false;
-  let redirectShown = false;
 
   // ── Меню разделов ─────────────────────────────────────────
   //
@@ -1530,8 +1445,6 @@
   async function loadConfig() {
     try {
       config = await (await fetch("/api/config")).json();
-      $("client-id").value = config.spotify_client_id || "";
-      $("proxy").value = config.spotify_proxy || "";
       $("twitch-id").value = config.twitch_client_id || "";
       $("da-id").value = config.donationalerts_client_id || "";
       $("dp-key").value = config.donatepay_key || "";
@@ -1625,39 +1538,19 @@
     }
   }
 
-  // showProbe рисует итог проверки поиска.
-  //
-  // Список нужен, чтобы человек своими глазами увидел: «этот способ прошёл, а
-  // этот — нет». Разбираться всё равно буду я по логу, поэтому подробности
-  // ответа тут обрезаны до кода и числа находок.
-  function showProbe(d) {
-    const box = $("probe-out");
-    if (!box) return;
-    if (!d || !d.probes) {
-      box.innerHTML = "";
-      return;
-    }
-    const rows = d.probes.map((p) => {
-      const ok = p.http >= 200 && p.http < 300;
-      const what = p.error ? esc(p.error) : `${p.http || "нет ответа"}`;
-      return `<div>${ok ? "✅" : "❌"} ${esc(p.way)} — <b>${what}</b>` +
-        `${ok ? `, нашлось ${p.found}` : ""}</div>`;
-    }).join("");
-    box.innerHTML = `<b>Проверка поиска: прошло ${d.ok} из ${d.total}.</b>` +
-      `${rows}<br>Теперь нажми «Сохранить лог и историю» и пришли архив.`;
-  }
+
 
   async function loadPlaylists() {
     if (playlistsLoaded) return;
     playlistsFailed = false;
-    if (!lastState || !lastState.spotify.connected) return;
+    if (!lastState || !lastState.yandex.connected) return;
     try {
-      const r = await fetch("/api/spotify/playlists");
+      const r = await fetch("/api/yandex/playlists");
       const list = await r.json();
       if (!r.ok) {
         $("playlist-hint").className = "hint warn";
         $("playlist-hint").textContent = `${list.code} · ${list.error}`;
-        // Не повторяем без спроса: раньше при отвалившемся Spotify панель
+        // Не повторяем без спроса: раньше при отвалившемся сервисе панель
         // молотила этот запрос на каждом состоянии, то есть каждые несколько
         // секунд весь стрим. Но и «навсегда» не годится: стример чинит связь,
         // жмёт «Проверить связь» — и список должен собраться заново, иначе
@@ -1670,7 +1563,7 @@
       $("playlist").innerHTML = '<option value="">— не выбран —</option>' +
         list.map((p) => `<option value="${esc(p.id)}" data-name="${esc(p.name)}"${
           p.id === chosen ? " selected" : ""}>${esc(p.name)}${
-          // Ноль здесь чаще значит «Spotify не сказал», чем «пусто»: писать
+          // Ноль здесь чаще значит «сервис не сказал», чем «пусто»: писать
           // «0 треков» у плейлиста, который стример сам же и слушает, — врать.
           p.tracks > 0
             ? ` · ${p.tracks} ${plural(p.tracks, "трек", "трека", "треков")}`
@@ -1693,103 +1586,37 @@
     return run(btn);
   }
 
-  // tunnelStart отдаёт ключ серверу и ждёт. Ждать приходится долго: в первый
-  // раз внутри скачивается программа обхода, а потом перебираются серверы
-  // подписки — до нескольких минут. Поле после успеха очищаем: ключ уже
-  // сохранён в хранилище Windows, и держать его на экране незачем.
-  async function tunnelStart(btn) {
-    const key = $("tunnel-key").value.trim();
-    const d = await post("/api/tunnel/on", btn, key ? { key } : {});
-    if (d) {
-      $("tunnel-key").value = "";
-      // standby — приложение проверило и решило, что обход сейчас не нужен:
-      // Spotify отвечает и без него. Ключ при этом сохранён.
-      say(d.standby
-        ? "Spotify отвечает и без обхода — держу обход наготове"
-        : `Обход работает: ${d.server}`);
-    }
-    return d;
-  }
-
   const actions = {
-    login: (btn) => saveThenConnect("client-id", "spotify_client_id",
-      (b) => post("/api/spotify/login", b), btn).then((d) => {
+    "ym-login": (btn) => post("/api/yandex/login", btn).then((d) => {
       if (!d) return;
-      // Показываем адрес возврата: если вход не пройдёт, первым делом сверяют
-      // именно эту строку с тем, что вписано в настройках Spotify.
-      $("redirect").textContent = `Адрес возврата: ${d.redirect_uri}`;
-      // in_app означает, что приложение уже открыло вход в своём окне — так
-      // бывает, когда работает обход. Открыть ту же страницу ещё и в браузере
-      // значит показать человеку два входа сразу, причём браузерный из России
-      // не загрузится вовсе, и виноватым окажется приложение.
-      if (!d.in_app) window.open(d.url, "_blank", "noopener");
-      redirectShown = true;
-      return d;
-    }),
-    logout: (btn) => post("/api/spotify/logout", btn),
-    // «Включить обход» и «Проверить обход» — одна и та же ручка: проверка и
-    // есть попытка поднять всё заново. Отдельная «проверка», которая ничего
-    // не чинит, человеку бесполезна.
-    "tunnel-on": (btn) => tunnelStart(btn),
-    "tunnel-check": (btn) => tunnelStart(btn),
-    "tunnel-off": (btn) => post("/api/tunnel/off", btn),
-    "tunnel-forget": (btn) => new Promise((done) => {
-      confirmThen(btn, "забыть ключ?", async () => {
-        $("tunnel-key").value = "";
-        done(await post("/api/tunnel/forget", btn));
-      });
-    }),
-    "proxy-detect": (btn) => post("/api/spotify/proxy/detect", btn).then((d) => {
-      // Сервер уже сохранил найденный адрес и включил его; поле просто
-      // догоняет. Раньше поле заполнялось, а «Проверить связь» рядом
-      // проверяла всё ещё старый прокси.
-      if (d) {
-        $("proxy").value = d.address || "";
-        markSaved($("proxy"));
+      // in_app — окно входа уже открыто приложением и само заберёт токен.
+      // Иначе открываем браузер: токен оттуда человек вставит руками.
+      if (!d.in_app) {
+        window.open(d.url, "_blank", "noopener");
+        say("Открыл вход в браузере. После входа скопируй адрес из строки браузера и вставь в поле «Токен вручную».");
+      } else {
+        say("Открыл окно входа в Яндекс — войди, и оно закроется само.");
       }
       return d;
     }),
-    check: (btn) => {
-      // Spotify объявил паузу — стучаться сейчас можно, но не бесплатно.
-      //
-      // Кнопка нарочно сбрасывает объявленную паузу: человек её видел и решил
-      // попробовать. Беда в том, что каждый такой стук ограничение продлевает,
-      // а выглядит кнопка безобидно. В ночь на 10.09 их набралось тринадцать
-      // за час, пока Spotify просил подождать двадцать один час. Теперь она
-      // спрашивает.
-      const until = lastState && lastState.spotify && lastState.spotify.paused_until;
-      if (until && new Date(until) > new Date()) {
-        const at = new Date(until).toLocaleString("ru-RU",
-          { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-        const ask = "Spotify ограничил приложение и просит подождать до " + at + ".\n\n" +
-          "Каждая проверка сейчас может продлить ограничение. " +
-          "Само оно снимется, ничего делать не надо.\n\nВсё равно проверить?";
-        if (!confirm(ask)) return Promise.resolve(null);
+    "ym-logout": (btn) => new Promise((done) => {
+      confirmThen(btn, "отключить Яндекс?", async () => done(await post("/api/yandex/logout", btn)));
+    }),
+    "ym-check": (btn) => post("/api/yandex/check", btn).then((d) => {
+      if (playlistsFailed) {
+        playlistsLoaded = false;
+        loadPlaylists();
       }
-      return post("/api/spotify/check", btn).then((d) => {
-        // Связь починили — список плейлистов имеет смысл собрать заново.
-        if (playlistsFailed) {
-          playlistsLoaded = false;
-          loadPlaylists();
-        }
-        return d;
-      });
-    },
-    // Пробник поиска: жмут его по моей просьбе, когда поиск отказывает без
-    // видимой причины. Главное здесь — не картинка в панели, а строки «проба
-    // поиска» в логе; на экране просто видно, что проверка дошла до конца.
-    probe: (btn) => post("/api/spotify/probe", btn).then((d) => {
-      showProbe(d);
       return d;
     }),
-    snapshot: (btn) => post("/api/spotify/snapshot", btn),
+    snapshot: (btn) => post("/api/yandex/snapshot", btn),
     skip: (btn) => post("/api/queue/skip", btn),
     // Короткий сигнал на устройство заказов с YouTube: услышать, куда оно
     // ведёт, до того как на стриме заиграет настоящий заказ.
     "yt-test": (btn) => post("/api/youtube/test-sound", btn).then((d) => {
       if (d && d.ok) say("Сигнал отправлен. Не услышал — выбери другое устройство.");
     }),
-    restore: (btn) => post("/api/spotify/restore", btn),
+    restore: (btn) => post("/api/yandex/restore", btn),
     "twitch-login": (btn) => saveThenConnect("twitch-id", "twitch_client_id",
       (b) => post("/api/twitch/login", b), btn),
     "da-login": (btn) => saveThenConnect("da-id", "donationalerts_client_id",
@@ -1829,8 +1656,7 @@
 
     if (e.target.closest("[data-open-settings]")) {
       toggleSettings(true, "conn");
-      $("client-id").focus();
-      $("client-id").scrollIntoView({ block: "center", behavior: "smooth" });
+      $("account").scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
 
@@ -1929,7 +1755,7 @@
         return;
       }
       if (!data.length) {
-        $("fix-note").textContent = "Ничего не нашлось. Попробуй иначе или вставь ссылку Spotify.";
+        $("fix-note").textContent = "Ничего не нашлось. Попробуй иначе или вставь ссылку на трек.";
         $("fix-results").innerHTML = "";
         return;
       }
@@ -2141,16 +1967,13 @@
     }
   };
 
-  $("save-id").onclick = async () => {
-    if (await saveConfig({ spotify_client_id: $("client-id").value.trim() })) {
-      say("Client ID сохранён. Теперь нажми «Подключить Spotify».");
-    }
-  };
-  $("save-proxy").onclick = async () => {
-    if (await saveConfig({ spotify_proxy: $("proxy").value.trim() }, "?proxy=1")) {
-      say($("proxy").value.trim()
-        ? "Прокси включён. Самой программе Spotify он не нужен — нажми «Проверить связь»."
-        : "Прокси убран, Spotify идёт напрямую.");
+  $("save-ym-token").onclick = async () => {
+    const token = $("ym-token").value.trim();
+    if (!token) { say("Поле пустое: вставь адрес из браузера после входа или сам токен.", true); return; }
+    const d = await post("/api/yandex/token", $("save-ym-token"), { token });
+    if (d) {
+      $("ym-token").value = "";
+      say("Яндекс подключён: " + (d.display_name || d.login || "аккаунт"));
     }
   };
 
@@ -3011,7 +2834,7 @@
     // Позиция трека намеренно выброшена из подписи: она меняется каждые
     // несколько секунд, а перерисовывать из-за неё всю карточку — значит
     // мигать ею и сбивать собственный отсчёт полосы.
-    draw("stage", sig([nowKey(s.now), s.spotify, s.twitch, s.connections,
+    draw("stage", sig([nowKey(s.now), s.yandex, s.twitch, s.connections,
                        s.last_played && s.last_played.at]), () => renderStage(s));
     // Перемотка в Spotify не меняет ни трек, ни подпись — значит карточку не
     // перерисуют. Но время после неё другое, и полосу надо переставить.
@@ -3030,16 +2853,11 @@
     // вечер там часами висело «3 минуты».
     draw("tally", sig(s.session) + Math.floor(Date.now() / 60000), () => renderTally(s));
     draw("banner", sig([s.twitch.pending_code, s.twitch.pending_expires]), () => renderBanner(s.twitch));
-    draw("sp-card", sig(s.spotify), () => renderSpotifyCard(s.spotify));
+    draw("ym-card", sig(s.yandex), () => renderYandexCard(s.yandex));
     draw("tw-card", sig(s.twitch), () => renderTwitchCard(s.twitch));
-    draw("tunnel", sig(s.tunnel), () => renderTunnel(s.tunnel));
 
-    if (s.spotify.connected && !playlistsLoaded &&
+    if (s.yandex.connected && !playlistsLoaded &&
         !$("settings").hidden && settingsTab === "fallback") loadPlaylists();
-    if (redirectShown && s.spotify.account) {
-      $("redirect").textContent = "";
-      redirectShown = false;
-    }
 
     // Мастер настройки живёт в отдельном файле, но состояние у нас одно:
     // отдаём снимок ему, чтобы его проверки («Spotify подключён», «обход

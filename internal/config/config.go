@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 )
 
 // ResumeFailMode — что делать, если вернуть Spotify в исходное состояние не удалось.
@@ -47,35 +46,6 @@ type Config struct {
 	// хотят повторить, а не разбираться, что именно они сломали.
 	SetupDone bool `json:"setup_done"`
 
-	// Обход блокировок. Сам ключ здесь не лежит — он секрет и хранится в
-	// хранилище паролей Windows (internal/secrets). Тут только то, что можно
-	// показывать: включён ли обход, что за ключ вставлен (без секретной части)
-	// и какой сервер сработал в прошлый раз.
-	TunnelOn      bool   `json:"tunnel_on"`
-	TunnelKeyHint string `json:"tunnel_key_hint"`
-	TunnelServer  string `json:"tunnel_server"`
-	// TunnelToolPath — путь к xray.exe, если человек положил его руками.
-	// Пусто — приложение скачает и будет держать свою копию.
-	TunnelToolPath string `json:"tunnel_tool_path"`
-	// TunnelBad — серверы, через которые Spotify отказал по стране, и когда
-	// это случилось. Тут только подписи (имя, вид, адрес и порт) — секретов в
-	// них нет, они и в панели показываются.
-	//
-	// Зачем хранить: перезапуск приложения не делает негодный сервер годным.
-	// Раньше список забывался вместе с процессом, и вечер начинался с тех же
-	// самых граблей — перебор упирался в те же серверы. Пометки истекают сами
-	// (см. badFor в internal/tunnel).
-	TunnelBad map[string]time.Time `json:"tunnel_bad,omitempty"`
-
-	// Spotify
-	SpotifyClientID string `json:"spotify_client_id"`
-	// SpotifyProxy — посредник только для запросов к Spotify. Пусто — прямое
-	// соединение. Нужен там, где до Spotify не достучаться напрямую; всё
-	// остальное (Twitch, чат, донаты) при этом идёт своим путём и не теряет
-	// в скорости, в отличие от системного VPN.
-	SpotifyProxy string `json:"spotify_proxy"`
-
-	// Twitch
 	TwitchClientID   string `json:"twitch_client_id"`
 	RewardTitle      string `json:"reward_title"`
 	RewardCost       int    `json:"reward_cost"`
@@ -187,11 +157,11 @@ type MatchWeights struct {
 // Defaults возвращает конфиг со значениями по умолчанию.
 func Defaults() Config {
 	return Config{
-		Port:                8977,
+		Port:                8978,
 		RewardTitle:         "Заказ трека",
 		RewardCost:          1000,
 		CommandPrefix:       "!",
-		UpdateRepo:          "GoLsik-web/songrequest",
+		UpdateRepo:          "GoLsik-web/songrequest-yandex",
 		AutoCreateReward:    true,
 		PlaylistRewardTitle: "Заказ плейлиста",
 		PlaylistMaxTracks:   5,

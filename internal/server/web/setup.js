@@ -8,7 +8,7 @@
 // вызовом window.srSetupState.
 //
 // Ни одной новой ручки у приложения мастер не просит: он нажимает те же самые
-// кнопки, что и панель, — «включить обход», «подключить Spotify», «сохранить
+// кнопки, что и панель, — «войти в Яндекс», «подключить Twitch», «сохранить
 // настройки». Поэтому пройденный мастер и настроенная руками панель дают
 // ровно одно и то же состояние.
 (() => {
@@ -93,27 +93,27 @@
   // ── рисованные схемы ───────────────────────────────────────────────
   //
   // Вместо снимков чужих сайтов. Снимок понятнее ровно до того дня, когда
-  // Spotify или Twitch поменяют свою страницу: тогда он начинает врать, а
+  // Яндекс или Twitch поменяют свою страницу: тогда он начинает врать, а
   // человек ищет кнопку, которой больше нет. Схема показывает устройство
   // страницы — где адрес, где поле, где кнопка, — и стареет медленнее. Плюс
   // она весит килобайты, а не мегабайты внутри .exe.
 
   const C = {
     bg: "#0b0d0e", raise: "#14171a", line: "#282c30",
-    ink: "#e8ebed", dim: "#8b9298", lime: "#c8f751",
+    ink: "#e8ebed", dim: "#8b9298", lime: "#ffcc00",
   };
 
   // window рисует окно браузера с адресной строкой и содержимым.
   function browserArt(url, inner, h = 210) {
     return `<svg viewBox="0 0 640 ${h}" role="img" aria-label="Схема страницы: ${esc(url)}">
-      <rect x="1" y="1" width="638" height="${h - 2}" rx="12" fill="${C.bg}" stroke="${C.line}"/>
-      <rect x="1" y="1" width="638" height="34" rx="12" fill="${C.raise}"/>
+      <rect x="1" y="1" width="638" height="${h - 2}" rx="0" fill="${C.bg}" stroke="${C.line}"/>
+      <rect x="1" y="1" width="638" height="34" rx="0" fill="${C.raise}"/>
       <rect x="1" y="24" width="638" height="12" fill="${C.raise}"/>
       <circle cx="22" cy="18" r="4" fill="${C.line}"/>
       <circle cx="38" cy="18" r="4" fill="${C.line}"/>
       <circle cx="54" cy="18" r="4" fill="${C.line}"/>
-      <rect x="72" y="8" width="548" height="20" rx="10" fill="${C.bg}" stroke="${C.line}"/>
-      <text x="86" y="22" font-family="Manrope, sans-serif" font-size="11" fill="${C.dim}">${esc(url)}</text>
+      <rect x="72" y="8" width="548" height="20" rx="0" fill="${C.bg}" stroke="${C.line}"/>
+      <text x="86" y="22" font-family="Onest, sans-serif" font-size="11" fill="${C.dim}">${esc(url)}</text>
       ${inner}
     </svg>`;
   }
@@ -123,7 +123,7 @@
     const stroke = hot ? C.lime : C.line;
     const ink = hot ? C.lime : C.dim;
     return `
-      <text x="${x}" y="${y}" font-family="Manrope, sans-serif" font-size="10"
+      <text x="${x}" y="${y}" font-family="Onest, sans-serif" font-size="10"
             fill="${C.dim}" letter-spacing="1">${esc(label)}</text>
       <rect x="${x}" y="${y + 8}" width="${w}" height="26" rx="7"
             fill="${C.bg}" stroke="${stroke}" ${hot ? 'stroke-width="1.5"' : ""}/>
@@ -136,163 +136,60 @@
       <rect x="${x}" y="${y}" width="${w}" height="26" rx="13"
             fill="${hot ? C.lime : "none"}" stroke="${hot ? C.lime : C.line}"/>
       <text x="${x + w / 2}" y="${y + 17}" text-anchor="middle"
-            font-family="Manrope, sans-serif" font-size="11" font-weight="600"
-            fill="${hot ? "#0d1204" : C.dim}">${esc(text)}</text>`;
+            font-family="Onest, sans-serif" font-size="11" font-weight="600"
+            fill="${hot ? "#0c0c0c" : C.dim}">${esc(text)}</text>`;
   }
 
   // ── шаги ───────────────────────────────────────────────────────────
   //
-  // Порядок не случайный: сначала обход, иначе вход в Spotify не пройдёт
-  // вовсе и человек упрётся в непонятную ошибку на первом же шаге.
+  // Порядок не случайный: сначала музыка, потом Twitch — без входа в Яндекс
+  // заказы принимать бессмысленно.
 
   const host = location.host;
-  const redirectURI = `http://127.0.0.1:${location.port || 8977}/callback`;
   const widgetURL = `http://${host}/widget`;
 
   const STEPS = [
     {
-      id: "tunnel",
-      name: "Обход блокировок",
+      id: "yandex",
+      name: "Яндекс Музыка",
       must: true,
-      short: "ключ от VPN",
-      title: "Обход блокировок",
-      why: "Spotify не отвечает приложениям из России. Вставь сюда ключ от своего VPN " +
-        "или ссылку на подписку — приложение само скачает всё нужное, переберёт серверы " +
-        "и оставит тот, через который Spotify работает. Отдельных программ запускать не надо.",
-      art: () => `<svg viewBox="0 0 640 150" role="img" aria-label="Схема: приложение ходит к Spotify через сервер обхода">
-        <rect x="14" y="46" width="150" height="58" rx="12" fill="${C.raise}" stroke="${C.line}"/>
-        <text x="89" y="72" text-anchor="middle" font-family="Manrope" font-size="12" fill="${C.ink}">Это приложение</text>
-        <text x="89" y="90" text-anchor="middle" font-family="Manrope" font-size="10" fill="${C.dim}">твой компьютер</text>
-
-        <path d="M170 75 h70" stroke="${C.lime}" stroke-width="1.5" stroke-dasharray="4 4"/>
-        <path d="M236 70 l8 5 -8 5 z" fill="${C.lime}"/>
-
-        <rect x="246" y="40" width="150" height="70" rx="12" fill="${C.raise}" stroke="${C.lime}"/>
-        <text x="321" y="66" text-anchor="middle" font-family="Manrope" font-size="12" fill="${C.lime}">Сервер обхода</text>
-        <text x="321" y="84" text-anchor="middle" font-family="Manrope" font-size="10" fill="${C.dim}">по твоему ключу</text>
-        <text x="321" y="100" text-anchor="middle" font-family="Manrope" font-size="10" fill="${C.dim}">выбирается сам</text>
-
-        <path d="M402 75 h70" stroke="${C.lime}" stroke-width="1.5" stroke-dasharray="4 4"/>
-        <path d="M468 70 l8 5 -8 5 z" fill="${C.lime}"/>
-
-        <rect x="478" y="46" width="148" height="58" rx="12" fill="${C.raise}" stroke="${C.line}"/>
-        <text x="552" y="72" text-anchor="middle" font-family="Manrope" font-size="12" fill="${C.ink}">Spotify</text>
-        <text x="552" y="90" text-anchor="middle" font-family="Manrope" font-size="10" fill="${C.dim}">заказы и плеер</text>
-
-        <text x="14" y="26" font-family="Manrope" font-size="10" fill="${C.dim}" letter-spacing="1">ЧЕРЕЗ ОБХОД ИДУТ ТОЛЬКО ЗАПРОСЫ К SPOTIFY — ИГРА, ЧАТ И СТРИМ ОСТАЮТСЯ НА ПРЯМОМ КАНАЛЕ</text>
-      </svg>`,
-      body: () => `
-        <ol class="steps-list">
-          <li>Открой личный кабинет своего VPN и найди там <b>ссылку на подписку</b>
-              («Subscription», «Импорт в v2rayN») или отдельный ключ вида
-              <span class="quiet">vless://…</span>, <span class="quiet">trojan://…</span>,
-              <span class="quiet">ss://…</span></li>
-          <li>Скопируй её целиком и вставь в поле ниже</li>
-          <li>Нажми <b>Включить обход</b> и подожди. В первый раз приложение качает
-              программу обхода и перебирает серверы — до пары минут</li>
-        </ol>
-        <label class="setup-field">
-          <span>Ключ от VPN или ссылка на подписку</span>
-          <input type="password" id="su-tunnel" spellcheck="false" autocomplete="off"
-                 placeholder="vless://… или https://…">
-        </label>
-        <div class="setup-acts">
-          <button class="s-btn key" data-act="tunnel-on">Включить обход</button>
-        </div>
-        <div class="check" id="su-check"></div>
-        <p class="why">Ключ никому не виден: он ложится в хранилище паролей Windows.
-          В настройках приложения и в архиве диагностики его нет.
-          <br>Если Spotify у тебя открывается без всякого VPN — этот шаг можно пропустить.</p>`,
-      check: (s) => {
-        const t = (s && s.tunnel) || {};
-        if (t.on) return { ok: true, text: "Обход работает: " + (t.server || "сервер выбран") };
-        // Ключ вставлен, а обход не поднят, потому что Spotify отвечает и без
-        // него: шаг сдан, чинить нечего.
-        if (t.standby) {
-          return { ok: true, text: t.note || "Ключ сохранён. Обход наготове — сейчас Spotify отвечает и без него." };
-        }
-        if (t.note) return { ok: false, text: t.note };
-        return { ok: false, text: "Обход пока не включён." };
-      },
-    },
-
-    {
-      id: "spotify-id",
-      name: "Ключ Spotify",
-      must: true,
-      short: "Client ID",
-      title: "Spotify: свой ключ приложения",
-      why: "Spotify не разрешает чужим программам управлять твоей музыкой просто так. " +
-        "Нужен собственный ключ — Client ID. Заводится один раз, бесплатно, на том же " +
-        "аккаунте, где у тебя Premium.",
-      art: () => browserArt("developer.spotify.com/dashboard → Create app", `
-        ${fieldArt(30, 60, 260, "APP NAME", "Заказ музыки", false)}
-        ${fieldArt(30, 118, 260, "APP DESCRIPTION", "музыка по заказам зрителей", false)}
-        ${fieldArt(320, 60, 290, "REDIRECT URI  ← самое важное", redirectURI, true)}
-        ${buttonArt(320, 118, 70, "Add", true)}
-        <text x="400" y="136" font-family="Manrope" font-size="10" fill="${C.dim}">не нажмёшь Add — адрес не сохранится</text>
-        ${buttonArt(540, 170, 70, "Save", false)}
-        <text x="30" y="180" font-family="Manrope" font-size="10" fill="${C.dim}">☑ Web API</text>
-      `),
-      body: () => `
-        <ol class="steps-list">
-          <li>Открой <b>developer.spotify.com/dashboard</b> и войди
-              <b>тем же аккаунтом Spotify</b>, на котором у тебя Premium</li>
-          <li>Нажми <b>Create app</b>. Название и описание — любые</li>
-          <li>В поле <b>Redirect URI</b> вставь строку ниже и обязательно нажми
-              <b>Add</b> справа от поля</li>
-          <li>Поставь галочку <b>Web API</b>, согласись с условиями и нажми <b>Save</b></li>
-          <li>Зайди в <b>Settings</b> приложения и скопируй <b>Client ID</b>.
-              <span class="quiet">Client secret не нужен — не показывай его никому.</span></li>
-        </ol>
-        <div class="copyline">
-          <code>${esc(redirectURI)}</code>
-          <button class="s-btn" data-act="copy" data-text="${esc(redirectURI)}">Скопировать</button>
-        </div>
-        <label class="setup-field">
-          <span>Client ID Spotify</span>
-          <input type="text" id="su-spotify-id" spellcheck="false" autocomplete="off"
-                 placeholder="набор букв и цифр">
-        </label>
-        <div class="setup-acts">
-          <button class="s-btn key" data-act="save-spotify-id">Сохранить</button>
-        </div>
-        <div class="check" id="su-check"></div>`,
-      fill: (cfg) => { $("su-spotify-id").value = (cfg && cfg.spotify_client_id) || ""; },
-      check: (s, cfg) => cfg && cfg.spotify_client_id
-        ? { ok: true, text: "Ключ сохранён." }
-        : { ok: false, text: "Ключ пока не вставлен." },
-    },
-
-    {
-      id: "spotify-login",
-      name: "Вход в Spotify",
-      must: true,
-      short: "разрешить доступ",
-      title: "Spotify: вход",
-      why: "Теперь разреши приложению управлять твоим плеером. Откроется страница входа " +
-        "Spotify — если обход включён, она откроется прямо в окне программы и закроется сама.",
-      art: () => browserArt("accounts.spotify.com", `
-        <text x="320" y="86" text-anchor="middle" font-family="Unbounded, Manrope" font-size="14" fill="${C.ink}">Заказ музыки хочет:</text>
-        <text x="320" y="112" text-anchor="middle" font-family="Manrope" font-size="11" fill="${C.dim}">управлять воспроизведением · видеть, что играет</text>
-        ${buttonArt(270, 140, 100, "Agree", true)}
+      short: "вход",
+      title: "Яндекс Музыка: вход",
+      why: "Заказы будут играть в твоём приложении Яндекс Музыки — встанут в его очередь " +
+        "сразу за текущим треком. Для этого приложению нужен вход в твой аккаунт Яндекса.",
+      art: () => browserArt("oauth.yandex.ru", `
+        <text x="320" y="86" text-anchor="middle" font-family="Dela Gothic One, Onest" font-size="14" fill="${C.ink}">ВОЙТИ В ЯНДЕКС</text>
+        <text x="320" y="112" text-anchor="middle" font-family="Onest" font-size="11" fill="${C.dim}">логин и пароль — на странице самого Яндекса</text>
+        ${buttonArt(270, 140, 100, "Войти", true)}
       `, 190),
       body: () => `
         <ol class="steps-list">
-          <li>Нажми <b>Подключить Spotify</b></li>
-          <li>На странице Spotify нажми <b>Agree</b></li>
+          <li>Нажми <b>Войти в Яндекс</b> — откроется окно входа Яндекса</li>
+          <li>Войди тем аккаунтом, где у тебя <b>Плюс</b> и где ты слушаешь музыку</li>
           <li>Окно закроется само, а здесь появится твой аккаунт</li>
         </ol>
         <div class="setup-acts">
-          <button class="s-btn key" data-act="spotify-login">Подключить Spotify</button>
+          <button class="s-btn key" data-act="ym-login">Войти в Яндекс</button>
+        </div>
+        <label class="setup-field">
+          <span>Окно не открылось? Вставь сюда адрес из браузера после входа</span>
+          <input type="password" id="su-ym-token" spellcheck="false" autocomplete="off"
+                 placeholder="https://music.yandex.ru/#access_token=…">
+        </label>
+        <div class="setup-acts">
+          <button class="s-btn" data-act="ym-token">Сохранить</button>
         </div>
         <div class="check" id="su-check"></div>
-        <p class="why">Не открылось или ругается на адрес возврата — вернись на шаг назад и
-          сверь <b>Redirect URI</b> в настройках приложения Spotify: он должен совпадать
-          до последнего знака.</p>`,
-      check: (s) => s && s.spotify && s.spotify.connected
-        ? { ok: true, text: "Spotify подключён" + (s.spotify.account ? ": " + s.spotify.account : "") }
-        : { ok: false, text: "Вход пока не выполнен." },
+        <p class="why">Токен никому не виден: он ложится в хранилище паролей Windows.
+          <br>Открой приложение Яндекс Музыки и включи любой трек — так заказам будет куда встать.</p>`,
+      check: (s) => {
+        const y = (s && s.yandex) || {};
+        if (!y.connected) return { ok: false, text: "Вход пока не выполнен." };
+        if (y.plus === "no") return { ok: false, text: y.plus_note || "На аккаунте нет Плюса." };
+        let text = "Яндекс подключён" + (y.account ? ": " + y.account : "");
+        if (!y.ynison && y.ynison_note) text += ". " + y.ynison_note;
+        return { ok: true, text };
+      },
     },
 
     {
@@ -301,7 +198,7 @@
       must: true,
       short: "Client ID",
       title: "Twitch: свой ключ приложения",
-      why: "То же самое, что со Spotify, только на Twitch: нужен собственный Client ID. " +
+      why: "Twitch не разрешает чужим программам принимать награды просто так: нужен собственный Client ID. " +
         "Заводится на том аккаунте, с которого ты стримишь.",
       art: () => browserArt("dev.twitch.tv/console/apps → Register Your Application", `
         ${fieldArt(30, 60, 260, "NAME", "Заказ музыки", false)}
@@ -309,7 +206,7 @@
         ${fieldArt(320, 60, 290, "OAUTH REDIRECT URLS", "http://localhost", true)}
         ${buttonArt(320, 118, 70, "Add", true)}
         ${buttonArt(540, 170, 70, "Create", false)}
-        <text x="30" y="180" font-family="Manrope" font-size="10" fill="${C.dim}">Client Type: Public (если такого поля нет — ничего не делай)</text>
+        <text x="30" y="180" font-family="Onest" font-size="10" fill="${C.dim}">Client Type: Public (если такого поля нет — ничего не делай)</text>
       `),
       body: () => `
         <ol class="steps-list">
@@ -352,11 +249,11 @@
       why: "Twitch пускает по короткому коду: приложение показывает код, ты вводишь его " +
         "на сайте Twitch — с этого же компьютера или с телефона.",
       art: () => `<svg viewBox="0 0 640 150" role="img" aria-label="Схема: код для входа в Twitch">
-        <rect x="1" y="1" width="638" height="148" rx="12" fill="${C.bg}" stroke="${C.line}"/>
-        <text x="320" y="46" text-anchor="middle" font-family="Manrope" font-size="11" fill="${C.dim}">открой адрес и введи код</text>
-        <text x="320" y="84" text-anchor="middle" font-family="Unbounded, Manrope" font-size="26" fill="${C.lime}" letter-spacing="4">WXYZ-7788</text>
+        <rect x="1" y="1" width="638" height="148" rx="0" fill="${C.bg}" stroke="${C.line}"/>
+        <text x="320" y="46" text-anchor="middle" font-family="Onest" font-size="11" fill="${C.dim}">открой адрес и введи код</text>
+        <text x="320" y="84" text-anchor="middle" font-family="Dela Gothic One, Onest" font-size="26" fill="${C.lime}" letter-spacing="4">WXYZ-7788</text>
         <text x="320" y="112" text-anchor="middle" font-family="ui-monospace, Consolas, monospace" font-size="12" fill="${C.ink}">twitch.tv/activate</text>
-        <text x="320" y="134" text-anchor="middle" font-family="Manrope" font-size="10" fill="${C.dim}">код живёт полчаса · не успел — нажми «Подключить Twitch» ещё раз</text>
+        <text x="320" y="134" text-anchor="middle" font-family="Onest" font-size="10" fill="${C.dim}">код живёт полчаса · не успел — нажми «Подключить Twitch» ещё раз</text>
       </svg>`,
       body: () => `
         <ol class="steps-list">
@@ -399,18 +296,18 @@
         "название трека — заказ прилетает сюда. Руками награду создавать нельзя: за чужую " +
         "награду Twitch не даёт вернуть баллы, если трек не подошёл.",
       art: () => `<svg viewBox="0 0 640 150" role="img" aria-label="Схема: награда на канале">
-        <rect x="1" y="1" width="638" height="148" rx="12" fill="${C.bg}" stroke="${C.line}"/>
-        <rect x="30" y="34" width="250" height="82" rx="10" fill="${C.raise}" stroke="${C.line}"/>
+        <rect x="1" y="1" width="638" height="148" rx="0" fill="${C.bg}" stroke="${C.line}"/>
+        <rect x="30" y="34" width="250" height="82" rx="0" fill="${C.raise}" stroke="${C.line}"/>
         <rect x="46" y="52" width="46" height="46" rx="8" fill="${C.lime}" opacity=".18"/>
-        <text x="69" y="81" text-anchor="middle" font-family="Manrope" font-size="14" fill="${C.lime}">♪</text>
-        <text x="108" y="70" font-family="Manrope" font-size="13" fill="${C.ink}">Заказ трека</text>
-        <text x="108" y="90" font-family="Manrope" font-size="11" fill="${C.dim}">1000 баллов</text>
+        <text x="69" y="81" text-anchor="middle" font-family="Onest" font-size="14" fill="${C.lime}">♪</text>
+        <text x="108" y="70" font-family="Onest" font-size="13" fill="${C.ink}">Заказ трека</text>
+        <text x="108" y="90" font-family="Onest" font-size="11" fill="${C.dim}">1000 баллов</text>
         <path d="M292 75 h60" stroke="${C.line}" stroke-width="1.5"/>
         <path d="M348 70 l8 5 -8 5 z" fill="${C.dim}"/>
-        <rect x="360" y="34" width="250" height="82" rx="10" fill="${C.raise}" stroke="${C.line}"/>
-        <text x="380" y="64" font-family="Manrope" font-size="11" fill="${C.dim}">зритель пишет</text>
-        <text x="380" y="86" font-family="Manrope" font-size="13" fill="${C.ink}">queen bohemian rhapsody</text>
-        <text x="380" y="104" font-family="Manrope" font-size="10" fill="${C.dim}">не нашлось — баллы вернутся сами</text>
+        <rect x="360" y="34" width="250" height="82" rx="0" fill="${C.raise}" stroke="${C.line}"/>
+        <text x="380" y="64" font-family="Onest" font-size="11" fill="${C.dim}">зритель пишет</text>
+        <text x="380" y="86" font-family="Onest" font-size="13" fill="${C.ink}">queen bohemian rhapsody</text>
+        <text x="380" y="104" font-family="Onest" font-size="10" fill="${C.dim}">не нашлось — баллы вернутся сами</text>
       </svg>`,
       body: () => `
         <label class="setup-field">
@@ -456,7 +353,7 @@
           <button class="s-btn key" data-act="save-playlist">Сохранить</button>
         </div>
         <div class="check" id="su-check"></div>
-        <p class="why">Список берётся из твоего Spotify — значит шаг работает только после
+        <p class="why">Список берётся из твоей Яндекс Музыки — значит шаг работает только после
           входа. Пропустил вход — пропусти и этот шаг, потом настроишь в панели.</p>`,
       fill: (cfg) => loadPlaylists(cfg),
       check: (s, cfg) => cfg && cfg.fallback_playlist_id
@@ -521,16 +418,16 @@
       why: "Маленькая плашка в углу кадра: обложка, название, артист и кто заказал. " +
         "Это не отдельная программа, а страница, которую отдаёт само приложение.",
       art: () => `<svg viewBox="0 0 640 210" role="img" aria-label="Схема: источник «Браузер» в OBS">
-        <rect x="1" y="1" width="638" height="208" rx="12" fill="${C.bg}" stroke="${C.line}"/>
-        <text x="24" y="30" font-family="Manrope" font-size="11" fill="${C.dim}" letter-spacing="1">OBS · ИСТОЧНИКИ</text>
-        <rect x="24" y="42" width="230" height="146" rx="10" fill="${C.raise}" stroke="${C.line}"/>
-        <text x="40" y="68" font-family="Manrope" font-size="12" fill="${C.dim}">Игра</text>
-        <text x="40" y="92" font-family="Manrope" font-size="12" fill="${C.dim}">Камера</text>
-        <text x="40" y="116" font-family="Manrope" font-size="12" fill="${C.lime}">Заказ музыки  ← Браузер</text>
+        <rect x="1" y="1" width="638" height="208" rx="0" fill="${C.bg}" stroke="${C.line}"/>
+        <text x="24" y="30" font-family="Onest" font-size="11" fill="${C.dim}" letter-spacing="1">OBS · ИСТОЧНИКИ</text>
+        <rect x="24" y="42" width="230" height="146" rx="0" fill="${C.raise}" stroke="${C.line}"/>
+        <text x="40" y="68" font-family="Onest" font-size="12" fill="${C.dim}">Игра</text>
+        <text x="40" y="92" font-family="Onest" font-size="12" fill="${C.dim}">Камера</text>
+        <text x="40" y="116" font-family="Onest" font-size="12" fill="${C.lime}">Заказ музыки  ← Браузер</text>
         <circle cx="230" cy="170" r="12" fill="none" stroke="${C.lime}"/>
-        <text x="230" y="175" text-anchor="middle" font-family="Manrope" font-size="14" fill="${C.lime}">+</text>
+        <text x="230" y="175" text-anchor="middle" font-family="Onest" font-size="14" fill="${C.lime}">+</text>
 
-        <rect x="280" y="42" width="336" height="146" rx="10" fill="${C.raise}" stroke="${C.line}"/>
+        <rect x="280" y="42" width="336" height="146" rx="0" fill="${C.raise}" stroke="${C.line}"/>
         ${fieldArt(298, 60, 300, "URL", widgetURL, true)}
         ${fieldArt(298, 118, 140, "ШИРИНА", "640", false)}
         ${fieldArt(458, 118, 140, "ВЫСОТА", "200", false)}
@@ -723,7 +620,7 @@
   }
 
   // refresh пересчитывает живую проверку текущего шага. Зовётся на каждый
-  // снимок состояния: человек нажал кнопку в другом окне, вошёл в Spotify —
+  // снимок состояния: человек нажал кнопку в другом окне, вошёл в Яндекс —
   // и «Дальше» должно загореться само, без единого нажатия здесь.
   function refresh() {
     if (finished) return;
@@ -825,30 +722,23 @@
       refresh();
     },
 
-    "tunnel-on": (btn) => busy(btn, async () => {
-      const key = $("su-tunnel").value.trim();
-      say("Включаю обход… в первый раз это до пары минут.");
-      const d = await post("/api/tunnel/on", key ? { key } : {});
-      $("su-tunnel").value = "";
-      say(d.standby
-        ? "Ключ сохранён. Сейчас Spotify отвечает и без обхода — подниму его, когда понадобится."
-        : "Обход работает: " + (d.server || ""));
-      refresh();
+    "ym-login": (btn) => busy(btn, async () => {
+      const d = await post("/api/yandex/login", {});
+      if (!d.in_app) {
+        window.open(d.url, "_blank", "noopener");
+        say("Открыл вход в браузере. После входа скопируй адрес из строки браузера и вставь в поле ниже.");
+        return;
+      }
+      say("Открыл окно входа. Войди — оно закроется само.");
     }),
 
-    "save-spotify-id": (btn) => busy(btn, async () => {
-      const ok = await saveConfig({ spotify_client_id: $("su-spotify-id").value.trim() });
-      say(ok ? "Ключ сохранён." : "Не смог сохранить.", !ok);
+    "ym-token": (btn) => busy(btn, async () => {
+      const token = $("su-ym-token").value.trim();
+      if (!token) { say("Поле пустое.", true); return; }
+      await post("/api/yandex/token", { token });
+      $("su-ym-token").value = "";
+      say("Яндекс подключён.");
       refresh();
-    }),
-
-    "spotify-login": (btn) => busy(btn, async () => {
-      const d = await post("/api/spotify/login", {});
-      // Приложение уже открыло страницу входа в своём окне (так бывает, когда
-      // работает обход) — второй раз открывать её в браузере нельзя: из
-      // России она там просто не загрузится, и человек решит, что сломалось.
-      if (!d.in_app) window.open(d.url, "_blank", "noopener");
-      say("Открыл страницу входа. Нажми там Agree и вернись сюда.");
     }),
 
     "save-twitch-id": (btn) => busy(btn, async () => {
@@ -930,7 +820,7 @@
     const sel = $("su-playlist");
     if (!sel) return;
     try {
-      const r = await fetch("/api/spotify/playlists");
+      const r = await fetch("/api/yandex/playlists");
       if (!r.ok) throw new Error();
       const list = await r.json();
       const items = Array.isArray(list) ? list : (list.items || []);

@@ -23,10 +23,10 @@
      ленте подключений (первое, что человек должен увидеть на первом запуске),
      исходный текст зрителя рядом с найденным треком и время в хронике. Для
      тусклого текста есть --dimmer. */
-  --lime:    #c8f751;
-  --lime-lo: #4e5f22;
+  --lime:    #ffcc00;
+  --lime-lo: #5c4a00;
   --bad:     #ff4d4d;
-  --ink:     #0d1204;
+  --ink:     #0c0c0c;
   --hover:   rgba(255, 255, 255, .04);
 
   /* Шкала отступов. Промежуточных значений нет специально: разнобой в
@@ -65,7 +65,7 @@ body {
   padding-bottom: var(--edge);
   background: var(--bg);
   color: var(--text);
-  font: var(--t-md)/1.5 Manrope, system-ui, sans-serif;
+  font: var(--t-md)/1.5 var(--f-body);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -78,9 +78,9 @@ body.stale .status-bar,
 body.stale .menu,
 body.stale .panel { opacity: .4; pointer-events: none; }
 
-h1 { font-family: Unbounded, Manrope, sans-serif; font-weight: 600; }
+h1 { font-family: var(--f-head); font-weight: 400; text-transform: uppercase; }
 
-button { font-family: Manrope, system-ui, sans-serif; color: inherit; }
+button { font-family: var(--f-body); color: inherit; }
 
 :focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
 ::selection { background: var(--lime); color: var(--ink); }
@@ -240,7 +240,7 @@ button { font-family: Manrope, system-ui, sans-serif; color: inherit; }
 #banner .what { font-size: var(--t-sm); font-weight: 700; line-height: 1.45; max-width: 420px; }
 #banner .what a { color: var(--ink); }
 #banner .code {
-  font-family: Unbounded, monospace;
+  font-family: var(--f-mono);
   font-size: 34px; font-weight: 700; letter-spacing: .22em;
   user-select: all;
 }
@@ -379,7 +379,7 @@ button { font-family: Manrope, system-ui, sans-serif; color: inherit; }
   width: 40px; height: 40px;
   background: var(--lime); border-color: var(--lime); color: var(--ink);
 }
-.pbtn.key:hover { background: #d6ff6b; border-color: #d6ff6b; color: var(--ink); }
+.pbtn.key:hover { background: #ffd84d; border-color: #ffd84d; color: var(--ink); }
 .pbtn.key svg { width: 17px; height: 17px; }
 
 .pvol {
@@ -476,7 +476,7 @@ button { font-family: Manrope, system-ui, sans-serif; color: inherit; }
   display: inline-flex; align-items: center; gap: var(--s2);
   border: 1px solid var(--line-2); background: transparent; color: var(--text);
   padding: var(--s3) var(--s4); border-radius: 2px; cursor: pointer;
-  font: 600 var(--t-sm)/1 Manrope, system-ui, sans-serif;
+  font: 600 var(--t-sm)/1 var(--f-body);
   text-decoration: none;
   transition: border-color var(--fast) var(--ease),
               background var(--fast) var(--ease),
@@ -488,7 +488,7 @@ button { font-family: Manrope, system-ui, sans-serif; color: inherit; }
 .act svg { width: 16px; height: 16px; }
 
 .act.key { background: var(--lime); border-color: var(--lime); color: var(--ink); }
-.act.key:hover { background: #d5ff6b; border-color: #d5ff6b; }
+.act.key:hover { background: #ffd84d; border-color: #ffd84d; }
 
 .act.small { padding: var(--s2) var(--s3); font-size: 12px; }
 .act.small svg { width: 14px; height: 14px; }
@@ -541,7 +541,7 @@ button { font-family: Manrope, system-ui, sans-serif; color: inherit; }
 .rows li:last-child { border-bottom: none; }
 
 .rows .idx {
-  font-family: Unbounded, sans-serif; font-size: var(--t-sm); font-weight: 600;
+  font-family: var(--f-head); font-size: var(--t-sm); font-weight: 600;
   color: var(--dimmer); font-variant-numeric: tabular-nums;
 }
 .rows li:first-child .idx { color: var(--dim); }
@@ -584,7 +584,7 @@ button { font-family: Manrope, system-ui, sans-serif; color: inherit; }
 /* Заказ приезжает коротким сдвигом — видно, что список изменился,
    без пульсаций и переливов. */
 @keyframes land {
-  from { transform: translateX(-6px); background: rgba(200, 247, 81, .10); }
+  from { transform: translateX(-6px); background: rgba(255, 204, 0, .10); }
   to   { transform: none; background: transparent; }
 }
 .rows li.fresh { animation: land var(--slow) var(--ease); }
@@ -623,7 +623,7 @@ button { font-family: Manrope, system-ui, sans-serif; color: inherit; }
 .more {
   margin-top: var(--s2);
   background: none; border: none; cursor: pointer;
-  color: var(--dimmer); font: 600 12px/1 Manrope, system-ui, sans-serif;
+  color: var(--dimmer); font: 600 12px/1 var(--f-body);
   padding: var(--s2) 0;
   transition: color var(--fast) var(--ease);
 }
@@ -638,7 +638,7 @@ button { font-family: Manrope, system-ui, sans-serif; color: inherit; }
 .void { padding: var(--s7) 0 var(--s6); }
 .void .rule { width: 40px; height: 2px; background: var(--line-2); margin-bottom: var(--s5); }
 .void .mark {
-  font-family: Unbounded, sans-serif; font-weight: 600; letter-spacing: -.01em;
+  font-family: var(--f-head); font-weight: 600; letter-spacing: -.01em;
   font-size: 18px; color: var(--dim); margin-bottom: var(--s2);
 }
 .void .say { font-size: var(--t-sm); color: var(--dimmer); max-width: 460px; line-height: 1.6; }
@@ -679,7 +679,7 @@ button { font-family: Manrope, system-ui, sans-serif; color: inherit; }
 
 .field { display: block; margin-bottom: var(--s3); }
 .field > span { display: block; font-size: 12px; color: var(--dim); margin-bottom: var(--s1); }
-.field input[type="text"], .field input[type="number"], .field textarea, .field select {
+.field input[type="text"], .field input[type="number"], .field input[type="password"], .field textarea, .field select {
   width: 100%;
   background: var(--bg); border: 1px solid var(--line-2); border-radius: 2px;
   color: var(--text); padding: var(--s2) var(--s3); font: inherit; font-size: var(--t-sm);
@@ -732,7 +732,7 @@ button { font-family: Manrope, system-ui, sans-serif; color: inherit; }
 .mode:hover { border-color: var(--line-2); background: var(--hover); }
 .mode:focus-within { border-color: var(--dim); }
 .mode input { margin: 3px 0 0; accent-color: var(--lime); flex: none; }
-.mode.sel { border-color: var(--lime); background: rgba(200, 247, 81, .05); }
+.mode.sel { border-color: var(--lime); background: rgba(255, 204, 0, .05); }
 .mode .name { display: block; font-size: var(--t-sm); font-weight: 600; }
 .mode .why { display: block; font-size: 12px; color: var(--dimmer); margin-top: 3px; line-height: 1.45; }
 .mode.broken { border-color: var(--bad); }
@@ -809,7 +809,7 @@ footer[hidden] { display: none; }
 .head { max-width: 640px; margin-bottom: var(--s6); }
 
 .big {
-  font-family: Unbounded, sans-serif; font-weight: 600;
+  font-family: var(--f-head); font-weight: 600;
   font-size: clamp(26px, 3vw, 36px); line-height: 1.1; letter-spacing: -.02em;
   margin: 0 0 var(--s2);
 }
@@ -843,7 +843,7 @@ footer[hidden] { display: none; }
 @media (max-width: 900px) { .step { border-right: none; } }
 
 .no {
-  font-family: Unbounded, sans-serif; font-size: var(--t-xs); font-weight: 600;
+  font-family: var(--f-head); font-size: var(--t-xs); font-weight: 600;
   color: var(--dimmer); flex: none; padding-top: 2px;
   font-variant-numeric: tabular-nums;
 }
@@ -889,7 +889,7 @@ footer[hidden] { display: none; }
   background: var(--raise);
 }
 .preview-cost {
-  font-family: Unbounded, sans-serif; font-weight: 600; font-size: 20px;
+  font-family: var(--f-head); font-weight: 600; font-size: 20px;
   color: var(--lime); flex: none; font-variant-numeric: tabular-nums;
   line-height: 1.2;
 }
@@ -907,7 +907,7 @@ footer[hidden] { display: none; }
 }
 .tally .cell { background: var(--bg); padding: var(--s3); }
 .tally .num {
-  font-family: Unbounded, sans-serif; font-weight: 600; font-size: 18px;
+  font-family: var(--f-head); font-weight: 600; font-size: 18px;
   color: var(--text); font-variant-numeric: tabular-nums; line-height: 1.2;
 }
 .tally .lab {
@@ -939,7 +939,7 @@ footer[hidden] { display: none; }
 
 .link-btn {
   background: none; border: none; cursor: pointer;
-  color: var(--dimmer); font: 600 var(--t-xs)/1 Manrope, system-ui, sans-serif;
+  color: var(--dimmer); font: 600 var(--t-xs)/1 var(--f-body);
   letter-spacing: var(--track-chip); text-transform: uppercase;
   padding: 2px 0;
   transition: color var(--fast) var(--ease);
@@ -1215,15 +1215,15 @@ footer[hidden] { display: none; }
   opacity: 0; transition: opacity var(--fast) var(--ease);
   background:
     linear-gradient(to right,
-      transparent calc(100% / 3 - 1px), rgba(200, 247, 81, .28) calc(100% / 3 - 1px),
-      rgba(200, 247, 81, .28) calc(100% / 3), transparent calc(100% / 3),
-      transparent calc(200% / 3 - 1px), rgba(200, 247, 81, .28) calc(200% / 3 - 1px),
-      rgba(200, 247, 81, .28) calc(200% / 3), transparent calc(200% / 3)),
+      transparent calc(100% / 3 - 1px), rgba(255, 204, 0, .28) calc(100% / 3 - 1px),
+      rgba(255, 204, 0, .28) calc(100% / 3), transparent calc(100% / 3),
+      transparent calc(200% / 3 - 1px), rgba(255, 204, 0, .28) calc(200% / 3 - 1px),
+      rgba(255, 204, 0, .28) calc(200% / 3), transparent calc(200% / 3)),
     linear-gradient(to bottom,
-      transparent calc(100% / 3 - 1px), rgba(200, 247, 81, .28) calc(100% / 3 - 1px),
-      rgba(200, 247, 81, .28) calc(100% / 3), transparent calc(100% / 3),
-      transparent calc(200% / 3 - 1px), rgba(200, 247, 81, .28) calc(200% / 3 - 1px),
-      rgba(200, 247, 81, .28) calc(200% / 3), transparent calc(200% / 3));
+      transparent calc(100% / 3 - 1px), rgba(255, 204, 0, .28) calc(100% / 3 - 1px),
+      rgba(255, 204, 0, .28) calc(100% / 3), transparent calc(100% / 3),
+      transparent calc(200% / 3 - 1px), rgba(255, 204, 0, .28) calc(200% / 3 - 1px),
+      rgba(255, 204, 0, .28) calc(200% / 3), transparent calc(200% / 3));
 }
 .wx-stage.dragging .wx-grid { opacity: 1; }
 
@@ -1297,7 +1297,7 @@ input[type="range"]:disabled::-moz-range-thumb { background: var(--dimmer); }
 .fam { display: flex; flex-direction: column; gap: var(--s3); }
 .fam-head { display: flex; align-items: baseline; gap: var(--s4); flex-wrap: wrap; }
 .fam-head h3 {
-  margin: 0; font-family: Unbounded, sans-serif; font-size: var(--t-sm);
+  margin: 0; font-family: var(--f-head); font-size: var(--t-sm);
   font-weight: 600; letter-spacing: var(--track-chip);
 }
 .fam-head p { margin: 0; font-size: 12px; color: var(--dimmer); flex: 1; min-width: 200px; }
@@ -1503,7 +1503,7 @@ body.menu-open { overflow: hidden; }
    верхней полосе, чтобы связь между ними читалась без объяснений. */
 .menu-item.on {
   color: var(--lime);
-  background: rgba(200, 247, 81, .07);
+  background: rgba(255, 204, 0, .07);
 }
 
 .menu-tail {
@@ -1569,7 +1569,7 @@ body.menu-open { overflow: hidden; }
 .tab.on {
   color: var(--lime);
   border-color: var(--lime-lo);
-  background: rgba(200, 247, 81, .07);
+  background: rgba(255, 204, 0, .07);
 }
 
 .tab-pane { animation: unfold var(--slow) var(--ease); }
@@ -1633,7 +1633,7 @@ body.menu-open { overflow: hidden; }
 
 .pl-head { display: flex; align-items: flex-start; gap: var(--s4); }
 .pl-title {
-  font-family: Unbounded, Manrope, sans-serif;
+  font-family: var(--f-head); font-weight: 400; text-transform: uppercase;
   font-size: 17px; font-weight: 600; line-height: 1.2;
 }
 .pl-sub {
@@ -1648,7 +1648,7 @@ body.menu-open { overflow: hidden; }
    эфира. «Пять треков» не говорит ничего, «19 минут» говорит всё. */
 .pl-time {
   margin-left: auto; flex: none;
-  font-family: Unbounded, Manrope, sans-serif;
+  font-family: var(--f-head); font-weight: 400; text-transform: uppercase;
   font-size: 15px; color: var(--lime);
   white-space: nowrap;
 }
