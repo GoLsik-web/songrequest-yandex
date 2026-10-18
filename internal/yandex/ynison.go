@@ -243,7 +243,11 @@ func (y *Ynison) session(ctx context.Context) error {
 	})
 	dialCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	conn, _, err := websocket.Dial(dialCtx, "wss://"+host+"/ynison_state.YnisonStateService/PutYnisonState", &websocket.DialOptions{
+	scheme := "wss://"
+	if strings.HasPrefix(y.c.ynisonBase, "ws://") {
+		scheme = "ws://" // проверки ходят на свой сервер без шифрования
+	}
+	conn, _, err := websocket.Dial(dialCtx, scheme+host+"/ynison_state.YnisonStateService/PutYnisonState", &websocket.DialOptions{
 		HTTPHeader:   y.headers(),
 		Subprotocols: proto,
 	})

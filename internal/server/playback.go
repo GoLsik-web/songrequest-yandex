@@ -49,6 +49,11 @@ func (s *Server) setupPlayer(cfg *config.File) {
 	// очередь разом.
 	s.player.OnDropped = func(item queue.Item, err error) {
 		go func() {
+			// Очередь Яндекса недоступна — заказ не пропадает, а ложится в
+			// плейлист «Заказы со стрима»: стример включит его сам.
+			if s.toOrdersPlaylist(item, err) {
+				return
+			}
 			_, text := errs.Describe(err)
 			s.history(item, "rejected", text)
 
@@ -525,4 +530,36 @@ func (s *Server) takeSkip() (who string, refund bool) {
 		return "музыку переключили в самом Spotify", false
 	}
 	return who, refund
+}
+
+// toOrdersPlaylist пишет заказ в плейлист «Заказы со стрима», если включить
+// его сразу не дала очередь Яндекса. true — заказ записан и баллы остаются
+// списанными: трек будет, просто стример включит его сам.
+func (s *Server) toOrdersPlaylist(item queue.Item, cause error) bool {
+	code := errs.CodeOf(cause)
+	if code != errs.YandexYnison && code != errs.YandexNoPlayer {
+		return false
+	}
+	if _, _, ok := yandex.ParseURI(item.URI); !ok {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(s.baseContext(), 20*time.Second)
+	defer cancel()
+	if err := s.ym.AddToOrders(ctx, item.URI); err != nil {
+		s.log.Warn("не записал заказ и в плейлист", "трек", item.Artist+" — "+item.Title, "ошибка", err)
+		return false
+	}
+	s.log.Info("очередь Яндекса недоступна — заказ записан в плейлист",
+		"трек", item.Artist+" — "+item.Title, "причина", code)
+	s.history(item, "playlist", yandex.OrdersPlaylistTitle)
+	s.state.Notify("warn", "Очередь Яндекса недоступна — «"+item.Artist+" — "+item.Title+
+		"» записан в плейлист «"+yandex.OrdersPlaylistTitle+"».")
+	s.say(ctx, "@"+item.Requester+", трек записан в плейлист заказов — стример включит его чуть позже.")
+	if item.RedemptionID != "" {
+		if err := s.twitch.FulfillRedemption(ctx, item.RewardID, item.RedemptionID); err == nil {
+			s.state.SetRedemptionStatus(item.RedemptionID, app.OrderFulfilled)
+		}
+	}
+	s.syncPlayback()
+	return true
 }
