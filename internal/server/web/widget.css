@@ -174,6 +174,81 @@
 .card[data-bar="off"] .bar { display: none; }
 
 
+/* ═══ 0. НЕФОР ══════════════════════════════════════════════════════════
+   Родное оформление: самодельный журнал. Тёмная плашка в толстой рамке с
+   жёсткой тенью, название рубленым капсом, ник — моноширинным на тёмной
+   подложке, обложка приклеена скотчем, полоса — в штриховку. Цвет —
+   только акцент: скотч, штриховка и ник. */
+
+.card[data-family="nefor"] {
+  --w-bg: #0c0c0c;
+  --w-ink: #e9e6df;
+  --w-sub: #9a978f;
+  --w-bar: #0c0c0c;
+  --w-radius: 0px;
+  --w-blur: 0px;
+  --w-pad: calc(14px * var(--scale, 1)) calc(18px * var(--scale, 1));
+  --w-edge: 0px;
+  --w-art-radius: 0px;
+  --w-title-font: "Dela Gothic One", Onest, sans-serif;
+  --w-body-font: Onest, sans-serif;
+  --w-weight: 400;
+  --w-caps: uppercase;
+  --w-track: 0;
+  border: calc(2px * var(--scale, 1)) solid #3a3936;
+  box-shadow: calc(5px * var(--scale, 1)) calc(5px * var(--scale, 1)) 0 #000;
+}
+.card[data-family="nefor"][data-variant="yellow"] { --w-accent: #ffcc00; }
+.card[data-family="nefor"][data-variant="red"]    { --w-accent: #ff3b30; }
+.card[data-family="nefor"][data-variant="xerox"]  { --w-accent: #e9e6df; --w-bg: #141414; }
+.card[data-family="nefor"][data-variant="pink"]   { --w-accent: #ff4fa3; }
+
+.card[data-family="nefor"] .art {
+  position: relative;
+  overflow: visible;
+  border: calc(2px * var(--scale, 1)) solid #3a3936;
+  transform: rotate(-2deg);
+}
+.card[data-family="nefor"] .art img { filter: contrast(1.08) saturate(.9); }
+.card[data-family="nefor"] .art::before {
+  content: "";
+  position: absolute;
+  left: 22%; top: calc(-7px * var(--scale, 1));
+  width: 56%; height: calc(14px * var(--scale, 1));
+  background: var(--w-accent);
+  opacity: .82;
+  transform: rotate(-7deg);
+  z-index: 2;
+}
+.card[data-family="nefor"] .by {
+  display: inline-block;
+  max-width: 100%;
+  font-family: "JetBrains Mono Var", "JetBrains Mono", monospace;
+  font-weight: 600;
+  text-transform: lowercase;
+  color: var(--w-ink);
+  background: #262624;
+  padding: 1px calc(6px * var(--scale, 1));
+}
+.card[data-family="nefor"][data-source="own"] .by { background: none; padding: 0; color: var(--w-sub); }
+.card[data-family="nefor"] .bar {
+  height: calc(10px * var(--scale, 1));
+  border: calc(2px * var(--scale, 1)) solid #3a3936;
+  border-radius: 0;
+  margin-top: calc(10px * var(--scale, 1));
+}
+.card[data-family="nefor"] .bar i {
+  border-radius: 0;
+  background: repeating-linear-gradient(-45deg, var(--w-accent) 0 5px, #000 5px 8px);
+}
+.card[data-family="nefor"].enter { animation: neforDrop .38s cubic-bezier(.2, .7, .3, 1) both; }
+@keyframes neforDrop {
+  from { transform: translate(-6px, -10px) rotate(-1.5deg); opacity: 0; }
+  60%  { transform: translate(1px, 1px) rotate(.3deg); opacity: 1; }
+  to   { transform: none; opacity: 1; }
+}
+
+
 /* ═══ 1. ЭФИР ═══════════════════════════════════════════════════════════
    Родное оформление приложения: плотная плашка с цветной гранью слева.
    Грань — единственное цветное пятно в спокойном прямоугольнике, поэтому

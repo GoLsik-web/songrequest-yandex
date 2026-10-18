@@ -9,7 +9,7 @@ import "strings"
 // один и навсегда, а всё оформление живёт здесь: стример правит его в панели,
 // виджет подхватывает на лету, OBS трогать не нужно.
 type Widget struct {
-	// Preset — выбранный набор, «семейство/вариант»: efir/lime, vinyl/sepia.
+	// Preset — выбранный набор, «семейство/вариант»: nefor/yellow, vinyl/sepia.
 	// Семейство задаёт устройство плашки, вариант — цвета и настроение.
 	Preset string `json:"preset"`
 
@@ -97,7 +97,7 @@ type Widget struct {
 // DefaultWidget — то, с чего начинают все.
 func DefaultWidget() Widget {
 	return Widget{
-		Preset:        "efir/lime",
+		Preset:        "nefor/yellow",
 		Position:      "left-bottom",
 		Scale:         1,
 		Gap:           40,
@@ -148,7 +148,7 @@ func (w *Widget) Normalize() {
 		w.Rev = widgetRev
 	}
 	if strings.TrimSpace(w.Preset) == "" {
-		w.Preset = "efir/lime"
+		w.Preset = "nefor/yellow"
 	}
 	if !positions[w.Position] {
 		w.Position = "left-bottom"

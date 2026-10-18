@@ -47,7 +47,7 @@ func TestWidgetNormalizeRepairsBrokenSettings(t *testing.T) {
 	}
 	w.Normalize()
 
-	if w.Preset != "efir/lime" {
+	if w.Preset != "nefor/yellow" {
 		t.Errorf("пустой набор должен становиться родным, стал %q", w.Preset)
 	}
 	if w.Position != "left-bottom" {

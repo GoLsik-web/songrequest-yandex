@@ -482,7 +482,7 @@
       fill: (cfg) => setupPresets(cfg),
       check: (s, cfg) => ({
         ok: true,
-        text: "Выбрано: " + presetName((cfg && cfg.widget && cfg.widget.preset) || "efir/lime"),
+        text: "Выбрано: " + presetName((cfg && cfg.widget && cfg.widget.preset) || "nefor/yellow"),
       }),
     },
   ];
@@ -841,7 +841,7 @@
     const card = $("su-card");
     if (!card || !window.WIDGET_FAMILIES) return;
 
-    let preset = (cfg && cfg.widget && cfg.widget.preset) || "efir/lime";
+    let preset = (cfg && cfg.widget && cfg.widget.preset) || "nefor/yellow";
 
     // Вместо обложки — значок ноты: настоящей картинки в образце нет, а пустой
     // серый квадрат читается как «оформление сломалось».
