@@ -58,7 +58,7 @@ func (s *Server) youtubeOff() bool { return s.youtubeMode() == "off" }
 // offerYouTube решает судьбу найденного на YouTube заказа по настройке.
 func (s *Server) offerYouTube(ctx context.Context, r twitch.Redemption, item queue.Item, note string) {
 	if s.youtubeMode() != "ask" {
-		s.state.Notify("info", "Нет в Spotify — играет с YouTube: «"+trackLine(item)+"» ("+item.Via+")")
+		s.state.Notify("info", "Нет в Яндексе — играет с YouTube: «"+trackLine(item)+"» ("+item.Via+")")
 		s.acceptYouTube(ctx, r, item, note)
 		return
 	}
@@ -93,9 +93,9 @@ func (s *Server) offerYouTube(ctx context.Context, r twitch.Redemption, item que
 		CoverURL: item.CoverURL, Duration: item.DurationMs,
 		Note: "Ждёт решения: играть ли с YouTube",
 	})
-	s.state.Notify("info", "Нет в Spotify. Нашёл на YouTube: «"+trackLine(item)+
+	s.state.Notify("info", "Нет в Яндексе. Нашёл на YouTube: «"+trackLine(item)+
 		"» — включить или отклонить, решайте в панели.")
-	s.say(ctx, "@"+r.UserName+", в Spotify такого нет. Нашёл на YouTube: "+trackLine(item)+
+	s.say(ctx, "@"+r.UserName+", в Яндекс Музыке такого нет. Нашёл на YouTube: "+trackLine(item)+
 		" — стример решает, включать ли.")
 
 	// Срок ожидания. Решение по сроку идёт тем же путём, что и кнопка, — но
@@ -190,7 +190,7 @@ func (s *Server) rememberYouTube(r twitch.Redemption, item queue.Item) {
 // youtubeOffReason — что сказать зрителю, когда трека нет в Spotify, а
 // играть мимо него стример запретил.
 func youtubeOffReason() string {
-	return "этого трека нет в Spotify, а с YouTube на этом канале не играют"
+	return "этого трека нет в Яндекс Музыке, а с YouTube на этом канале не играют"
 }
 
 // isElsewhereLink — ссылка, которую играть можно только мимо Spotify.

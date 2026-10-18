@@ -232,7 +232,7 @@ func (s *Server) handlePlayerRepeat(w http.ResponseWriter, r *http.Request) {
 	// заголовка окна Spotify, а там только название и артист. Ставить нечего.
 	if last.Source != app.SourceOrder || last.URI == "" {
 		s.fail(w, errs.New(errs.PlayerIdle,
-			"Это твоя музыка, а не заказ — приложение её не ставит. Включи в самом Spotify."))
+			"Это твоя музыка, а не заказ — приложение её не ставит. Включи в самой Яндекс Музыке."))
 		return
 	}
 

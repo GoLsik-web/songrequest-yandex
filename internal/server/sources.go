@@ -38,10 +38,10 @@ import (
 // вместе с заказом в очередь, показываются в панели и переживают перезапуск.
 const (
 	viaLink      = "по ссылке зрителя"
-	viaMissing   = "в Spotify такого нет"
-	viaNoAnswer  = "Spotify не ответил на поиск"
+	viaMissing   = "в Яндексе такого нет"
+	viaNoAnswer  = "Яндекс не ответил на поиск"
 	viaYandex    = "по ссылке на Яндекс.Музыку"
-	viaRescueYT  = "Spotify не сыграл этот трек"
+	viaRescueYT  = "Яндекс не сыграл этот трек"
 	viaRescueAlt = "первый ролик не заиграл"
 )
 
@@ -121,7 +121,7 @@ func (s *Server) playElsewhere(ctx context.Context, r twitch.Redemption,
 			s.log.Debug("звено не помогло", "звено", source.name, "заказ", r.UserInput)
 			continue
 		}
-		s.log.Info("заказ сыграет мимо Spotify",
+		s.log.Info("заказ сыграет мимо Яндекса",
 			"звено", source.name, "заказ", r.UserInput,
 			"трек", item.Artist+" — "+item.Title, "почему", source.via)
 

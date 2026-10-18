@@ -667,7 +667,7 @@ func (s *Server) announceQueued(ctx context.Context, item queue.Item, position i
 	// Зритель должен знать, что звук пойдёт не из Spotify: иначе «почему
 	// играет какая-то запись с ютуба» — вопрос в чат через три минуты.
 	if item.Provider == "youtube" {
-		text += " — в Spotify нет, сыграет с YouTube"
+		text += " — в Яндексе нет, сыграет с YouTube"
 	}
 	s.say(ctx, text)
 }

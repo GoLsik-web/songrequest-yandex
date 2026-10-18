@@ -527,7 +527,7 @@ func (s *Server) takeSkip() (who string, refund bool) {
 	who, refund = s.skipActor, s.skipRefund
 	s.skipActor, s.skipRefund = "", false
 	if who == "" {
-		return "музыку переключили в самом Spotify", false
+		return "музыку переключили в самой Яндекс Музыке", false
 	}
 	return who, refund
 }

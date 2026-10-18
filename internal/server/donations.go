@@ -132,7 +132,7 @@ func (s *Server) onDonation(d donations.Donation) {
 	if !res.Found {
 		s.log.Info("трек из доната не найден", "текст", text, "запросы", res.Attempts)
 		s.state.NotifyWarn(errs.Code(""), "По донату от "+d.Username+" трек не нашёлся: "+text)
-		s.say(ctx, "@"+d.Username+", спасибо за донат! Такого трека в Spotify не нашлось.")
+		s.say(ctx, "@"+d.Username+", спасибо за донат! Такого трека в Яндекс Музыке не нашлось.")
 		return
 	}
 

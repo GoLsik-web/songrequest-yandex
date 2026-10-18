@@ -60,7 +60,7 @@ func (s *Server) fill(ctx context.Context, cfg config.Config, mode config.Resume
 			continue // он уже играет, второй раз не нужен
 		}
 		if err := s.ym.QueueTrack(ctx, uri, deviceID); err != nil {
-			s.log.Warn("не поставил трек в очередь Spotify", "ошибка", err)
+			s.log.Warn("не поставил трек в очередь Яндекса", "ошибка", err)
 			break
 		}
 		queued++
@@ -178,7 +178,7 @@ func (s *Server) continuation(ctx context.Context, cfg config.Config,
 		return nil, "", err
 	}
 	if len(uris) == 0 {
-		return nil, "", errs.New(errs.SpotifyNothing, "В выбранном источнике не нашлось треков.")
+		return nil, "", errs.New(errs.YandexNothing, "В выбранном источнике не нашлось треков.")
 	}
 	return uris, what, nil
 }

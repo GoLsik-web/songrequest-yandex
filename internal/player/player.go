@@ -528,7 +528,7 @@ func (p *Player) playYouTube(ctx context.Context, item queue.Item) error {
 
 	// Spotify обязательно на паузу: иначе два трека заиграют одновременно.
 	if err := p.music.Pause(ctx, ""); err != nil {
-		p.log.Warn("не поставил Spotify на паузу перед заказом с YouTube", "ошибка", err)
+		p.log.Warn("не поставил Яндекс на паузу перед заказом с YouTube", "ошибка", err)
 	}
 
 	// Громкость берём из снимка: заказ должен звучать так же, как звучала
@@ -681,7 +681,7 @@ func (p *Player) await(ctx context.Context, item queue.Item) bool {
 			continue
 		}
 		if !ok || st.Item == nil || !yandex.SameTrack(st.Item.URI, item.URI) {
-			p.log.Info("заказ больше не играет в Spotify",
+			p.log.Info("заказ больше не играет в Яндексе",
 				"трек", item.Artist+" — "+item.Title, "доиграл_сам", toEnd)
 			return toEnd
 		}
@@ -722,7 +722,7 @@ func (p *Player) await(ctx context.Context, item queue.Item) bool {
 		slack := p.endSlack(length)
 		if time.Duration(st.ProgressMs)*time.Millisecond <= slack &&
 			!time.Now().Add(slack).Before(endBy) {
-			p.log.Info("заказ доиграл: Spotify отмотал трек на начало и встал",
+			p.log.Info("заказ доиграл: Яндекс отмотал трек на начало и встал",
 				"трек", item.Artist+" — "+item.Title)
 			return true
 		}
@@ -743,7 +743,7 @@ func (p *Player) await(ctx context.Context, item queue.Item) bool {
 			paused += p.awaitStep()
 			if paused > maxPause {
 				// Музыку остановил человек — возврату здесь делать нечего.
-				p.log.Info("заказ снят: Spotify стоит на паузе слишком долго",
+				p.log.Info("заказ снят: Яндекс стоит на паузе слишком долго",
 					"трек", item.Artist+" — "+item.Title)
 				return false
 			}
@@ -925,13 +925,13 @@ func (p *Player) restore(ctx context.Context) {
 	p.mu.Unlock()
 	if touched && snap.Volume > 0 {
 		if err := p.music.SetVolume(ctx, snap.Volume, snap.DeviceID); err != nil {
-			p.log.Warn("не вернул громкость Spotify", "ошибка", err)
+			p.log.Warn("не вернул громкость Яндекса", "ошибка", err)
 		}
 	}
 
 	outcome, err := p.music.Restore(ctx, snap, played, force)
 	if err != nil {
-		p.log.Warn("не вернул Spotify на место", "ошибка", err)
+		p.log.Warn("не вернул музыку Яндекса на место", "ошибка", err)
 		p.fail(err)
 
 		// Сорвалось ошибкой — снимок не отработал. Выбросить его сейчас
@@ -986,7 +986,7 @@ func (p *Player) notOurOwn(snap *yandex.Snapshot) *yandex.Snapshot {
 		return snap
 	}
 
-	p.log.Warn("в Spotify всё ещё наш прошлый заказ — запоминать нечего",
+	p.log.Warn("в Яндексе всё ещё наш прошлый заказ — запоминать нечего",
 		"трек", snap.ArtistName+" — "+snap.TrackName)
 	return &yandex.Snapshot{
 		CapturedAt: snap.CapturedAt,

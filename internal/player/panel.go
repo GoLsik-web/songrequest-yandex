@@ -84,7 +84,7 @@ func (p *Player) peek(ctx context.Context, item queue.Item) (*yandex.PlayerState
 			miss := p.panelMiss
 			p.mu.Unlock()
 			if miss == panelMaxMiss {
-				p.log.Warn("панель Windows не узнаёт заказ — дальше проверяю его через Spotify",
+				p.log.Warn("панель Windows не узнаёт заказ — дальше проверяю его через Ynison",
 					"заказ", item.Artist+" — "+item.Title,
 					"в_панели", t.Artist+" — "+t.Title)
 			}

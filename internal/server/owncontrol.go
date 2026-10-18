@@ -51,7 +51,7 @@ func (s *Server) holdOwn(ctx context.Context, on bool) error {
 		cmd = smtc.CmdPause
 	}
 	if err := smtc.Control(smtc.YandexApp, cmd); err != nil {
-		s.log.Debug("панель Windows команду не приняла, иду в Spotify", "ошибка", err)
+		s.log.Debug("панель Windows команду не приняла, иду в Ynison", "ошибка", err)
 	} else {
 		s.ownPaused.Store(on)
 		s.log.Info("своя музыка через панель Windows", "пауза", on)
@@ -60,7 +60,7 @@ func (s *Server) holdOwn(ctx context.Context, on bool) error {
 	}
 
 	if s.ym == nil || !s.ym.Connected() {
-		return errs.New(errs.SpotifyAuthExpired, "Spotify не подключён.")
+		return errs.New(errs.YandexNoToken, "Яндекс Музыка не подключена.")
 	}
 
 	// Устройство не называем: пусть Spotify командует тем, на котором сейчас
@@ -90,14 +90,14 @@ func (s *Server) holdOwn(ctx context.Context, on bool) error {
 // запросом за то, что и так вот-вот придёт бесплатно.
 func (s *Server) nextOwn(ctx context.Context) error {
 	if err := smtc.Control(smtc.YandexApp, smtc.CmdNext); err != nil {
-		s.log.Debug("панель Windows команду не приняла, иду в Spotify", "ошибка", err)
+		s.log.Debug("панель Windows команду не приняла, иду в Ynison", "ошибка", err)
 	} else {
 		s.ownPaused.Store(false)
 		s.log.Info("своя музыка: следующий трек через панель Windows")
 		return nil
 	}
 	if s.ym == nil || !s.ym.Connected() {
-		return errs.New(errs.SpotifyAuthExpired, "Spotify не подключён.")
+		return errs.New(errs.YandexNoToken, "Яндекс Музыка не подключена.")
 	}
 	if err := s.ym.Next(ctx, ""); err != nil {
 		return err
@@ -111,14 +111,14 @@ func (s *Server) nextOwn(ctx context.Context) error {
 // prevOwn возвращает Spotify на предыдущий трек плейлиста стримера.
 func (s *Server) prevOwn(ctx context.Context) error {
 	if err := smtc.Control(smtc.YandexApp, smtc.CmdPrevious); err != nil {
-		s.log.Debug("панель Windows команду не приняла, иду в Spotify", "ошибка", err)
+		s.log.Debug("панель Windows команду не приняла, иду в Ynison", "ошибка", err)
 	} else {
 		s.ownPaused.Store(false)
 		s.log.Info("своя музыка: предыдущий трек через панель Windows")
 		return nil
 	}
 	if s.ym == nil || !s.ym.Connected() {
-		return errs.New(errs.SpotifyAuthExpired, "Spotify не подключён.")
+		return errs.New(errs.YandexNoToken, "Яндекс Музыка не подключена.")
 	}
 	if err := s.ym.Previous(ctx, ""); err != nil {
 		return err

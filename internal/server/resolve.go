@@ -75,7 +75,7 @@ func (s *Server) resolveOrder(ctx context.Context, r twitch.Redemption) {
 		// Ссылка на ролик, а YouTube стример выключил.
 		if hasLink && s.youtubeOff() && isElsewhereLink(r.UserInput) {
 			s.state.SetOrderMatch(r.ID, app.OrderMatch{State: app.MatchFailed, Note: "YouTube выключен в настройках"})
-			s.rejectRedemption(s.afterSearch(base), r, "ссылки на YouTube и Яндекс.Музыку здесь не играют — закажи трек из Spotify")
+			s.rejectRedemption(s.afterSearch(base), r, "ссылки на YouTube и VK здесь не играют — закажи трек из Яндекс Музыки")
 			return
 		}
 		// Ссылка есть, а играть её нечем: запасной проигрыватель ещё не
@@ -164,7 +164,7 @@ func (s *Server) resolveOrder(ctx context.Context, r twitch.Redemption) {
 		// ссылки на YouTube и Яндекс.Музыку — хотя играть их Spotify не
 		// требуется вовсе.
 		if s.playElsewhere(ctx, r, req, link, viaNoAnswer) {
-			s.log.Info("Spotify не ответил — заказ сыграет мимо него",
+			s.log.Info("Яндекс не ответил — заказ сыграет мимо него",
 				"заказ", r.UserInput, "код", code)
 			return
 		}
@@ -193,11 +193,11 @@ func (s *Server) resolveOrder(ctx context.Context, r twitch.Redemption) {
 		// Первое лечится другим запросом, второе — только сменой страны
 		// аккаунта, и пока об этом не сказать, стример будет думать, что
 		// сломан поиск.
-		note := "В Spotify не нашлось"
+		note := "В Яндексе не нашлось"
 		if res.AbroadOnly > 0 {
-			note = "Есть в Spotify, но не в стране аккаунта (" + opts.Market + ")"
+			note = "Есть в Яндексе, но не в стране аккаунта (" + opts.Market + ")"
 			s.state.NotifyWarn(errs.SpotifyCountry,
-				"«"+req.Clean+"» есть в Spotify, но не издан в стране твоего аккаунта ("+
+				"«"+req.Clean+"» есть в Яндексе, но не издан в стране твоего аккаунта ("+
 					opts.Market+"). Такие треки играть нельзя — их не найдёт и поиск.")
 		}
 		s.state.SetOrderMatch(r.ID, app.OrderMatch{
@@ -212,14 +212,14 @@ func (s *Server) resolveOrder(ctx context.Context, r twitch.Redemption) {
 		}
 		if res.AbroadOnly > 0 {
 			s.rejectRedemption(s.afterSearch(base), r,
-				"этот трек не издан в стране аккаунта стримера, Spotify его не отдаёт")
+				"этот трек недоступен в стране аккаунта стримера")
 			return
 		}
 		if s.youtubeOff() {
 			s.rejectRedemption(s.afterSearch(base), r, youtubeOffReason())
 			return
 		}
-		s.rejectRedemption(s.afterSearch(base), r, "не нашёл такого трека ни в Spotify, ни на YouTube")
+		s.rejectRedemption(s.afterSearch(base), r, "не нашёл такого трека ни в Яндекс Музыке, ни на YouTube")
 		return
 	}
 

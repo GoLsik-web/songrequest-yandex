@@ -742,7 +742,7 @@
     }
     box.innerHTML = `
       <div class="kicker">
-        Нет в Spotify — включить с YouTube? <span class="cnt">${list.length}</span>
+        Нет в Яндексе — включить с YouTube? <span class="cnt">${list.length}</span>
       </div>
       ${list.map((a) => `
         <div class="pl">

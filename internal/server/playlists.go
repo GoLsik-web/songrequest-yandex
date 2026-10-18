@@ -252,7 +252,7 @@ func (s *Server) resolvePlaylist(ctx context.Context, r twitch.Redemption) {
 			Note:  "Это не ссылка на плейлист",
 		})
 		s.rejectRedemption(ctx, r,
-			"это награда за плейлист — нужна ссылка на плейлист или альбом Spotify либо Яндекс.Музыки")
+			"это награда за плейлист — нужна ссылка на плейлист или альбом Яндекс Музыки")
 		return
 	}
 
@@ -319,40 +319,47 @@ type playlistCollection struct {
 func (s *Server) readCollection(ctx context.Context, link links.Link, want int) (playlistCollection, string, error) {
 	switch link.Kind {
 	case links.SpotifyPlaylist, links.SpotifyAlbum:
-		if s.ym == nil || !s.ym.Connected() {
-			return playlistCollection{}, "", errs.New(errs.SpotifyAuthExpired, "Spotify не подключён.")
-		}
-		if link.Kind == links.SpotifyPlaylist {
-			got, err := s.ym.PlaylistCollection(ctx, link.ID, want)
-			if err != nil {
-				return playlistCollection{}, "", err
+		// Плейлист Spotify из России не прочитать, а song.link плейлисты не
+		// переводит. Честнее отказать сразу, с понятной причиной.
+		return playlistCollection{}, "", errs.New(errs.PlaylistNone,
+			"Плейлисты Spotify не принимаются — кинь плейлист или альбом Яндекс Музыки.")
+
+	case links.YandexPlaylist, links.YandexAlbum:
+		// С входом читаем сами: треки приезжают готовыми к игре. Без входа —
+		// открытой точкой, по названиям; играть их всё равно придётся искать.
+		if s.ym != nil && s.ym.Connected() {
+			var (
+				got yandex.Collection
+				err error
+			)
+			if link.Kind == links.YandexPlaylist {
+				got, err = s.ym.PlaylistCollection(ctx, link.Owner+":"+link.ID, want)
+			} else {
+				got, err = s.ym.AlbumCollection(ctx, link.ID, want)
 			}
-			return fromSpotifyCollection(got), "Spotify", nil
+			if err == nil {
+				return fromYandexTracks(got), "Яндекс Музыка", nil
+			}
+			s.log.Warn("не прочитал плейлист через вход, читаю открытой точкой", "ошибка", err)
 		}
-		got, err := s.ym.AlbumCollection(ctx, link.ID, want)
+		var (
+			got links.Collection
+			err error
+		)
+		if link.Kind == links.YandexPlaylist {
+			got, err = s.ymLinks.Playlist(ctx, link.Owner, link.ID, want)
+		} else {
+			got, err = s.ymLinks.Album(ctx, link.ID, want)
+		}
 		if err != nil {
 			return playlistCollection{}, "", err
 		}
-		return fromSpotifyCollection(got), "Spotify", nil
-
-	case links.YandexPlaylist:
-		got, err := s.ymLinks.Playlist(ctx, link.Owner, link.ID, want)
-		if err != nil {
-			return playlistCollection{}, "", err
-		}
-		return fromYandexCollection(got), "Яндекс.Музыка", nil
-
-	case links.YandexAlbum:
-		got, err := s.ymLinks.Album(ctx, link.ID, want)
-		if err != nil {
-			return playlistCollection{}, "", err
-		}
-		return fromYandexCollection(got), "Яндекс.Музыка", nil
+		return fromYandexCollection(got), "Яндекс Музыка", nil
 	}
 	return playlistCollection{}, "", errs.New(errs.PlaylistNone, "Такие плейлисты приложение не читает.")
 }
 
-func fromSpotifyCollection(col yandex.Collection) playlistCollection {
+func fromYandexTracks(col yandex.Collection) playlistCollection {
 	out := playlistCollection{Title: col.Title, Total: col.Total}
 	for _, t := range col.Tracks {
 		out.Tracks = append(out.Tracks, pendingTrack{
@@ -369,10 +376,9 @@ func fromSpotifyCollection(col yandex.Collection) playlistCollection {
 func fromYandexCollection(col links.Collection) playlistCollection {
 	out := playlistCollection{Title: col.Title, Total: col.Total}
 	for _, t := range col.Tracks {
-		// Адреса нет нарочно: сыграть трек Яндекса приложение не умеет, и
-		// при одобрении он будет найден в Spotify или на YouTube. Зато
-		// артист, название и длительность точные, и подбор выйдет
-		// несравнимо лучше, чем по строке из чата.
+		// Адреса нет: открытая точка его не даёт, и при одобрении трек будет
+		// найден поиском. Зато артист, название и длительность точные, и
+		// подбор выйдет несравнимо лучше, чем по строке из чата.
 		out.Tracks = append(out.Tracks, pendingTrack{
 			Artist: t.Artist, Title: t.Title, DurationMs: t.DurationMs,
 			CoverURL: t.CoverURL,
@@ -480,7 +486,7 @@ func (s *Server) playlistItem(ctx context.Context, p pendingPlaylist,
 		return base, true
 	}
 
-	// Ищем в Spotify по точным артисту и названию с известной длительностью —
+	// Ищем в Яндексе по точным артисту и названию с известной длительностью —
 	// это лучший запрос из возможных, куда точнее строки из чата.
 	if s.ym != nil && s.ym.Connected() {
 		req := match.Parse(t.Artist + " - " + t.Title)
