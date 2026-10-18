@@ -3,10 +3,12 @@ package yandex
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -59,6 +61,14 @@ type Ynison struct {
 
 func newYnison(c *Client) *Ynison {
 	return &Ynison{c: c, deviceID: randomID()}
+}
+
+// stableDeviceID — номер устройства, постоянный для одного токена. Со
+// случайным каждый запуск приложения добавлял бы в список устройств Яндекса
+// ещё одно «Заказ музыки».
+func stableDeviceID(token string) string {
+	sum := sha256.Sum256([]byte("yandex-music-ynison:" + token))
+	return hex.EncodeToString(sum[:])[:12]
 }
 
 // ynState — состояние плеера, как его присылает Ynison.
@@ -232,6 +242,11 @@ func (y *Ynison) loop(ctx context.Context) {
 
 // session — одно соединение от redirector до обрыва.
 func (y *Ynison) session(ctx context.Context) error {
+	if token := y.c.accessToken(); token != "" {
+		y.mu.Lock()
+		y.deviceID = stableDeviceID(token)
+		y.mu.Unlock()
+	}
 	host, ticket, session, err := y.redirect(ctx)
 	if err != nil {
 		return err
@@ -344,7 +359,9 @@ func (y *Ynison) headers() http.Header {
 // protocol — Ynison принимает свои параметры через Sec-WebSocket-Protocol:
 // «Bearer, v2, {json}».
 func (y *Ynison) protocol(extra map[string]string) []string {
-	info, _ := json.Marshal(map[string]any{"app_name": "Chrome", "type": 1})
+	// type строкой, а весь набор — в URL-кодировке: так делает веб-плеер
+	// Яндекса, и сырой JSON с кавычками сервер не принимает.
+	info, _ := json.Marshal(map[string]any{"app_name": "Заказ музыки", "type": "1"})
 	params := map[string]string{
 		"Ynison-Device-Id":   y.deviceID,
 		"Ynison-Device-Info": string(info),
@@ -353,14 +370,13 @@ func (y *Ynison) protocol(extra map[string]string) []string {
 		params[k] = v
 	}
 	raw, _ := json.Marshal(params)
-	return []string{"Bearer", "v2", string(raw)}
+	return []string{"Bearer", "v2", url.QueryEscape(string(raw))}
 }
 
 // hello — первое сообщение: «я пульт, сам ничего не играю».
 //
-// is_shadow и can_be_player=false важны: без них Ynison считает нас
-// плеером и может перевести воспроизведение к нам — музыка у стримера
-// замолчит.
+// can_be_player=false важно: без него Ynison считает нас плеером и может
+// перевести воспроизведение к нам — музыка у стримера замолчит.
 func (y *Ynison) hello() map[string]any {
 	v := y.version()
 	return map[string]any{
@@ -380,16 +396,15 @@ func (y *Ynison) hello() map[string]any {
 				"capabilities": map[string]any{
 					"can_be_player":            false,
 					"can_be_remote_controller": true,
-					"volume_granularity":       16,
+					"volume_granularity":       0,
 				},
 				"info": map[string]any{
 					"device_id": y.deviceID,
 					"type":      "WEB",
 					"title":     "Заказ музыки",
-					"app_name":  "Chrome",
+					"app_name":  "yandex-music",
 				},
 				"volume_info": map[string]any{"volume": 0},
-				"is_shadow":   true,
 			},
 			"is_currently_active": false,
 		},

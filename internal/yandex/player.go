@@ -180,20 +180,24 @@ func (q ynQueue) current() (ynPlayable, bool) {
 	return q.PlayableList[i], true
 }
 
-// progress — где сейчас трек, с поправкой на время с последнего состояния.
+// progress — где сейчас трек. Сервер присылает положение на момент
+// последнего изменения статуса (его version.timestamp_ms), а не на момент
+// отправки сообщения: состояние приходит целиком на любое событие, и счёт от
+// времени прихода копил бы ошибку.
 func (y *Ynison) progress(st ynState) int {
 	pos := int(st.Status.ProgressMs)
-	if st.Status.Paused {
+	if st.Status.Paused || st.Status.Version == nil || st.Status.Version.TimestampMs <= 0 {
 		return pos
 	}
-	y.mu.Lock()
-	since := time.Since(y.updatedAt)
-	y.mu.Unlock()
+	elapsed := time.Now().UnixMilli() - int64(st.Status.Version.TimestampMs)
+	if elapsed < 0 {
+		elapsed = 0
+	}
 	speed := st.Status.PlaybackSpeed
 	if speed <= 0 {
 		speed = 1
 	}
-	pos += int(float64(since.Milliseconds()) * speed)
+	pos += int(float64(elapsed) * speed)
 	if d := int(st.Status.DurationMs); d > 0 && pos > d {
 		pos = d
 	}
