@@ -240,7 +240,7 @@ func coverURL(raw string) string {
 	if raw == "" {
 		return ""
 	}
-	url := "https://" + strings.Replace(raw, "%%", "400x400", 1)
+	url := "https://" + strings.Replace(raw, "%%", "800x800", 1)
 	if !strings.HasPrefix(url, "https://avatars.yandex.net/") || len(url) > 256 {
 		return ""
 	}

@@ -241,7 +241,7 @@ func (c *Client) State(ctx context.Context) (*PlayerState, bool, error) {
 				Name string
 			}{string(a.ID), a.Name})
 		}
-		if cover := CoverURL(t.CoverURI, 400); cover != "" {
+		if cover := CoverURL(t.CoverURI, 800); cover != "" {
 			item.Album.Images = append(item.Album.Images, struct{ URL string }{cover})
 		}
 		if len(t.Albums) > 0 {

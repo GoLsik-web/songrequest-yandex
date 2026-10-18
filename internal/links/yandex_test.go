@@ -121,7 +121,7 @@ func TestYandexTrackReplyIsRead(t *testing.T) {
 	if meta.DurationMs != 235100 {
 		t.Fatalf("длительность %d", meta.DurationMs)
 	}
-	if meta.CoverURL != "https://avatars.yandex.net/get-music-content/95061/4f3808a0.a.5307396-3/400x400" {
+	if meta.CoverURL != "https://avatars.yandex.net/get-music-content/95061/4f3808a0.a.5307396-3/800x800" {
 		t.Fatalf("обложка %q", meta.CoverURL)
 	}
 	if meta.Query() != "Кино - Группа крови" {

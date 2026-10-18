@@ -40,7 +40,8 @@ var coverHosts = map[string]bool{
 	"image-cdn-fa.spotifycdn.com": true,
 	"i.ytimg.com":                 true, // кадры роликов YouTube
 	"img.youtube.com":             true,
-	"avatars.ym.net":              true, // обложки Яндекс.Музыки
+	"avatars.yandex.net":          true, // обложки Яндекс.Музыки
+	"avatars.ym.net":              true,
 }
 
 const (

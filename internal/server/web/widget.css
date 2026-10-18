@@ -147,6 +147,23 @@
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
+/* Бегущая строка для названий, которые не влезли (её включает виджет).
+   Строка стоит у начала, доезжает до конца, стоит и возвращается: читать
+   удобно, и глаз не цепляется за постоянное движение. */
+.title .run, .artist .run { display: inline-block; white-space: nowrap; }
+.title.running, .artist.running {
+  text-overflow: clip; text-align: left !important;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 .6em, #000 calc(100% - .6em), transparent);
+}
+.title.running .run, .artist.running .run {
+  animation: runText var(--run-time, 8s) ease-in-out infinite alternate;
+}
+@keyframes runText {
+  0%, 18%   { transform: translateX(0); }
+  82%, 100% { transform: translateX(var(--run, 0px)); }
+}
+.card[data-motion="off"] .running .run { animation: none; }
+
 .by {
   display: block;
   font-size: calc(12px * var(--scale, 1));
@@ -197,7 +214,15 @@
   --w-track: 0;
   border: calc(2px * var(--scale, 1)) solid #3a3936;
   box-shadow: calc(5px * var(--scale, 1)) calc(5px * var(--scale, 1)) 0 #000;
+  /* Ширина не прыгает от трека к треку: «Я» Ёлки и длинный фит занимают
+     одну и ту же плашку, а не то спичечный коробок, то простыню. */
+  width: calc(400px * var(--scale, 1));
+  box-sizing: border-box;
 }
+/* Воздух между строками — в тех же долях масштаба, что и всё остальное. */
+.card[data-family="nefor"] .title { padding-bottom: calc(2px * var(--scale, 1)); }
+.card[data-family="nefor"] .artist { margin-top: calc(3px * var(--scale, 1)); font-weight: 500; }
+.card[data-family="nefor"] .by { margin-top: calc(8px * var(--scale, 1)); }
 .card[data-family="nefor"][data-variant="yellow"] { --w-accent: #ffcc00; }
 .card[data-family="nefor"][data-variant="red"]    { --w-accent: #ff3b30; }
 .card[data-family="nefor"][data-variant="xerox"]  { --w-accent: #e9e6df; --w-bg: #141414; }
@@ -208,8 +233,13 @@
   overflow: visible;
   border: calc(2px * var(--scale, 1)) solid #3a3936;
   transform: rotate(-2deg);
+  /* Без этого края повёрнутой обложки идут лесенкой. */
+  outline: 1px solid transparent;
+  backface-visibility: hidden;
+  background: #1a1a19;
+  box-shadow: calc(3px * var(--scale, 1)) calc(3px * var(--scale, 1)) 0 #000;
 }
-.card[data-family="nefor"] .art img { filter: contrast(1.08) saturate(.9); }
+.card[data-family="nefor"] .art img { filter: contrast(1.06) saturate(.92); image-rendering: auto; }
 .card[data-family="nefor"] .art::before {
   content: "";
   position: absolute;

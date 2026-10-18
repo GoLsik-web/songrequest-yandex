@@ -22,7 +22,7 @@ type Widget struct {
 	// top|middle|bottom, например «center-top» или «right-middle».
 	Position string `json:"position"`
 
-	Scale float64 `json:"scale"` // 0.5…2
+	Scale float64 `json:"scale"` // 0.5…4
 
 	// Gap — старый общий отступ от края. Остаётся ради настроек, написанных
 	// прошлыми сборками: из него берутся GapX и GapY, если те не заданы.
@@ -158,7 +158,7 @@ func (w *Widget) Normalize() {
 	default:
 		w.Align = "auto"
 	}
-	if w.Scale < 0.5 || w.Scale > 2 {
+	if w.Scale < 0.5 || w.Scale > 4 {
 		w.Scale = 1
 	}
 	if w.Opacity < 10 || w.Opacity > 100 {

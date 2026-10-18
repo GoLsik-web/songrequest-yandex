@@ -98,7 +98,15 @@ body { -webkit-font-smoothing: antialiased; }
     // а в OBS плашка продолжала дёргаться.
     card.dataset.motion = w.motion === false ? "off" : "on";
 
-    card.style.setProperty("--scale", Number(w.scale) || 1);
+    // Масштаб — через zoom, а не через растяжку источника в OBS. Растянутый
+    // в OBS источник — это растянутая картинка, отсюда мыло. zoom же заново
+    // раскладывает плашку в большем размере: шрифты, рамки и полоса
+    // рисуются чётко при любом масштабе, а не только то, что прописано
+    // через --scale. --scale остаётся единицей, им пользуется предпросмотр
+    // в панели.
+    card.style.setProperty("--scale", 1);
+    card.style.zoom = Math.min(4, Math.max(0.5, Number(w.scale) || 1));
+    requestAnimationFrame(fitRuns);
 
     // Прозрачность всей плашки. Отдельным слоем на обёртке, а не через
     // opacity самой плашки: у той opacity занята появлением и уходом, и
@@ -301,10 +309,13 @@ body { -webkit-font-smoothing: antialiased; }
 
       const fill = () => {
         card.dataset.source = now.source === "own" ? "own" : "order";
-        $("title").textContent = now.title;
-        $("artist").textContent = now.artist;
+        runText($("title"), now.title);
+        runText($("artist"), now.artist);
         $("by").textContent = byLine(now);
         $("art").innerHTML = now.cover_url ? `<img src="${esc(coverSrc(now.cover_url))}" alt="">` : NOTE;
+        // Обложка не пришла — ставим ноту, а не значок битой картинки.
+        const img = $("art").querySelector("img");
+        if (img) img.onerror = () => { $("art").innerHTML = NOTE; };
       };
 
       // Плашка уже висела — значит трек просто сменился, заново выезжать
@@ -342,6 +353,33 @@ body { -webkit-font-smoothing: antialiased; }
       card.style.setProperty("--progress", "0");
     }
   }
+
+  // Длинное название не режем троеточием: зритель хочет прочитать его
+  // целиком. Строка, которая не влезла, медленно доезжает до конца и
+  // возвращается. Текст живёт во вложенном span, потому что у самой строки
+  // в части семейств уже есть свои анимации (дыхание неона, глитч).
+  function runText(el, text) {
+    el.innerHTML = '<span class="run"></span>';
+    el.firstChild.textContent = text;
+    requestAnimationFrame(fitRuns);
+  }
+
+  function fitRuns() {
+    for (const el of [$("title"), $("artist")]) {
+      const run = el.firstChild;
+      if (!run || !run.classList) continue;
+      el.classList.remove("running");
+      const over = run.scrollWidth - el.clientWidth;
+      if (over > 2) {
+        el.style.setProperty("--run", -over + "px");
+        // Скорость постоянная — около 40 пикселей в секунду плюс паузы
+        // на краях, — чтобы короткий хвост не пролетал рывком.
+        el.style.setProperty("--run-time", (4 + over / 40).toFixed(1) + "s");
+        el.classList.add("running");
+      }
+    }
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitRuns);
 
   // Откуда трек — это отдельная мысль, и сказать её надо словами: цветом
   // или значком зритель не поймёт, а подписи «музыка канала» достаточно.

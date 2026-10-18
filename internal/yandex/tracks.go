@@ -102,7 +102,7 @@ func (t trackJSON) candidate() match.Candidate {
 		URI:        TrackURI(string(t.ID), t.albumID()),
 		Title:      t.fullTitle(),
 		DurationMs: t.DurationMs,
-		CoverURL:   CoverURL(t.CoverURI, 400),
+		CoverURL:   CoverURL(t.CoverURI, 800),
 	}
 	for _, a := range t.Artists {
 		c.Artists = append(c.Artists, a.Name)
@@ -119,7 +119,7 @@ func (t trackJSON) candidate() match.Candidate {
 			c.AlbumType = "album"
 		}
 		if c.CoverURL == "" {
-			c.CoverURL = CoverURL(al.CoverURI, 400)
+			c.CoverURL = CoverURL(al.CoverURI, 800)
 		}
 	}
 	// Популярности в ответе нет; лайки альбома — лучшее, что есть. Шкала
