@@ -304,7 +304,10 @@ func darkFrame(hwnd uintptr) {
 	// Цвет пишется как 0x00BBGGRR — у Windows задом наперёд. #08090a.
 	back := uint32(0x000A0908)
 	procDwmSetAttr.Call(hwnd, dwmCaption, uintptr(unsafe.Pointer(&back)), 4)
-	edge := uint32(0x00161514) // чуть светлее фона, чтобы окно не сливалось со стримом
+	// Кант вокруг окна не рисуем вовсе (DWMWA_COLOR_NONE). Тёмный кант на
+	// светлом фоне читался как чёрная обводка сверху и справа — владелец
+	// попросил её убрать. Окно и без него отделено от фона тенью Windows.
+	edge := uint32(0xFFFFFFFE)
 	procDwmSetAttr.Call(hwnd, dwmBorder, uintptr(unsafe.Pointer(&edge)), 4)
 
 	corner := int32(cornerRound)
