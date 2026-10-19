@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"songrequest-yandex/internal/app"
 	"songrequest-yandex/internal/errs"
 	"songrequest-yandex/internal/logx"
 )
@@ -514,7 +515,7 @@ func (p *Player) TestSound(ctx context.Context, device string) error {
 
 // Devices перечисляет доступные аудиоустройства mpv — чтобы стример выбрал
 // виртуальный кабель из списка, а не вписывал его имя руками.
-func (p *Player) Devices(ctx context.Context) ([]string, error) {
+func (p *Player) Devices(ctx context.Context) ([]app.AudioDevice, error) {
 	_, mpv := p.tools.Paths()
 	if mpv == "" {
 		return nil, errs.New(errs.YouTubeNoMpv, "mpv не найден.")
@@ -530,20 +531,33 @@ func (p *Player) Devices(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, errs.Wrap(errs.YouTubePlay, "Не получилось спросить у mpv список устройств.", err)
 	}
+	return parseDevices(string(out)), nil
+}
 
-	var devices []string
-	for _, line := range strings.Split(string(out), "\n") {
+// parseDevices разбирает ответ mpv: строки вида «  'wasapi/{...}' (VB-Cable)».
+//
+// Оставляем только настоящие устройства Windows. «auto» и есть системное
+// устройство — оно уже стоит первым пунктом, а openal и прочие выходы
+// дублируют те же колонки под другим именем и только путают.
+func parseDevices(out string) []app.AudioDevice {
+	var devices []app.AudioDevice
+	for _, line := range strings.Split(out, "\n") {
 		line = strings.TrimSpace(line)
-		// Строки вида «  'wasapi/{...}' (VB-Cable)».
 		if !strings.HasPrefix(line, "'") {
 			continue
 		}
-		name, _, ok := strings.Cut(strings.TrimPrefix(line, "'"), "'")
-		if ok && name != "" {
-			devices = append(devices, name)
+		id, rest, ok := strings.Cut(strings.TrimPrefix(line, "'"), "'")
+		if !ok || !strings.HasPrefix(id, "wasapi/") {
+			continue
 		}
+		name := strings.TrimSpace(rest)
+		name = strings.TrimSuffix(strings.TrimPrefix(name, "("), ")")
+		if name == "" {
+			name = id
+		}
+		devices = append(devices, app.AudioDevice{ID: id, Name: name})
 	}
-	return devices, nil
+	return devices
 }
 
 func firstNonEmpty(values ...string) string {

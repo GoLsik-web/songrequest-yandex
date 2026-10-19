@@ -625,7 +625,7 @@
         <div class="wx-grid" id="wx-grid" aria-hidden="true"></div>
         <div class="slot" id="wx-slot">
           <div class="card show" id="wx-card">
-            <div class="art" id="wx-art"></div>
+            <div class="art" id="wx-art"><svg class="no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
             <div class="text">
               <div class="title" id="wx-title">Bohemian Rhapsody</div>
               <div class="artist" id="wx-artist">Queen</div>
@@ -646,9 +646,11 @@
           <button data-scene="light">светлая</button>
           <button data-scene="busy">пёстрая</button>
         </div>
-        <button class="link-btn" id="wx-play">появление</button>
-        <button class="link-btn" id="wx-leave">уход</button>
-        <button class="link-btn" id="wx-next">следующий трек</button>
+        <div class="wx-replay">
+          <button class="link-btn" id="wx-play">появление</button>
+          <button class="link-btn" id="wx-leave">уход</button>
+          <button class="link-btn" id="wx-next">следующий трек</button>
+        </div>
       </div>
 
       <div class="hint">Так плашка выглядит в кадре, в натуральную величину.

@@ -1149,10 +1149,14 @@ footer[hidden] { display: none; }
 
 .wx-stage-bar {
   display: flex; align-items: center; gap: var(--s4);
+  flex-wrap: wrap;
   padding: var(--s3) 0;
   border-bottom: 1px solid var(--line);
 }
-.wx-stage-bar .link-btn { margin-left: auto; }
+/* Три ссылки проигрыша держатся одной группой: по отдельности они
+   разъезжались и ломались по одной на новую строку. */
+.wx-replay { display: flex; gap: var(--s3); margin-left: auto; }
+.wx-replay .link-btn { white-space: nowrap; }
 
 .chips { display: flex; gap: var(--s1); }
 .chips button {

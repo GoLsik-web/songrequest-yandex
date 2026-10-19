@@ -380,6 +380,11 @@ body { -webkit-font-smoothing: antialiased; }
     }
   }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitRuns);
+  // fonts.ready иногда срабатывает раньше, чем шрифт плашки вообще начал
+  // грузиться, — тогда длину строки меряли по запасному шрифту, и бегущая
+  // строка не доезжала до конца. Перемеряем, когда шрифт правда пришёл.
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", fitRuns);
+  window.addEventListener("load", fitRuns);
 
   // Откуда трек — это отдельная мысль, и сказать её надо словами: цветом
   // или значком зритель не поймёт, а подписи «музыка канала» достаточно.

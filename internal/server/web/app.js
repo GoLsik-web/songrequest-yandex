@@ -1247,7 +1247,7 @@
     const select = $("yt-device");
     if (y.devices && y.devices.length && select.options.length <= 1) {
       select.innerHTML = `<option value="">системное устройство</option>` +
-        y.devices.map((d) => `<option value="${esc(d)}">${esc(d)}</option>`).join("");
+        y.devices.map((d) => `<option value="${esc(d.id)}">${esc(d.name)}</option>`).join("");
     }
     // Что выбрано — знает конфиг. Поле y.device сервер заполняет один раз при
     // старте и только если yt-dlp с mpv на месте: без этого стример выбирал

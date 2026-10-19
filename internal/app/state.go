@@ -244,7 +244,7 @@ type YouTubeInfo struct {
 	YtDlp    string   `json:"ytdlp"`
 	Mpv      string   `json:"mpv"`
 	Device   string   `json:"device"`
-	Devices  []string `json:"devices"`
+	Devices  []AudioDevice `json:"devices"`
 	Note     string   `json:"note"`
 	NoteCode string   `json:"note_code"`
 }
@@ -815,4 +815,11 @@ func (s *State) Snapshot() Snapshot {
 		snap.LastPlayed = &last
 	}
 	return snap
+}
+
+// AudioDevice — устройство звука для заказов с YouTube: ID уходит в mpv,
+// Name видит стример. ID вида «wasapi/{1a7e…}» человеку ничего не говорит.
+type AudioDevice struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
