@@ -15,7 +15,7 @@
 //
 //	go run github.com/tc-hib/go-winres@v0.3.3 simply --icon internal/desktop/icon.ico --arch amd64
 //
-// Рисунок повторяет web/favicon.svg: жёлтый квадрат «Нефора» с чёрной нотой.
+// Рисунок повторяет web/favicon.svg: тёмный квадрат и жёлтая нота «Нефора» с жёсткой тенью.
 // Прежний значок — лаймовая точка на тёмном — в трее путали со Spotify.
 package main
 
@@ -32,6 +32,7 @@ import (
 var (
 	yellow = rgb{0xff, 0xcc, 0x00}
 	ink    = rgb{0x0c, 0x0c, 0x0c}
+	shade  = rgb{0x3a, 0x39, 0x36}
 )
 
 type rgb struct{ R, G, B uint8 }
@@ -131,15 +132,19 @@ func draw(size int) []uint8 {
 }
 
 // paint — цвет точки в сетке 32×32, или false, если точка прозрачная.
-// Повторяет web/favicon.svg: жёлтый квадрат, на нём чёрная восьмая нота.
+// Повторяет web/favicon.svg: тёмный квадрат, жёлтая нота с жёсткой тенью.
 func paint(x, y float64) (rgb, bool) {
 	if !inRoundedSquare(x, y, 32, 5) {
 		return rgb{}, false
 	}
 	if inNote(x, y) {
-		return ink, true
+		return yellow, true
 	}
-	return yellow, true
+	// Жёсткая тень ноты со сдвигом вправо-вниз — как у плашек «Нефора».
+	if inNote(x-1.6, y-1.6) {
+		return shade, true
+	}
+	return ink, true
 }
 
 // inNote — головка (наклонный овал), штиль и флажок.
