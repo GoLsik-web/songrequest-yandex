@@ -272,14 +272,6 @@
   border-radius: 0;
   background: repeating-linear-gradient(-45deg, var(--w-accent) 0 5px, #000 5px 8px);
 }
-.card[data-family="nefor"].enter { animation: neforDrop .38s cubic-bezier(.2, .7, .3, 1) both; }
-@keyframes neforDrop {
-  from { transform: translate(-6px, -10px) rotate(-1.5deg); opacity: 0; }
-  60%  { transform: translate(1px, 1px) rotate(.3deg); opacity: 1; }
-  to   { transform: none; opacity: 1; }
-}
-
-
 /* ═══ 1. ЭФИР ═══════════════════════════════════════════════════════════
    Родное оформление приложения: плотная плашка с цветной гранью слева.
    Грань — единственное цветное пятно в спокойном прямоугольнике, поэтому
@@ -1635,6 +1627,135 @@
 @keyframes outPhoto { to { opacity: 0; transform: translateY(12px) rotate(2.5deg) scale(.96); } }
 
 
+/* ── Нефор ──────────────────────────────────────────────────────────────
+   Самодельный журнал, и двигается он как журнал: плашку не «выдвигают», её
+   шлёпают на кадр, как наклейку на гитарный кейс. Обложку прихлопывают
+   ладонью, скотч рвут и клеят поверх, название пропечатывается кривым
+   ксероксом — со сдвинутыми цветными слоями, — а ник ставят штампом.
+   Уходит плашка тоже по-нефорски: её сдирают, и она падает вниз.
+
+   Постоянное — медленное: штриховка ползёт, как лента «осторожно», а раз
+   в полминуты ксерокс коротко «заедает» на названии. Не чаще: через
+   двадцать минут стрима это должно оставаться шуткой, а не тиком. */
+
+.card[data-family="nefor"] { --swap-out: 220ms; }
+
+/* Вход: удар, отскок, дрожь от удара. */
+.card[data-family="nefor"].enter              { animation: nfSlam  .52s var(--e-snap) both; }
+.card[data-family="nefor"].enter .art         { animation: nfSlap  .50s var(--e-back) .12s both; }
+.card[data-family="nefor"].enter .art::before { animation: nfTape  .30s var(--e-snap) .42s both; }
+.card[data-family="nefor"].enter .title       { animation: nfXerox .46s steps(1, end) .22s both; }
+.card[data-family="nefor"].enter .artist      { animation: nfShove .30s var(--e-snap) .34s both; }
+.card[data-family="nefor"].enter .by          { animation: nfStamp .34s var(--e-back) .44s both; }
+.card[data-family="nefor"].enter .bar         { animation: nfTapeBar .40s var(--e-snap) .5s both; }
+
+@keyframes nfSlam {
+  0%   { opacity: 0; transform: translate(-10px, -16px) rotate(-5deg) scale(1.18); }
+  45%  { opacity: 1; transform: translate(2px, 2px) rotate(.8deg) scale(.97); }
+  60%  { transform: translate(-2px, 0) rotate(-.6deg) scale(1.01); }
+  75%  { transform: translate(1px, -1px) rotate(.3deg); }
+  100% { opacity: 1; transform: none; }
+}
+/* У обложки свой наклон −2°: все кадры кончаются на нём, иначе в конце
+   она дёргалась бы на место. */
+@keyframes nfSlap {
+  0%   { opacity: 0; transform: rotate(-16deg) scale(1.35) translate(-6px, -10px); }
+  60%  { opacity: 1; transform: rotate(1.5deg) scale(.95); }
+  100% { opacity: 1; transform: rotate(-2deg); }
+}
+/* Скотч отрывают от рулона слева направо и прижимают. */
+@keyframes nfTape {
+  0%   { opacity: 0; clip-path: inset(0 100% 0 0); transform: rotate(-7deg) scaleY(1.4); }
+  70%  { opacity: .9; clip-path: inset(0 0 0 0);   transform: rotate(-9deg) scaleY(1); }
+  100% { opacity: .82; clip-path: inset(0 0 0 0);  transform: rotate(-7deg); }
+}
+/* Кривой ксерокс: слои краски разъехались, строку рвёт полосами, потом
+   всё сходится. steps — нарочно: плавный глитч выглядит как фильтр из
+   телефона, а не как сбой. */
+@keyframes nfXerox {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; transform: translateX(-6px) skewX(-14deg);
+         text-shadow: 4px 0 var(--w-accent), -4px 0 #ff2a6d;
+         clip-path: inset(0 0 55% 0); }
+  25%  { transform: translateX(5px);
+         text-shadow: -3px 0 var(--w-accent), 3px 0 #2af0ff;
+         clip-path: inset(40% 0 0 0); }
+  40%  { transform: translateX(-2px) skewX(8deg);
+         text-shadow: 2px 0 var(--w-accent), -2px 0 #ff2a6d;
+         clip-path: inset(0 0 20% 0); }
+  60%  { transform: translateX(1px);
+         text-shadow: 1px 0 var(--w-accent);
+         clip-path: inset(0); }
+  100% { opacity: 1; transform: none; text-shadow: none; clip-path: inset(0); }
+}
+@keyframes nfShove {
+  from { opacity: 0; transform: translateX(-14px) skewX(-12deg); }
+  to   { opacity: 1; transform: none; }
+}
+/* Штамп: сверху, крупнее, с поворотом — и бах. */
+@keyframes nfStamp {
+  0%   { opacity: 0; transform: scale(2.2) rotate(-8deg); }
+  70%  { opacity: 1; transform: scale(.94) rotate(1deg); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes nfTapeBar {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0); }
+}
+
+/* Пока висит: штриховка ползёт, а ксерокс изредка заедает. */
+.card[data-family="nefor"] .bar i {
+  background-size: 11.3px 11.3px;
+  animation: nfCrawl 1.6s linear infinite;
+}
+@keyframes nfCrawl { to { background-position: 11.3px 0; } }
+.card[data-family="nefor"]:not(.enter):not(.swap-out):not(.swap-in):not(.leave) .title {
+  animation: nfJam 30s steps(1, end) 6s infinite;
+}
+@keyframes nfJam {
+  0%, 96.4%, 100% { transform: none; text-shadow: none; clip-path: none; }
+  96.6% { transform: translateX(-3px) skewX(-10deg);
+          text-shadow: 3px 0 var(--w-accent), -3px 0 #ff2a6d; clip-path: inset(0 0 50% 0); }
+  96.9% { transform: translateX(3px);
+          text-shadow: -2px 0 var(--w-accent), 2px 0 #2af0ff; clip-path: inset(45% 0 0 0); }
+  97.2% { transform: translateX(-1px); text-shadow: 1px 0 var(--w-accent); clip-path: none; }
+}
+
+/* Смена трека: старое сдирают полосой наискось, новое шлёпают заново. */
+.card[data-family="nefor"].swap-out .text { animation: nfRip  220ms var(--e-in) both; }
+.card[data-family="nefor"].swap-out .art  { animation: nfFlick 220ms var(--e-in) both; }
+.card[data-family="nefor"].swap-in        { animation: nfJolt .34s var(--e-snap) both; }
+.card[data-family="nefor"].swap-in .art   { animation: nfSlap  .44s var(--e-back) both; }
+.card[data-family="nefor"].swap-in .art::before { animation: nfTape .28s var(--e-snap) .26s both; }
+.card[data-family="nefor"].swap-in .title  { animation: nfXerox .42s steps(1, end) .06s both; }
+.card[data-family="nefor"].swap-in .artist { animation: nfShove .28s var(--e-snap) .16s both; }
+.card[data-family="nefor"].swap-in .by     { animation: nfStamp .32s var(--e-back) .24s both; }
+.card[data-family="nefor"].swap-in .bar    { animation: nfTapeBar .34s var(--e-snap) .3s both; }
+
+@keyframes nfRip {
+  from { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); transform: none; }
+  to   { clip-path: polygon(100% 0, 100% 0, 100% 100%, 100% 100%);
+         transform: translateX(18px) skewX(-18deg); opacity: .4; }
+}
+@keyframes nfFlick {
+  to { opacity: 0; transform: rotate(14deg) scale(.7) translate(10px, 8px); }
+}
+@keyframes nfJolt {
+  0%   { transform: none; }
+  30%  { transform: translate(2px, 2px) rotate(.6deg); }
+  60%  { transform: translate(-1px, 0) rotate(-.3deg); }
+  100% { transform: none; }
+}
+
+/* Уход: край отклеился, плашка повисла на углу и рухнула. */
+.card[data-family="nefor"].leave { animation: nfTear .34s var(--e-in) both; transform-origin: 100% 0; }
+@keyframes nfTear {
+  0%   { transform: none; opacity: 1; }
+  35%  { transform: rotate(4deg); opacity: 1; }
+  100% { transform: translateY(46px) rotate(14deg); opacity: 0; }
+}
+
+
 /* ── Тишина ─────────────────────────────────────────────────────────────
    Всё движение обязано уметь останавливаться: и по просьбе системы, и по
    настройке. Узлы перечислены явно — анимации висят и на псевдоэлементах,
@@ -1647,7 +1768,7 @@
   .card .art::before, .card .art::after,
   .card .text, .card .text::before, .card .text::after,
   .card .title, .card .title::after,
-  .card .artist, .card .by, .card .bar {
+  .card .artist, .card .by, .card .bar, .card .bar i {
     animation: none !important;
     transition: none !important;
   }
@@ -1662,7 +1783,8 @@
 .card[data-motion="off"] .text,
 .card[data-motion="off"] .text::before, .card[data-motion="off"] .text::after,
 .card[data-motion="off"] .title, .card[data-motion="off"] .title::after,
-.card[data-motion="off"] .artist, .card[data-motion="off"] .by, .card[data-motion="off"] .bar {
+.card[data-motion="off"] .artist, .card[data-motion="off"] .by, .card[data-motion="off"] .bar,
+.card[data-motion="off"] .bar i {
   animation: none !important;
   transition: none !important;
 }
