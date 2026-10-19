@@ -9,8 +9,14 @@
 //
 //	go run ./tools/ico
 //
-// Рисунок повторяет web/favicon.svg: тёмный квадрат со скруглением и лаймовая
-// точка «в эфире» посередине — те же краски, что в панели «Эфир».
+// Тот же значок вшит в сам exe (его видно в проводнике и на ярлыке) файлом
+// rsrc_windows_amd64.syso в корне. Go подхватывает его при сборке сам. После
+// смены значка пересобрать и его:
+//
+//	go run github.com/tc-hib/go-winres@v0.3.3 simply --icon internal/desktop/icon.ico --arch amd64
+//
+// Рисунок повторяет web/favicon.svg: жёлтый квадрат «Нефора» с чёрной нотой.
+// Прежний значок — лаймовая точка на тёмном — в трее путали со Spotify.
 package main
 
 import (
@@ -22,10 +28,10 @@ import (
 	"path/filepath"
 )
 
-// Краски из дизайна «Эфир». Меняются вместе с web/favicon.svg, не по отдельности.
+// Краски из дизайна «Нефор». Меняются вместе с web/favicon.svg, не по отдельности.
 var (
-	dark = rgb{0x08, 0x09, 0x0a}
-	lime = rgb{0xc8, 0xf7, 0x51}
+	yellow = rgb{0xff, 0xcc, 0x00}
+	ink    = rgb{0x0c, 0x0c, 0x0c}
 )
 
 type rgb struct{ R, G, B uint8 }
@@ -33,7 +39,7 @@ type rgb struct{ R, G, B uint8 }
 // sizes — все размеры значка в одном файле. Windows сам берёт подходящий:
 // 16 для трея, 32 для окна, 128 для Alt+Tab на крупном экране. Если нужного
 // размера в файле нет, система растянет ближайший, и края расползутся.
-var sizes = []int{16, 20, 24, 32, 48, 64, 128}
+var sizes = []int{16, 20, 24, 32, 48, 64, 128, 256}
 
 func main() {
 	if err := run(); err != nil {
@@ -87,59 +93,77 @@ func run() error {
 // draw возвращает точки значка построчно сверху вниз, по четыре байта
 // (R, G, B, прозрачность) на точку.
 //
-// Каждая точка считается по шестнадцати подточкам: край скругления и край
-// круга проходят не по границе точек, и без такого усреднения они выглядят
+// Каждая точка считается по шестнадцати подточкам: края ноты и скругления
+// проходят не по границе точек, и без такого усреднения они выглядят
 // лесенкой — особенно заметно на 16 точках в трее.
 func draw(size int) []uint8 {
 	pixels := make([]uint8, size*size*4)
-	scale := float64(size) / 32 // масштаб от исходных 32 точек в SVG
-	corner := 6 * scale
-	dot := 6 * scale
-	center := float64(size) / 2
+	scale := float64(size) / 32 // рисунок задан в сетке 32×32, как SVG
 
 	const sub = 4
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
-			var cover, inDot float64
+			var a, r, g, b float64
 			for jy := 0; jy < sub; jy++ {
 				for jx := 0; jx < sub; jx++ {
-					sx := float64(x) + (float64(jx)+0.5)/sub
-					sy := float64(y) + (float64(jy)+0.5)/sub
-					if inRoundedSquare(sx, sy, float64(size), corner) {
-						cover++
+					sx := (float64(x) + (float64(jx)+0.5)/sub) / scale
+					sy := (float64(y) + (float64(jy)+0.5)/sub) / scale
+					c, ok := paint(sx, sy)
+					if !ok {
+						continue
 					}
-					if math.Hypot(sx-center, sy-center) <= dot {
-						inDot++
-					}
+					a++
+					r += float64(c.R)
+					g += float64(c.G)
+					b += float64(c.B)
 				}
 			}
-			total := float64(sub * sub)
-			cover /= total
-			inDot /= total
-
-			// Круг лежит на тёмном квадрате, поэтому сначала смешиваем краски,
-			// а потом умножаем на прозрачность самого квадрата.
-			limeShare := inDot
-			if limeShare > cover {
-				limeShare = cover
-			}
-			alpha := cover
-			var r, g, b float64
-			if alpha > 0 {
-				darkPart := (cover - limeShare) / alpha
-				limePart := limeShare / alpha
-				r = float64(dark.R)*darkPart + float64(lime.R)*limePart
-				g = float64(dark.G)*darkPart + float64(lime.G)*limePart
-				b = float64(dark.B)*darkPart + float64(lime.B)*limePart
-			}
 			i := (y*size + x) * 4
-			pixels[i+0] = uint8(r + 0.5)
-			pixels[i+1] = uint8(g + 0.5)
-			pixels[i+2] = uint8(b + 0.5)
-			pixels[i+3] = uint8(alpha*255 + 0.5)
+			if a > 0 {
+				pixels[i+0] = uint8(r/a + 0.5)
+				pixels[i+1] = uint8(g/a + 0.5)
+				pixels[i+2] = uint8(b/a + 0.5)
+			}
+			pixels[i+3] = uint8(a/(sub*sub)*255 + 0.5)
 		}
 	}
 	return pixels
+}
+
+// paint — цвет точки в сетке 32×32, или false, если точка прозрачная.
+// Повторяет web/favicon.svg: жёлтый квадрат, на нём чёрная восьмая нота.
+func paint(x, y float64) (rgb, bool) {
+	if !inRoundedSquare(x, y, 32, 5) {
+		return rgb{}, false
+	}
+	if inNote(x, y) {
+		return ink, true
+	}
+	return yellow, true
+}
+
+// inNote — головка (наклонный овал), штиль и флажок.
+func inNote(x, y float64) bool {
+	// Головка: овал 6.5×4.8 с центром (15, 22.5), повёрнут на −22°.
+	const angle = -22 * math.Pi / 180
+	dx, dy := x-15, y-22.5
+	u := dx*math.Cos(angle) + dy*math.Sin(angle)
+	v := -dx*math.Sin(angle) + dy*math.Cos(angle)
+	if (u*u)/(6.5*6.5)+(v*v)/(4.8*4.8) <= 0.25 {
+		return true
+	}
+	// Штиль: от головки вверх.
+	if x >= 16.6 && x <= 19.4 && y >= 6 && y <= 22 {
+		return true
+	}
+	// Флажок: толстая полоса, спадающая вправо вниз.
+	if x >= 19 && x <= 25.5 {
+		top := 6 + (x-19)*0.75
+		if y >= top && y <= top+4 {
+			return true
+		}
+	}
+	return false
 }
 
 // inRoundedSquare — попала ли точка внутрь квадрата со скруглёнными углами.
