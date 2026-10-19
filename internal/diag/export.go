@@ -151,7 +151,8 @@ func sanitizeConfig(data []byte, red *logx.Redactor) []byte {
 func isSecretKey(key string) bool {
 	return strings.HasSuffix(key, "_key") ||
 		strings.HasSuffix(key, "_token") ||
-		strings.HasSuffix(key, "_secret")
+		strings.HasSuffix(key, "_secret") ||
+		strings.HasSuffix(key, "_password")
 }
 
 func filledOrNot(s string) string {

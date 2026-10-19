@@ -240,13 +240,13 @@ type OrderMatch struct {
 type YouTubeInfo struct {
 	// Ready означает, что оба инструмента на месте и заказ, которого нет
 	// в Spotify, всё-таки заиграет.
-	Ready    bool     `json:"ready"`
-	YtDlp    string   `json:"ytdlp"`
-	Mpv      string   `json:"mpv"`
-	Device   string   `json:"device"`
+	Ready    bool          `json:"ready"`
+	YtDlp    string        `json:"ytdlp"`
+	Mpv      string        `json:"mpv"`
+	Device   string        `json:"device"`
 	Devices  []AudioDevice `json:"devices"`
-	Note     string   `json:"note"`
-	NoteCode string   `json:"note_code"`
+	Note     string        `json:"note"`
+	NoteCode string        `json:"note_code"`
 }
 
 // Session — итоги с момента запуска. Панель на этапе, когда заказов ещё нет,
@@ -293,6 +293,8 @@ type Snapshot struct {
 	Tunnel TunnelInfo `json:"tunnel"`
 	// Update — что известно про обновление приложения.
 	Update UpdateInfo `json:"update"`
+	// OBS — связь с OBS: найден ли источник виджета.
+	OBS OBSInfo `json:"obs"`
 	// Widget — оформление виджета. Едет вместе с состоянием, чтобы правка в
 	// панели доезжала до OBS сразу: перезагружать источник не нужно.
 	Widget any `json:"widget"`
@@ -303,6 +305,23 @@ type Snapshot struct {
 // Приложение само в интернет за обновлениями не ходит: проверка только по
 // кнопке. Поэтому здесь почти всегда пусто, и кнопка «Обновить» появляется
 // ровно тогда, когда человек нажал «Проверить» и обновление правда есть.
+// OBSInfo — что известно про связь с OBS.
+//
+// Status: "" — ещё не проверяли, "ok" — источник виджета найден, "nosource"
+// — OBS на связи, а источника нет (тогда в панели кнопка «Добавить в OBS»),
+// "off" — OBS не отвечает, "auth" — не подошёл пароль, "error" — OBS отказал.
+type OBSInfo struct {
+	Status   string   `json:"status"`
+	Note     string   `json:"note"`
+	NoteCode string   `json:"note_code"`
+	Version  string   `json:"version"`
+	Source   string   `json:"source"`
+	Width    int      `json:"width"`
+	Height   int      `json:"height"`
+	Scenes   []string `json:"scenes"`
+	Busy     bool     `json:"busy"`
+}
+
 type UpdateInfo struct {
 	// Repo — откуда берём выпуски, «имя/репозиторий» на GitHub. Пусто —
 	// обновляться неоткуда, и панель говорит об этом словами.
@@ -465,6 +484,7 @@ type State struct {
 	tunnel      TunnelInfo
 	bans        []Ban
 	youtube     YouTubeInfo
+	obs         OBSInfo
 	widget      any
 
 	subs map[int]chan struct{}
@@ -639,7 +659,15 @@ func (s *State) SetTwitch(info TwitchInfo) {
 	s.notify()
 }
 
-// UpdateTwitch меняет часть сведений о Twitch, не трогая остальные.
+// UpdateOBS меняет сведения о связи с OBS.
+func (s *State) UpdateOBS(fn func(*OBSInfo)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	fn(&s.obs)
+	s.notify()
+}
+
+// UpdateSelf меняет сведения об обновлении приложения.
 func (s *State) UpdateSelf(fn func(*UpdateInfo)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -791,6 +819,7 @@ func (s *State) Snapshot() Snapshot {
 		YouTubeAsks:   append(make([]YouTubeAsk, 0, len(s.ytAsks)), s.ytAsks...),
 		YouTubeRecent: append(make([]YouTubeRecent, 0, len(s.ytRecent)), s.ytRecent...),
 		Update:        s.update,
+		OBS:           s.obs,
 		Notices:       append(make([]Notice, 0, len(s.notices)), s.notices...),
 		Paused:        s.paused,
 		Version:       s.version,

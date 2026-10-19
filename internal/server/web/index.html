@@ -686,6 +686,33 @@
         <span class="hint" id="wx-frame-hint"></span>
       </div>
 
+      <!-- Связь с OBS: по ней формат кадра меняет источник в самом OBS. -->
+      <div class="obs-link" id="obs-link">
+        <div class="obs-head">
+          <span>Связь с OBS</span>
+          <span class="obs-dot" id="obs-dot" data-status=""></span>
+        </div>
+        <div class="obs-status" id="obs-status">ещё не проверяли</div>
+        <div class="obs-fields">
+          <label class="field">
+            <span>Порт</span>
+            <input type="number" id="obs-port" min="1" max="65535" placeholder="4455">
+          </label>
+          <label class="field">
+            <span>Пароль</span>
+            <input type="password" id="obs-password" autocomplete="off" spellcheck="false"
+                   placeholder="без пароля">
+          </label>
+        </div>
+        <span class="hint">В OBS: «Инструменты → Настройки сервера WebSocket».
+          Там же «Показать сведения о подключении» — порт и пароль.</span>
+        <div class="acts">
+          <button class="act small" id="obs-check">Проверить связь</button>
+          <button class="act small" id="obs-fit" hidden>Подогнать сейчас</button>
+          <button class="act small key" id="obs-add" hidden>Добавить в OBS</button>
+        </div>
+      </div>
+
       <div class="field">
         <span>Место в кадре</span>
         <!-- Девять точек вместо четырёх углов: «сверху по центру» и «слева

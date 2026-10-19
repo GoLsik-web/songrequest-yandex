@@ -230,6 +230,7 @@ func run() error {
 	srv.StartPlayer(ctx)
 	srv.StartDonations(ctx)
 	srv.StartYouTube(ctx)
+	srv.CheckOBS(ctx)
 
 	// mpv не должен пережить приложение: иначе он останется занимать
 	// звуковое устройство, а музыка продолжит играть после закрытия.

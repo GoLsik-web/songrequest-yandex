@@ -72,10 +72,18 @@ type Config struct {
 	PlaylistCost int `json:"playlist_cost"`
 
 	// Донаты
-	DonationAlertsClientID string  `json:"donationalerts_client_id"`
-	DonatePayKey           string  `json:"donatepay_key"`
-	DonateXKey             string  `json:"donatex_key"`
-	DonationMin            float64 `json:"donation_min"` // от какой суммы принимаем заказ
+	DonationAlertsClientID string `json:"donationalerts_client_id"`
+	DonatePayKey           string `json:"donatepay_key"`
+	DonateXKey             string `json:"donatex_key"`
+
+	// Связь с OBS через obs-websocket: по ней приложение само ставит
+	// источнику виджета размер выбранного формата кадра. Порт 0 — 4455,
+	// стандартный. Пароль — из окна OBS «Инструменты → Настройки сервера
+	// WebSocket»; в архив диагностики он не попадает (оканчивается на
+	// _password).
+	OBSPort     int     `json:"obs_port"`
+	OBSPassword string  `json:"obs_password"`
+	DonationMin float64 `json:"donation_min"` // от какой суммы принимаем заказ
 
 	// Лимиты заказов
 	MaxTrackSeconds  int  `json:"max_track_seconds"`
@@ -186,7 +194,8 @@ func Defaults() Config {
 			Popularity: 0.1,
 			Version:    1.0,
 		},
-		Widget: DefaultWidget(),
+		Widget:  DefaultWidget(),
+		OBSPort: 4455,
 		RejectKeywords: []string{
 			"нарезка", "нарезки", "подкаст", "стрим", "compilation", "mix",
 			"1 hour", "1 час", "10 hours", "podcast", "livestream", "best moments",

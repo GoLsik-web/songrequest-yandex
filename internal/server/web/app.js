@@ -622,6 +622,54 @@
   // причине: настройки открывают раз в месяц, а увидеть «вышла новая версия»
   // надо тогда, когда её выпустили.
 
+  // ── связь с OBS ────────────────────────────────────────────────────
+
+  let lastOBS = {};
+
+  function renderOBS(o) {
+    lastOBS = o;
+    const status = o.status || "";
+    $("obs-dot").dataset.status = status;
+    const scenes = (o.scenes || []).length
+      ? " · " + o.scenes.map(esc).join(", ") : "";
+    $("obs-status").innerHTML = o.busy ? "связываюсь с OBS…" : ({
+      "":         "ещё не проверяли",
+      ok:         `на связи · источник <b>«${esc(o.source)}»</b> ${o.width} × ${o.height}${scenes}`,
+      nosource:   "на связи, но источника с виджетом нет — его можно добавить кнопкой",
+      off:        esc(o.note || "OBS не отвечает"),
+      auth:       esc(o.note || "OBS не принял пароль"),
+      error:      esc(o.note || "OBS отказал"),
+    }[status] || esc(o.note || ""));
+    $("obs-add").hidden = status !== "nosource";
+    $("obs-fit").hidden = status !== "ok";
+    for (const id of ["obs-check", "obs-fit", "obs-add"]) $(id).disabled = !!o.busy;
+    // Подсказка у формата зависит от того, на связи ли OBS.
+    if ($("wx-frame-hint")) wxDrawFrame(widget());
+  }
+
+  function fillOBSFields() {
+    if (!config) return;
+    const port = $("obs-port");
+    const pass = $("obs-password");
+    if (document.activeElement !== port) port.value = config.obs_port || "";
+    if (document.activeElement !== pass) pass.value = config.obs_password || "";
+  }
+
+  $("obs-port").onchange = async (e) => {
+    const v = parseInt(e.target.value, 10);
+    if (await saveConfig({ obs_port: v > 0 && v < 65536 ? v : 4455 })) markSaved(e.target);
+  };
+  $("obs-password").onchange = async (e) => {
+    if (await saveConfig({ obs_password: e.target.value })) markSaved(e.target);
+  };
+  $("obs-check").onclick = (e) => post("/api/obs/check", e.currentTarget);
+  $("obs-fit").onclick = async (e) => {
+    if (await post("/api/obs/fit", e.currentTarget)) say("Источник в OBS подогнан под формат кадра.");
+  };
+  $("obs-add").onclick = async (e) => {
+    if (await post("/api/obs/add", e.currentTarget)) say("Виджет добавлен в OBS, в текущую сцену.");
+  };
+
   function renderUpdate(u) {
     const top = $("update-now");
     const busy = !!u.installing;
@@ -1476,6 +1524,7 @@
       $("da-id").value = config.donationalerts_client_id || "";
       $("dp-key").value = config.donatepay_key || "";
       $("dx-key").value = config.donatex_key || "";
+      fillOBSFields();
       $("donation-min").value = config.donation_min ?? "";
       $("command-prefix").value = config.command_prefix || "!";
       $("yt-browser").value = config.youtube_browser || "";
@@ -2354,10 +2403,13 @@
     document.querySelectorAll("#wx-frame-pick button").forEach((b) => {
       b.classList.toggle("on", b.dataset.frame === frame);
     });
-    $("wx-frame-hint").innerHTML =
-      `В OBS у источника «Браузер» поставьте ширину <b>${fw}</b> и высоту <b>${fh}</b> ` +
-      `и растяните его на весь кадр. Или просто перетащите кнопку «Перетащить в OBS» ` +
-      `в окно сцены — размер подставится сам.`;
+    // Связь с OBS есть и источник найден — приложение подгоняет его само,
+    // и подсказка про ручную настройку только сбивала бы с толку.
+    $("wx-frame-hint").innerHTML = lastOBS.status === "ok"
+      ? `Источник в OBS подгоняется сам: <b>${fw} × ${fh}</b>, на весь кадр.`
+      : `Источник «Браузер» в OBS: ширина <b>${fw}</b>, высота <b>${fh}</b>, растянуть ` +
+        `на весь кадр. Проще — настроить «Связь с OBS» ниже, тогда размер ` +
+        `поставится сам.`;
     // OBS понимает эти параметры у брошенной в сцену ссылки и сразу создаёт
     // источник нужного размера. Самому виджету они не мешают.
     $("wx-drag").href = location.origin + "/widget?layer-name=" +
@@ -2923,6 +2975,7 @@
     draw("orders", sig([s.queue, s.paused, s.twitch.reward_title,
                         s.twitch.reward_cost, s.twitch.reward_ready]), () => renderOrders(s));
     draw("update", sig(s.update), () => renderUpdate(s.update || {}));
+    draw("obs", sig(s.obs), () => renderOBS(s.obs || {}));
     draw("playlists", sig(s.playlists), () => renderPlaylists(s));
     draw("ytasks", sig(s.youtube_asks), () => renderYouTubeAsks(s));
     draw("yt-recent", sig(s.youtube_recent), () => renderYouTubeRecent(s.youtube_recent));

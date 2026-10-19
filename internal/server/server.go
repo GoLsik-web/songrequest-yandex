@@ -311,6 +311,9 @@ func New(d Deps) (*Server, error) {
 	mux.HandleFunc("GET /api/search", s.handleSearch)
 	mux.HandleFunc("POST /api/queue/reorder", s.handleQueueReorder)
 	mux.HandleFunc("POST /api/update/check", s.handleUpdateCheck)
+	mux.HandleFunc("POST /api/obs/check", s.obsHandler(obsCheck))
+	mux.HandleFunc("POST /api/obs/fit", s.obsHandler(obsFit))
+	mux.HandleFunc("POST /api/obs/add", s.obsHandler(obsAdd))
 	mux.HandleFunc("POST /api/update/install", s.handleUpdateInstall)
 
 	mux.HandleFunc("POST /api/queue/clear", s.handleQueueClear)
@@ -522,6 +525,11 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 	// сейчас, а не после перезапуска приложения.
 	donatePayChanged := incoming.DonatePayKey != current.DonatePayKey
 	donateXChanged := incoming.DonateXKey != current.DonateXKey
+	// Сменили формат кадра — источник в OBS должен поменяться сразу, а не
+	// по отдельной кнопке. Сменили порт или пароль — тоже переподключаемся:
+	// человек ждёт, что статус в панели ответит на новый пароль.
+	obsChanged := incoming.Widget.Frame != current.Widget.Frame ||
+		incoming.OBSPort != current.OBSPort || incoming.OBSPassword != current.OBSPassword
 
 	if err := s.cfg.Update(func(c *config.Config) { *c = incoming }); err != nil {
 		s.log.Error("сохранение настроек", "ошибка", err)
@@ -539,6 +547,9 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if donateXChanged {
 		s.donations.Restart("DonateX")
+	}
+	if obsChanged {
+		s.fitOBSLater()
 	}
 	// Настройки, которые раньше читались только при запуске: задержка
 	// возврата, «дожидаться конца трека», устройство и браузер для YouTube.

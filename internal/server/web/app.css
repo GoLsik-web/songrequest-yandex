@@ -1693,3 +1693,26 @@ body.menu-open { overflow: hidden; }
 .wx-frames { flex-wrap: wrap; }
 .wx-frames button { font-variant-numeric: tabular-nums; }
 #wx-drag { cursor: grab; }
+
+/* Связь с OBS — отдельная карточка: это не оформление, а подключение. */
+.obs-link {
+  margin: var(--s4) 0 var(--s5);
+  padding: var(--s3) var(--s4) var(--s4);
+  border: 2px solid var(--line-2);
+  background: var(--bg);
+}
+.obs-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-family: "JetBrains Mono Var", "JetBrains Mono", monospace;
+  font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+}
+.obs-dot { width: 10px; height: 10px; background: var(--line-2); }
+.obs-dot[data-status="ok"]       { background: #ffcc00; box-shadow: 0 0 0 3px rgba(255, 204, 0, .18); }
+.obs-dot[data-status="nosource"] { background: #e9e6df; }
+.obs-dot[data-status="off"],
+.obs-dot[data-status="auth"],
+.obs-dot[data-status="error"]    { background: #ff3b30; }
+.obs-status { margin: var(--s2) 0 var(--s3); font-size: 13px; line-height: 1.45; }
+.obs-status b { font-weight: 600; }
+.obs-fields { display: grid; grid-template-columns: 96px 1fr; gap: var(--s3); }
+.obs-link .acts { margin-top: var(--s3); flex-wrap: wrap; }

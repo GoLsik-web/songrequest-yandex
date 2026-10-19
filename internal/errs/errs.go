@@ -126,6 +126,17 @@ const (
 	// прав на папку, где она лежит.
 	UpdateApply Code = "UPD-05"
 
+	// Связь с OBS
+	//
+	// OBSUnreachable — OBS не запущен или в нём выключен сервер WebSocket.
+	OBSUnreachable Code = "OBS-01"
+	// OBSAuth — OBS не принял пароль.
+	OBSAuth Code = "OBS-02"
+	// OBSNoSource — источника виджета в OBS нет.
+	OBSNoSource Code = "OBS-03"
+	// OBSRequest — OBS выслушал и отказал.
+	OBSRequest Code = "OBS-04"
+
 	// Яндекс.Музыка
 	YandexRead         Code = "YM-01" // не удалось прочитать страницу трека
 	YandexNoToken      Code = "YM-02" // не выполнен вход в Яндекс
