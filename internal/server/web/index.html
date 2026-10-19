@@ -663,11 +663,28 @@
       <div class="acts">
         <button class="act small key" id="wx-copy">Скопировать адрес</button>
         <a class="act small" id="wx-open" target="_blank" rel="noopener">Открыть в браузере</a>
+        <a class="act small" id="wx-drag" draggable="true"
+           title="Перетащите кнопку мышью в окно сцены OBS — источник появится сразу нужного размера">Перетащить в OBS</a>
       </div>
     </div>
 
     <div class="wx-right">
       <div class="kicker">Как поставить</div>
+
+      <div class="field">
+        <span>Формат кадра</span>
+        <div class="chips wx-frames" id="wx-frame-pick">
+          <button data-frame="16:9">16:9</button>
+          <button data-frame="16:10">16:10</button>
+          <button data-frame="4:3">4:3</button>
+          <button data-frame="5:4">5:4</button>
+          <button data-frame="21:9">21:9</button>
+          <button data-frame="32:9">32:9</button>
+          <button data-frame="9:16">9:16</button>
+          <button data-frame="1:1">1:1</button>
+        </div>
+        <span class="hint" id="wx-frame-hint"></span>
+      </div>
 
       <div class="field">
         <span>Место в кадре</span>

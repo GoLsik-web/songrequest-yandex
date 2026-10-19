@@ -127,8 +127,8 @@ func (d *DonationAlerts) user(ctx context.Context, token string) (*daUser, error
 			"Слетела авторизация DonationAlerts. Подключи его заново.")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, errs.New(errs.DonationsUnreachable,
-			fmt.Sprintf("DonationAlerts ответил ошибкой (%d).", resp.StatusCode))
+		return nil, errs.Wrap(errs.DonationsUnreachable,
+			"DonationAlerts ответил ошибкой. Попробуй ещё раз чуть позже.", fmt.Errorf("HTTP %d", resp.StatusCode))
 	}
 
 	var out struct {
@@ -166,8 +166,8 @@ func (d *DonationAlerts) channelToken(ctx context.Context, token, channel, clien
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", errs.New(errs.DonationsUnreachable,
-			fmt.Sprintf("DonationAlerts не дал доступ к каналу (%d).", resp.StatusCode))
+		return "", errs.Wrap(errs.DonationsUnreachable,
+			"DonationAlerts не дал доступ к каналу. Попробуй ещё раз чуть позже.", fmt.Errorf("HTTP %d", resp.StatusCode))
 	}
 
 	var out struct {
@@ -234,7 +234,8 @@ func (d *DonationAlerts) session(ctx context.Context, onDonation func(Donation))
 
 	conn, _, err := websocket.Dial(ctx, d.wsURL, nil)
 	if err != nil {
-		return fmt.Errorf("не подключился к DonationAlerts: %w", err)
+		// Английская причина обрыва — в лог, стримеру понятная фраза.
+		return errs.Wrap(errs.DonationsUnreachable, "Не подключился к DonationAlerts. Проверь интернет — приложение попробует ещё раз само.", err)
 	}
 	defer conn.CloseNow()
 	conn.SetReadLimit(1 << 20)

@@ -45,7 +45,7 @@ func (s *Server) handleYandexToken(w http.ResponseWriter, r *http.Request) {
 		Token string `json:"token"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&body); err != nil {
-		http.Error(w, "не разобрал запрос", http.StatusBadRequest)
+		failText(w, http.StatusBadRequest, "Не разобрал запрос.")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
@@ -304,6 +304,15 @@ func (s *Server) fail(w http.ResponseWriter, err error) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusBadRequest)
 	writeJSON(w, map[string]string{"code": string(code), "error": text})
+}
+
+// failText — отказ без кода, но в том же JSON, что и fail: панель читает
+// поле error, а голый текст от http.Error она теряла и писала своё
+// «Не получилось».
+func failText(w http.ResponseWriter, status int, text string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	writeJSON(w, map[string]string{"code": "", "error": text})
 }
 
 // SyncYandex обновляет карточку Яндекса при старте и поднимает очередь,

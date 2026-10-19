@@ -1099,7 +1099,11 @@ footer[hidden] { display: none; }
    часть интерфейса, а изображение — то, что увидят зрители. */
 .wx-stage {
   position: relative;
-  aspect-ratio: 16 / 9;
+  /* Пропорции кадра выбирает стример (16:9, 4:3, 21:9…). Высоту держим в
+     пределах экрана: вертикальный 9:16 иначе вытянулся бы на три экрана. */
+  aspect-ratio: var(--wx-ar, 16 / 9);
+  width: min(100%, calc(62vh * var(--wx-arn, 1.7778)));
+  margin-inline: auto;
   overflow: hidden;
   border: 1px solid var(--line-2);
   background: #0b0d0e;
@@ -1180,8 +1184,9 @@ footer[hidden] { display: none; }
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
-  width: 96px;
-  aspect-ratio: 16 / 9;
+  width: calc(54px * var(--wx-arn, 1.7778));
+  max-width: 160px;
+  aspect-ratio: var(--wx-ar, 16 / 9);
   margin-top: var(--s2);
   padding: 4px;
   border: 1px solid var(--line);
@@ -1683,3 +1688,8 @@ body.menu-open { overflow: hidden; }
 .sum-row b { color: var(--text); font-weight: 600; }
 .sum-row.good b { color: var(--lime); }
 .sum-row.bad b { color: var(--dim); }
+
+/* Форматов восемь — пусть переносятся, а не вылезают за колонку. */
+.wx-frames { flex-wrap: wrap; }
+.wx-frames button { font-variant-numeric: tabular-nums; }
+#wx-drag { cursor: grab; }

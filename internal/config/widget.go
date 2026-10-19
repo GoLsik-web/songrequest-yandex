@@ -24,6 +24,12 @@ type Widget struct {
 
 	Scale float64 `json:"scale"` // 0.5…4
 
+	// Frame — формат кадра стрима: 16:9, 4:3, 21:9 и так далее. Сам виджет
+	// растягивается на весь источник OBS, поэтому формат нужен панели: она
+	// рисует образец в тех же пропорциях и подсказывает, какой ширины и
+	// высоты сделать источник «Браузер», чтобы он совпал с кадром.
+	Frame string `json:"frame"`
+
 	// Gap — старый общий отступ от края. Остаётся ради настроек, написанных
 	// прошлыми сборками: из него берутся GapX и GapY, если те не заданы.
 	Gap int `json:"gap"`
@@ -94,12 +100,20 @@ type Widget struct {
 	Tweaks map[string]string `json:"tweaks,omitempty"`
 }
 
+// frames — форматы кадра, которые знает панель. Список тот же, что в
+// app.js (WX_FRAMES): там к ним приписаны размеры источника.
+var frames = map[string]bool{
+	"16:9": true, "16:10": true, "4:3": true, "5:4": true,
+	"21:9": true, "32:9": true, "9:16": true, "1:1": true,
+}
+
 // DefaultWidget — то, с чего начинают все.
 func DefaultWidget() Widget {
 	return Widget{
 		Preset:        "nefor/yellow",
 		Position:      "left-bottom",
 		Scale:         1,
+		Frame:         "16:9",
 		Gap:           40,
 		GapX:          40,
 		GapY:          40,
@@ -149,6 +163,9 @@ func (w *Widget) Normalize() {
 	}
 	if strings.TrimSpace(w.Preset) == "" {
 		w.Preset = "nefor/yellow"
+	}
+	if !frames[w.Frame] {
+		w.Frame = "16:9"
 	}
 	if !positions[w.Position] {
 		w.Position = "left-bottom"

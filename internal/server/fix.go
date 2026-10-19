@@ -92,7 +92,7 @@ func asFound(c match.Candidate) foundTrack {
 func (s *Server) handleQueueFix(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		http.Error(w, "непонятный номер заказа", http.StatusBadRequest)
+		failText(w, http.StatusBadRequest, "Непонятный номер заказа.")
 		return
 	}
 
@@ -101,13 +101,13 @@ func (s *Server) handleQueueFix(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&body); err != nil ||
 		strings.TrimSpace(body.TrackID) == "" {
-		http.Error(w, "не понял, какой трек ставить", http.StatusBadRequest)
+		failText(w, http.StatusBadRequest, "Не понял, какой трек ставить.")
 		return
 	}
 
 	item, err := s.queue.Get(id)
 	if err != nil {
-		http.Error(w, "этого заказа в очереди уже нет", http.StatusNotFound)
+		failText(w, http.StatusNotFound, "Этого заказа в очереди уже нет.")
 		return
 	}
 
@@ -132,7 +132,7 @@ func (s *Server) handleQueueFix(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		s.log.Error("не смог подменить трек в очереди", "заказ", id, "ошибка", err)
-		http.Error(w, "не получилось заменить трек", http.StatusInternalServerError)
+		failText(w, http.StatusInternalServerError, "Не получилось заменить трек.")
 		return
 	}
 

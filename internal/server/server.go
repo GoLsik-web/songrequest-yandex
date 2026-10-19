@@ -385,7 +385,7 @@ func (s *Server) Serve(ctx context.Context) error {
 func (s *Server) guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !localHost(r.Host) {
-			http.Error(w, "запрос не с этого компьютера", http.StatusForbidden)
+			failText(w, http.StatusForbidden, "Запрос не с этого компьютера.")
 			return
 		}
 
@@ -408,7 +408,7 @@ func (s *Server) guard(next http.Handler) http.Handler {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			if origin := r.Header.Get("Origin"); origin != "" && !localOrigin(origin) {
 				s.log.Warn("запрос с чужого сайта отклонён", "origin", origin, "путь", r.URL.Path)
-				http.Error(w, "запрос с чужого сайта", http.StatusForbidden)
+				failText(w, http.StatusForbidden, "Запрос с чужого сайта.")
 				return
 			}
 		}
@@ -471,7 +471,7 @@ func (s *Server) OnOpenAuth(f func(url string, onToken func(string)) error) { s.
 func (s *Server) handleShowWindow(w http.ResponseWriter, r *http.Request) {
 	show := s.showWindow.Load()
 	if show == nil {
-		http.Error(w, "окна нет, панель открыта в браузере", http.StatusServiceUnavailable)
+		failText(w, http.StatusServiceUnavailable, "Окна нет, панель открыта в браузере.")
 		return
 	}
 	(*show)()
@@ -496,7 +496,7 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 	current := s.cfg.Get()
 	incoming := current
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&incoming); err != nil {
-		http.Error(w, "не разобрал настройки", http.StatusBadRequest)
+		failText(w, http.StatusBadRequest, "Не разобрал настройки.")
 		return
 	}
 
@@ -525,7 +525,7 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 
 	if err := s.cfg.Update(func(c *config.Config) { *c = incoming }); err != nil {
 		s.log.Error("сохранение настроек", "ошибка", err)
-		http.Error(w, "не смог сохранить настройки", http.StatusInternalServerError)
+		failText(w, http.StatusInternalServerError, "Не смог сохранить настройки.")
 		return
 	}
 	// Обе карточки: сохранили Client ID Twitch — лампочка Twitch обязана

@@ -565,9 +565,10 @@ func (s *Server) ensurePlaylistReward(ctx context.Context) string {
 		t.PlaylistCost = reward.Cost
 	})
 	if changed {
+		n := s.cfg.Get().PlaylistTrackCount()
 		s.state.Notify("info", "Награда «"+reward.Title+"» готова, стоит "+
 			strconv.Itoa(reward.Cost)+" баллов за "+
-			strconv.Itoa(s.cfg.Get().PlaylistTrackCount())+" треков")
+			strconv.Itoa(n)+" "+plural(n, "трек", "трека", "треков"))
 	}
 	return reward.ID
 }

@@ -357,7 +357,7 @@
           входа. Пропустил вход — пропусти и этот шаг, потом настроишь в панели.</p>`,
       fill: (cfg) => loadPlaylists(cfg),
       check: (s, cfg) => cfg && cfg.fallback_playlist_id
-        ? { ok: true, text: "Выбран: " + (cfg.fallback_playlist_name || cfg.fallback_playlist_id) }
+        ? { ok: true, text: (cfg.fallback_playlist_name ? "Выбран: " + cfg.fallback_playlist_name : "Плейлист выбран") }
         : { ok: false, text: "Плейлист не выбран — можно и потом." },
     },
 
@@ -691,7 +691,12 @@
     try {
       await run();
     } catch (e) {
-      say(String((e && e.message) || e), true);
+      // fetch при упавшем приложении бросает «Failed to fetch» — стримеру
+      // это ничего не говорит.
+      const msg = String((e && e.message) || e);
+      say(e instanceof TypeError || /fetch|network/i.test(msg)
+        ? "Приложение не отвечает. Проверь, что оно запущено, и попробуй ещё раз."
+        : msg, true);
     } finally {
       btn.classList.remove("busy");
       btn.disabled = false;
@@ -834,7 +839,8 @@
 
   function presetName(preset) {
     const p = window.widgetPreset ? window.widgetPreset(preset) : null;
-    return p ? `${p.family.name} · ${p.variant.name}` : preset;
+    // Неизвестный ключ («nefor/yellow») стримеру ничего не скажет.
+    return p ? `${p.family.name} · ${p.variant.name}` : "свой стиль";
   }
 
   function setupPresets(cfg) {

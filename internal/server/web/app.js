@@ -49,6 +49,26 @@
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
   ));
 
+  // trackLine — «Артист — Название» без висящего тире, когда артиста нет.
+  const trackLine = (artist, title) => [artist, title]
+    .map((x) => String(x ?? "").trim()).filter(Boolean).join(" — ");
+
+  // lenText — длительность для списков: неизвестную не пишем «0:00».
+  const lenText = (ms) => (ms > 0 ? mmss(ms) : "");
+
+  // plainNotes — описание релиза с GitHub приходит в Markdown; звёздочки,
+  // решётки и ссылки в скобках стримеру ни к чему.
+  const plainNotes = (md) => String(md || "")
+    .replace(/\r/g, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/^\s*[-*+]\s+/gm, "• ")
+    .replace(/(\*\*|__|\*|_|`)(.+?)\1/g, "$2")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
   const mmss = (ms) => {
     const t = Math.max(0, Math.round(ms / 1000));
     return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
@@ -141,6 +161,13 @@
   // body — необязательный: почти все ручки панели ничего не принимают, а
   // обходу блокировок надо передать ключ, и в адрес его класть нельзя —
   // адреса попадают в лог целиком.
+  // errLine — отказ приложения одной строкой. Код ставим впереди, только
+  // если он есть: иначе выходило « · текст» или «SP-19 · undefined».
+  function errLine(d, fallback) {
+    const text = (d && d.error) || fallback || "Не получилось";
+    return d && d.code ? `${d.code} · ${text}` : text;
+  }
+
   async function post(path, btn, body) {
     if (btn) btn.disabled = true;
     try {
@@ -150,7 +177,7 @@
             body: JSON.stringify(body) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) {
-        say(d.code ? `${d.code} · ${d.error}` : "Не получилось", true);
+        say(errLine(d), true);
         return null;
       }
       return d;
@@ -640,7 +667,7 @@
 
     // Что изменилось — отдельным текстом под сводкой: в строку сводки это не
     // влезает, а читать его человек будет ровно один раз перед нажатием.
-    const notes = u.available && u.notes ? u.notes.trim() : "";
+    const notes = u.available && u.notes ? plainNotes(u.notes) : "";
     let box = $("upd-notes");
     if (!box) {
       box = document.createElement("div");
@@ -861,14 +888,14 @@
           <span class="grip">${icon("clock")}</span>
           <span class="idx">${String(i + 1).padStart(2, "0")}</span>
           <span class="body">
-            <span class="ttl">${esc(r.artist)} — ${esc(r.title)}</span>
+            <span class="ttl">${esc(trackLine(r.artist, r.title))}</span>
             <span class="sub">
               ${r.provider === "youtube" ? `<span class="tag miss">YouTube</span>` : ""}
               ${esc(r.requester)}
               <span class="tag">заиграет сразу после трека стримера</span>
             </span>
           </span>
-          <span class="len">${mmss(r.duration_ms)}</span>
+          <span class="len">${lenText(r.duration_ms)}</span>
           <span class="deal"></span>
         </li>`;
       }
@@ -876,7 +903,7 @@
         <span class="grip" title="перетащи, чтобы поменять порядок">${icon("grip-vertical")}</span>
         <span class="idx">${String(i + 1).padStart(2, "0")}</span>
         <span class="body">
-          <span class="ttl">${esc(r.artist)} — ${esc(r.title)}</span>
+          <span class="ttl">${esc(trackLine(r.artist, r.title))}</span>
           <span class="sub">
             ${r.source === "donation" ? `<span class="chip money">донат</span>` : ""}
             ${r.uncertain ? `<span class="tag doubt" title="совпадение неточное">неточно</span>` : ""}
@@ -885,7 +912,7 @@
             ${r.raw_request ? `<span class="asked" title="${esc(r.raw_request)}">${esc(r.raw_request)}</span>` : ""}
           </span>
         </span>
-        <span class="len">${mmss(r.duration_ms)}</span>
+        <span class="len">${lenText(r.duration_ms)}</span>
         <span class="deal">
           <button class="icon-btn" data-queue="${r.id}" data-act="fix" title="Не тот трек — выбрать правильный">${icon("search")}</button>
           <button class="icon-btn" data-queue="${r.id}" data-act="top" title="Наверх">${icon("arrow-up")}</button>
@@ -1549,7 +1576,7 @@
       const list = await r.json();
       if (!r.ok) {
         $("playlist-hint").className = "hint warn";
-        $("playlist-hint").textContent = `${list.code} · ${list.error}`;
+        $("playlist-hint").textContent = errLine(list, "Не получилось загрузить плейлисты");
         // Не повторяем без спроса: раньше при отвалившемся сервисе панель
         // молотила этот запрос на каждом состоянии, то есть каждые несколько
         // секунд весь стрим. Но и «навсегда» не годится: стример чинит связь,
@@ -1718,7 +1745,7 @@
 
     fixOrder = item;
     $("fix-asked").textContent = item.raw_request || "—";
-    $("fix-was").textContent = `${item.artist} — ${item.title}`;
+    $("fix-was").textContent = trackLine(item.artist, item.title);
     $("fix-results").innerHTML = "";
     $("fix-note").textContent = "";
     $("fix").hidden = false;
@@ -1751,7 +1778,7 @@
       if (mine !== fixSeq) return;
 
       if (!r.ok) {
-        $("fix-note").textContent = `${data.code} · ${data.error}`;
+        $("fix-note").textContent = errLine(data, "Поиск не сработал");
         return;
       }
       if (!data.length) {
@@ -1770,7 +1797,7 @@
               <span class="pick-title">${esc(t.title)}</span>
               <span class="pick-sub">${esc(t.artist)}${t.album ? " · " + esc(t.album) : ""}</span>
             </span>
-            <span class="pick-len">${mmss(t.duration_ms)}</span>
+            <span class="pick-len">${lenText(t.duration_ms)}</span>
           </button>
         </li>`).join("");
     } catch {
@@ -1788,8 +1815,11 @@
         body: JSON.stringify({ track_id: trackID }),
       });
       if (!r.ok) {
-        const data = await r.json().catch(() => ({}));
-        $("fix-note").textContent = data.error || "Не получилось заменить трек";
+        // Ответ может быть и не JSON: тогда показываем сам текст.
+        const raw = await r.text().catch(() => "");
+        let data = {};
+        try { data = JSON.parse(raw); } catch { data = { error: raw.trim() }; }
+        $("fix-note").textContent = errLine(data, "Не получилось заменить трек");
         btn.disabled = false;
         return;
       }
@@ -1851,7 +1881,7 @@
       $("hist-note").textContent = "";
       $("hist").innerHTML = rows.map((h) => {
         const [word, tone] = outcomeWord[h.outcome] || [h.outcome, ""];
-        const name = h.artist || h.title ? `${esc(h.artist)} — ${esc(h.title)}` : esc(h.raw);
+        const name = h.artist || h.title ? esc(trackLine(h.artist, h.title)) : esc(h.raw);
         return `<li>
           <span class="body">
             <span class="ttl">${name}</span>
@@ -2287,13 +2317,51 @@
 
   // wxRatio — во сколько раз образец меньше настоящего кадра.
   //
-  // Считаем от 1920: это ширина кадра у подавляющего большинства, а точное
-  // разрешение сцены OBS приложению неоткуда узнать. Ошибка здесь не страшна
+  // Считаем от ширины источника для выбранного формата (1920 у 16:9, 1440
+  // у 4:3…): точное разрешение сцены OBS приложению неоткуда узнать. Ошибка здесь не страшна
   // (отступ на стриме окажется чуть другим), а вот отсутствие пересчёта
   // страшно: без него ползунок отступа в образце уезжал бы вчетверо дальше.
   function wxRatio() {
     const box = $("wx-stage").getBoundingClientRect();
-    return box.width > 0 ? box.width / 1920 : 1;
+    return box.width > 0 ? box.width / wxFrame(widget())[0] : 1;
+  }
+
+  // Форматы кадра и размер источника OBS для каждого. Высота у широких
+  // форматов — 1080, как у обычного стрима: плашка в пикселях остаётся той
+  // же, меняется только сколько места вокруг. Список тот же, что в
+  // config/widget.go.
+  const WX_FRAMES = {
+    "16:9":  [1920, 1080],
+    "16:10": [1920, 1200],
+    "4:3":   [1440, 1080],
+    "5:4":   [1350, 1080],
+    "21:9":  [2560, 1080],
+    "32:9":  [3840, 1080],
+    "9:16":  [1080, 1920],
+    "1:1":   [1080, 1080],
+  };
+  const wxFrame = (w) => WX_FRAMES[w.frame] || WX_FRAMES["16:9"];
+
+  // wxDrawFrame подгоняет образец под формат и подсказывает размер
+  // источника. Без этого стример ставил источник 800×600 по умолчанию OBS,
+  // и плашка в кадре стояла не там, где он её поставил в панели.
+  function wxDrawFrame(w) {
+    const [fw, fh] = wxFrame(w);
+    const box = $("widget");
+    box.style.setProperty("--wx-ar", fw + " / " + fh);
+    box.style.setProperty("--wx-arn", (fw / fh).toFixed(4));
+    const frame = WX_FRAMES[w.frame] ? w.frame : "16:9";
+    document.querySelectorAll("#wx-frame-pick button").forEach((b) => {
+      b.classList.toggle("on", b.dataset.frame === frame);
+    });
+    $("wx-frame-hint").innerHTML =
+      `В OBS у источника «Браузер» поставьте ширину <b>${fw}</b> и высоту <b>${fh}</b> ` +
+      `и растяните его на весь кадр. Или просто перетащите кнопку «Перетащить в OBS» ` +
+      `в окно сцены — размер подставится сам.`;
+    // OBS понимает эти параметры у брошенной в сцену ссылки и сразу создаёт
+    // источник нужного размера. Самому виджету они не мешают.
+    $("wx-drag").href = location.origin + "/widget?layer-name=" +
+      encodeURIComponent("Заказ музыки") + "&layer-width=" + fw + "&layer-height=" + fh;
   }
 
   const wxGapX = (w) => (Number.isFinite(w.gap_x) && w.gap_x > 0 ? w.gap_x : (Number.isFinite(w.gap) ? w.gap : 40));
@@ -2326,6 +2394,8 @@
     const family = dressCard(card, w);
 
     card.style.setProperty("--scale", w.scale || 1);
+    // Формат — до расстановки: отступы пересчитываются от ширины кадра.
+    wxDrawFrame(w);
     wxPlace(w, family);
     wxAlign(w);
     $("wx-slot").style.opacity = (Number.isFinite(w.opacity) ? w.opacity : 100) / 100;
@@ -2677,6 +2747,17 @@
   };
   $("wx-reset").onclick = () => saveWidget({ tweaks: null });
 
+  $("wx-frame-pick").onclick = (e) => {
+    const b = e.target.closest("button[data-frame]");
+    if (b) saveWidget({ frame: b.dataset.frame });
+  };
+  // Щелчок по кнопке перетаскивания открыл бы виджет во вкладке — это не то,
+  // что от неё ждут. Её надо тащить мышью.
+  $("wx-drag").onclick = (e) => {
+    e.preventDefault();
+    say("Эту кнопку надо не нажать, а перетащить мышью в окно сцены OBS.");
+  };
+
   live($("wx-scale"), (v) => {
     $("wx-scale-val").textContent = v + "%";
     $("wx-card").style.setProperty("--scale", v / 100);
@@ -2867,11 +2948,11 @@
     // В своей полосе заголовка окна пишем, что играет: панель бывает
     // прокручена, а полоса на виду всегда.
     const tb = $("titlebar-now");
-    if (tb) tb.textContent = s.now ? `${s.now.artist} — ${s.now.title}` : "";
+    if (tb) tb.textContent = s.now ? `${trackLine(s.now.artist, s.now.title)}` : "";
 
     // Заголовок вкладки — тоже часть панели: стример держит её в фоне.
     document.title = s.now
-      ? `${s.now.artist} — ${s.now.title}`
+      ? `${trackLine(s.now.artist, s.now.title)}`
       : s.queue.length > 0
         ? `${s.queue.length} в очереди · Заказ музыки`
         : "Заказ музыки";

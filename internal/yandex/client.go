@@ -364,7 +364,7 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, form
 	case resp.StatusCode == http.StatusNotFound:
 		return errs.New(errs.YandexBadResponse, "Яндекс не нашёл то, что просили.")
 	case resp.StatusCode >= 500:
-		return errs.New(errs.YandexUnreachable, fmt.Sprintf("Яндекс Музыка сейчас не работает (%d).", resp.StatusCode))
+		return errs.Wrap(errs.YandexUnreachable, "Яндекс Музыка сейчас не работает. Попробуй ещё раз чуть позже.", fmt.Errorf("HTTP %d", resp.StatusCode))
 	}
 
 	var env envelope

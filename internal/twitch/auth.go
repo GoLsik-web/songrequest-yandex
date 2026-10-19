@@ -1,6 +1,7 @@
 package twitch
 
 import (
+	"errors"
 	"context"
 	"encoding/json"
 	"io"
@@ -421,7 +422,10 @@ func authErrorReason(status int, code, message string) error {
 			"Twitch не узнал Client ID. Проверь, что он вставлен целиком и без пробелов.")
 	}
 	if status == http.StatusBadRequest && message != "" {
-		return errs.New(errs.TwitchAuthStart, "Twitch не принял вход: "+message)
+		// Текст Twitch — по-английски и для разработчиков: он уходит в лог,
+		// а стримеру — понятная фраза.
+		return errs.Wrap(errs.TwitchAuthStart,
+			"Twitch не принял вход. Нажми «Подключить Twitch» и попробуй ещё раз.", errors.New(message))
 	}
 	return errs.New(errs.TwitchAuthStart,
 		"Не удалось войти в Twitch. Попробуй ещё раз, а если не выйдет — выгрузи лог.")

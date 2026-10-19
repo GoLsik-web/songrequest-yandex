@@ -552,8 +552,9 @@ func parseDevices(out string) []app.AudioDevice {
 		}
 		name := strings.TrimSpace(rest)
 		name = strings.TrimSuffix(strings.TrimPrefix(name, "("), ")")
+		// Без имени показываем номер, а не служебный «wasapi/{…}».
 		if name == "" {
-			name = id
+			name = "Устройство " + strconv.Itoa(len(devices)+1)
 		}
 		devices = append(devices, app.AudioDevice{ID: id, Name: name})
 	}

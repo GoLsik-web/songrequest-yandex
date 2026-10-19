@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -302,13 +301,15 @@ func apiError(statusCode int, data []byte) error {
 		return errs.New(errs.TwitchNoAffiliate,
 			"Twitch не разрешил работать с наградами. Чаще всего это значит, что на канале нет баллов — они бывают только у аффилиатов и партнёров. Заказы за баллы работать не будут, донаты — будут.")
 	case statusCode == http.StatusBadRequest:
-		return errs.New(errs.TwitchBadResponse,
-			fmt.Sprintf("Twitch не принял запрос: %s", firstNonEmpty(e.Message, "без объяснения")))
+		// Объяснение Twitch английское и техническое — оно для лога.
+		return errs.Wrap(errs.TwitchBadResponse,
+			"Twitch не принял запрос. Подробности в логе.",
+			errors.New(firstNonEmpty(e.Message, "без объяснения")))
 	case statusCode == http.StatusNotFound:
 		return errs.New(errs.TwitchBadResponse, "Twitch не нашёл то, что мы просили.")
 	}
 	return errs.New(errs.TwitchBadResponse,
-		fmt.Sprintf("Twitch отказал (%d). Подробности в логе.", statusCode))
+		"Twitch отказал. Подробности в логе.")
 }
 
 // rateLimitWait читает, когда лимит обновится. Twitch присылает время в виде

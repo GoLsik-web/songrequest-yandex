@@ -149,8 +149,8 @@ func (d *DonateX) whoami(ctx context.Context, key string) (string, error) {
 		return "", errs.New(errs.DonationsAuth,
 			"DonateX не принял ключ. Возьми его заново в личном кабинете: Настройки → Api.")
 	case resp.StatusCode != http.StatusOK:
-		return "", errs.New(errs.DonationsUnreachable,
-			fmt.Sprintf("DonateX ответил ошибкой (%d).", resp.StatusCode))
+		return "", errs.Wrap(errs.DonationsUnreachable,
+			"DonateX ответил ошибкой. Попробуй ещё раз чуть позже.", fmt.Errorf("HTTP %d", resp.StatusCode))
 	}
 
 	var out struct {
@@ -183,8 +183,8 @@ func (d *DonateX) negotiate(ctx context.Context, key string) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", errs.New(errs.DonationsUnreachable,
-			fmt.Sprintf("DonateX не дал подключиться к событиям (%d).", resp.StatusCode))
+		return "", errs.Wrap(errs.DonationsUnreachable,
+			"DonateX не дал подключиться к событиям. Попробуй ещё раз чуть позже.", fmt.Errorf("HTTP %d", resp.StatusCode))
 	}
 
 	var out struct {

@@ -259,7 +259,7 @@ func (s *Server) resolvePlaylist(ctx context.Context, r twitch.Redemption) {
 	// Место в списке ожидания не бесконечно.
 	if len(s.pendingPlaylists()) >= playlistKeep {
 		s.rejectRedemption(ctx, r,
-			"слишком много плейлистов ждут решения — попробуй позже, баллы вернул")
+			"слишком много плейлистов ждут решения — попробуй позже")
 		return
 	}
 
@@ -431,7 +431,7 @@ func (s *Server) approvePlaylist(ctx context.Context, id, actor string) (pending
 			"Из этого плейлиста не удалось поставить ни один трек. Баллы вернул.")
 	}
 
-	s.modLog(actor, "одобрил плейлист", p.Title+" ("+strconv.Itoa(added)+" треков от "+p.Requester+")")
+	s.modLog(actor, "одобрил плейлист", p.Title+" ("+strconv.Itoa(added)+" "+plural(added, "трек", "трека", "треков")+" от "+p.Requester+")")
 	s.state.Notify("info", actor+" одобрил плейлист «"+p.Title+"»: "+
 		strconv.Itoa(added)+" "+plural(added, "трек", "трека", "треков")+" в очереди")
 

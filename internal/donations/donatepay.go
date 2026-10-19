@@ -94,7 +94,8 @@ func (d *DonatePay) session(ctx context.Context, onDonation func(Donation)) erro
 
 	conn, _, err := websocket.Dial(ctx, d.wsURL, nil)
 	if err != nil {
-		return fmt.Errorf("не подключился к DonatePay: %w", err)
+		// Английская причина обрыва — в лог, стримеру понятная фраза.
+		return errs.Wrap(errs.DonationsUnreachable, "Не подключился к DonatePay. Проверь интернет — приложение попробует ещё раз само.", err)
 	}
 	defer conn.CloseNow()
 	conn.SetReadLimit(1 << 20)
@@ -146,8 +147,8 @@ func (d *DonatePay) subscribeToken(ctx context.Context, key string) (userID, tok
 			"DonatePay не принял ключ. Проверь, что скопировал его целиком.")
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", "", errs.New(errs.DonationsUnreachable,
-			fmt.Sprintf("DonatePay ответил ошибкой (%d).", resp.StatusCode))
+		return "", "", errs.Wrap(errs.DonationsUnreachable,
+			"DonatePay ответил ошибкой. Попробуй ещё раз чуть позже.", fmt.Errorf("HTTP %d", resp.StatusCode))
 	}
 
 	var out struct {

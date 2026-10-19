@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -11,12 +12,15 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
+	"unicode"
 
 	"songrequest-yandex/internal/app"
 	"songrequest-yandex/internal/config"
 	"songrequest-yandex/internal/desktop"
+	"songrequest-yandex/internal/errs"
 	"songrequest-yandex/internal/logx"
 	"songrequest-yandex/internal/secrets"
 	"songrequest-yandex/internal/server"
@@ -74,7 +78,7 @@ func main() {
 		// окном), поэтому про поломку рассказываем окном с сообщением. В
 		// консоль тоже пишем — на случай запуска из PowerShell при разборе.
 		fmt.Fprintln(os.Stderr, "Ошибка:", err)
-		desktop.ShowError(windowTitle+" — не запустилось", err.Error()+
+		desktop.ShowError(windowTitle+" — не запустилось", humanErr(err)+
 			"\n\nПодробности в логе:\n"+logPathHint())
 		os.Exit(1)
 	}
@@ -200,7 +204,7 @@ func run() error {
 	go func() {
 		if err := srv.Serve(ctx); err != nil {
 			log.Error("панель управления остановилась", "ошибка", err)
-			state.Notify("error", "Панель управления остановилась: "+err.Error())
+			state.Notify("error", "Панель управления остановилась: "+humanErr(err))
 		}
 	}()
 
@@ -427,7 +431,7 @@ func trayMenu(d uiDeps, icon string, onOpen, onQuit func()) desktop.TrayOptions 
 		OnCopy: func(err error) {
 			if err != nil {
 				d.log.Warn("не скопировал адрес виджета", "ошибка", err)
-				d.state.Notify("error", "Не получилось скопировать адрес виджета: "+err.Error())
+				d.state.Notify("error", "Не получилось скопировать адрес виджета. Скопируй его из панели руками.")
 				return
 			}
 			d.log.Info("адрес виджета скопирован из трея")
@@ -506,4 +510,28 @@ func waitForPrevious(log *logx.Logger, port int) {
 		time.Sleep(step)
 	}
 	log.Warn("прежняя копия не закрылась вовремя, запускаюсь как есть")
+}
+
+// humanErr — текст ошибки для окна и панели. Наши ошибки с кодом уже
+// написаны для людей; чужие (английские, из библиотек) — только в лог.
+func humanErr(err error) string {
+	var e *errs.Error
+	if errors.As(err, &e) {
+		code, text := errs.Describe(err)
+		if code != "" {
+			return string(code) + " · " + text
+		}
+		return text
+	}
+	// Свои обёртки вида «не открыл базу: <английская причина>» — показываем
+	// русскую часть до двоеточия, хвост остаётся в логе.
+	head, _, _ := strings.Cut(err.Error(), ": ")
+	for _, r := range head {
+		if unicode.Is(unicode.Cyrillic, r) {
+			rs := []rune(head)
+			rs[0] = unicode.ToUpper(rs[0])
+			return string(rs) + "."
+		}
+	}
+	return "Что-то пошло не так."
 }

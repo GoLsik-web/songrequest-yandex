@@ -94,8 +94,8 @@ func Latest(ctx context.Context, repo string) (Release, error) {
 			"GitHub не нашёл такой репозиторий или в нём ещё нет ни одного выпуска. "+
 				"Проверь имя в настройках и что выпуск не помечен черновиком.")
 	case resp.StatusCode != http.StatusOK:
-		return Release{}, errs.New(errs.UpdateCheck,
-			fmt.Sprintf("GitHub ответил ошибкой (%d).", resp.StatusCode))
+		return Release{}, errs.Wrap(errs.UpdateCheck,
+			"GitHub ответил ошибкой. Попробуй ещё раз чуть позже.", fmt.Errorf("HTTP %d", resp.StatusCode))
 	}
 
 	var out struct {
@@ -171,8 +171,8 @@ func Download(ctx context.Context, rel Release, dir string) (string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", errs.New(errs.UpdateDownload,
-			fmt.Sprintf("GitHub не отдал файл обновления (%d).", resp.StatusCode))
+		return "", errs.Wrap(errs.UpdateDownload,
+			"GitHub не отдал файл обновления. Попробуй ещё раз чуть позже.", fmt.Errorf("HTTP %d", resp.StatusCode))
 	}
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxSize+1))

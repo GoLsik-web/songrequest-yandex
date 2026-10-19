@@ -85,7 +85,7 @@ func (c *Client) Say(ctx context.Context, text string) error {
 			}
 		}
 		c.log.Warn("Twitch не пропустил сообщение в чат", "текст", text, "причина", why)
-		return errs.New(errs.TwitchChat, "Twitch не пропустил сообщение в чат: "+why)
+		return errs.New(errs.TwitchChat, "Twitch не пропустил сообщение в чат: "+dropReasonText(out.Data[0].DropReason))
 	}
 	return nil
 }
@@ -169,4 +169,37 @@ func (e *EventSub) handleChat(payload []byte) {
 		// стоять не должен.
 		go e.OnChat(msg)
 	}
+}
+
+// dropReasonText — причина, по которой Twitch не пропустил сообщение, по-русски.
+// Английский код и текст Twitch уходят в лог отдельно.
+func dropReasonText(r *struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}) string {
+	if r == nil {
+		return "причину Twitch не сказал."
+	}
+	c := strings.ToLower(r.Code)
+	switch {
+	case strings.Contains(c, "automod"):
+		return "сообщение задержал AutoMod."
+	case strings.Contains(c, "follower"):
+		return "в чате режим «только для фолловеров»."
+	case strings.Contains(c, "slow"):
+		return "в чате включён медленный режим."
+	case strings.Contains(c, "emote"):
+		return "в чате режим «только смайлики»."
+	case strings.Contains(c, "sub"):
+		return "в чате режим «только для подписчиков»."
+	case strings.Contains(c, "verified") || strings.Contains(c, "phone") || strings.Contains(c, "email"):
+		return "у аккаунта бота не подтверждена почта или телефон."
+	case strings.Contains(c, "ban") || strings.Contains(c, "timeout"):
+		return "бот забанен или в таймауте на канале."
+	case strings.Contains(c, "duplicate"):
+		return "такое же сообщение только что уже было."
+	case strings.Contains(c, "rate") || strings.Contains(c, "limit"):
+		return "бот пишет слишком часто."
+	}
+	return "подробности в логе."
 }

@@ -272,6 +272,7 @@ func isDuplicateTitle(err error) bool {
 	if !errs.As(err, &e) {
 		return false
 	}
-	return contains(e.Message, "CREATE_CUSTOM_REWARD_DUPLICATE_REWARD") ||
-		contains(e.Message, "DUPLICATE_REWARD")
+	// Объяснение Twitch лежит в причине (для лога), а не в тексте для
+	// стримера, поэтому смотрим ошибку целиком.
+	return contains(err.Error(), "DUPLICATE_REWARD")
 }
