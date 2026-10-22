@@ -2,6 +2,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -253,6 +254,12 @@ func Load(dir string) (*File, error) {
 		return nil, fmt.Errorf("чтение настроек: %w", err)
 	}
 
+	// Метка BOM в начале: её ставят блокнот и PowerShell. Для разбора JSON
+	// это мусор, и без этой строки файл, просто открытый и сохранённый
+	// руками, считался битым — все настройки сбрасывались.
+	data = bytes.TrimPrefix(data, []byte{0xEF, 0xBB, 0xBF})
+	data, repaired := repairText(data)
+
 	if err := json.Unmarshal(data, &f.cfg); err != nil {
 		// Битый файл не должен превращать приложение в неоткрывающееся.
 		//
@@ -277,6 +284,13 @@ func Load(dir string) (*File, error) {
 	// рабочий вид сразу, а не когда виджет уже висит на стриме.
 	f.cfg.Widget.Normalize()
 	f.cfg.NormalizeMatching()
+	if repaired {
+		// Сразу на диск: иначе испорченное название уехало бы на Twitch
+		// при первом же сохранении из старой копии файла.
+		if err := f.Save(); err != nil {
+			return nil, err
+		}
+	}
 	return f, nil
 }
 
