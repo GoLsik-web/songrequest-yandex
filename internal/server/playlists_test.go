@@ -157,3 +157,32 @@ func TestPlaylistSkipsTooLongTracks(t *testing.T) {
 		t.Fatal("часовой трек прошёл в очередь")
 	}
 }
+
+// Программу закрыли посреди одобрения: два трека из трёх уже в очереди.
+// Повторное «одобрить» ставит только оставшийся, а не все три заново.
+func TestPlaylistApproveResumesAfterRestart(t *testing.T) {
+	srv := playlistServer(t)
+	tr := func(id string) pendingTrack {
+		return pendingTrack{Artist: "а", Title: id, DurationMs: 180000,
+			Provider: "yandex", URI: "yandex:" + id, TrackID: id}
+	}
+	srv.addPending(samplePlaylist("недоодобрен", tr("1"), tr("2"), tr("3")))
+	id := srv.pendingPlaylists()[0].ID
+	srv.notePlaylistProgress(id, 2, 2)
+
+	srv.mu.Lock()
+	srv.playlists = nil
+	srv.mu.Unlock()
+	srv.loadPlaylists()
+
+	_, added, err := srv.approvePlaylist(context.Background(), id, "стример")
+	if err != nil {
+		t.Fatalf("одобрение: %v", err)
+	}
+	if added != 3 {
+		t.Fatalf("всего поставлено %d, ждали 3", added)
+	}
+	if n, _ := srv.queue.Len(); n != 1 {
+		t.Fatalf("в очереди %d, ждали только оставшийся трек", n)
+	}
+}

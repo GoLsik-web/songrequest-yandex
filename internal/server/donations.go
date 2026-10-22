@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"songrequest-yandex/internal/donations"
@@ -27,11 +28,10 @@ func (s *Server) setupDonations() {
 			s.state.SetConnOK(name, detail)
 			return
 		}
-		if detail == "Не настроено" {
-			s.state.SetConnIdle(name, detail)
-			return
-		}
 		s.state.SetConnFail(name, detail)
+	}
+	s.donations.OnIdle = func(name string) {
+		s.state.SetConnIdle(name, "Не настроено")
 	}
 
 	keys := secrets.New()
@@ -63,18 +63,24 @@ func (s *Server) onDonation(d donations.Donation) {
 	ctx, cancel := context.WithTimeout(s.baseContext(), resolveTimeout)
 	defer cancel()
 
-	money := fmt.Sprintf("%.0f %s", d.Amount, d.Currency)
+	money := formatMoney(d.Amount, d.Currency)
 
 	if cfg.DonationMin > 0 && d.Amount < cfg.DonationMin {
 		s.log.Info("донат меньше порога заказа",
 			"от", d.Username, "сумма", d.Amount, "порог", cfg.DonationMin)
 		s.state.Notify("info", "Донат "+money+" от "+d.Username+" — меньше порога заказа")
+		// Зритель заплатил и молча ничего не получил — выглядит как поломка.
+		// Одной фразой объясняем, сколько нужно. Порог сравнивается с той же
+		// суммой, что пришла в донате, поэтому и подпись валюты та же.
+		s.say(ctx, "@"+d.Username+", спасибо за донат! Трек заказывается от "+
+			formatMoney(cfg.DonationMin, d.Currency)+".")
 		return
 	}
 
 	text := strings.TrimSpace(d.Message)
 	if text == "" {
 		s.state.Notify("info", "Донат "+money+" от "+d.Username+" — без сообщения, заказа нет")
+		s.say(ctx, "@"+d.Username+", спасибо за донат! Чтобы заказать трек, напиши его в сообщении к донату.")
 		return
 	}
 
@@ -82,9 +88,9 @@ func (s *Server) onDonation(d donations.Donation) {
 
 	// Ссылка важнее текста — ровно так же, как в заказе за баллы.
 	//
-	// Раньше этого здесь не было вовсе: сообщение доната уходило в Spotify
-	// целиком, вместе с адресом. Зритель донатил пятьсот рублей со ссылкой
-	// на трек и получал «такого трека в Spotify не нашлось», а деньги при
+	// Раньше этого здесь не было вовсе: сообщение доната уходило в поиск
+	// Яндекс Музыки целиком, вместе с адресом. Зритель донатил пятьсот рублей
+	// со ссылкой на трек и получал «такого трека не нашлось», а деньги при
 	// этом не возвращаются. Заказ за те же баллы с той же ссылкой работал.
 	link, hasLink := s.fromLink(ctx, text)
 	if hasLink && link.Track != nil {
@@ -258,3 +264,15 @@ func (s *Server) restartDonationAlerts() { s.donations.Restart("DonationAlerts")
 
 // stopDonationAlerts гасит подключение, если оно было.
 func (s *Server) stopDonationAlerts() { s.donations.Stop("DonationAlerts") }
+
+// formatMoney пишет сумму без лишних нулей: «150», «4.99», а не «5 USD»
+// вместо 4.99. Валюту без кода подписываем «в валюте счёта»: так приходит
+// сумма DonationAlerts в валюте основного счёта стримера.
+func formatMoney(amount float64, currency string) string {
+	n := strconv.FormatFloat(amount, 'f', 2, 64)
+	n = strings.TrimSuffix(strings.TrimRight(n, "0"), ".")
+	if currency = strings.TrimSpace(currency); currency == "" {
+		return n + " в валюте счёта"
+	}
+	return n + " " + currency
+}

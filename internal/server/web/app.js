@@ -45,13 +45,13 @@
   // атрибута, но не запрещает схему javascript:.
   const safeURL = (u) => (/^https?:\/\//i.test(String(u || "")) ? String(u) : "#");
 
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
+  const esc = (s) => String((s == null ? "" : s)).replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
   ));
 
   // trackLine — «Артист — Название» без висящего тире, когда артиста нет.
   const trackLine = (artist, title) => [artist, title]
-    .map((x) => String(x ?? "").trim()).filter(Boolean).join(" — ");
+    .map((x) => String((x == null ? "" : x)).trim()).filter(Boolean).join(" — ");
 
   // lenText — длительность для списков: неизвестную не пишем «0:00».
   const lenText = (ms) => (ms > 0 ? mmss(ms) : "");
@@ -162,7 +162,7 @@
   // обходу блокировок надо передать ключ, и в адрес его класть нельзя —
   // адреса попадают в лог целиком.
   // errLine — отказ приложения одной строкой. Код ставим впереди, только
-  // если он есть: иначе выходило « · текст» или «SP-19 · undefined».
+  // если он есть: иначе выходило « · текст» или «YM-03 · undefined».
   function errLine(d, fallback) {
     const text = (d && d.error) || fallback || "Не получилось";
     return d && d.code ? `${d.code} · ${text}` : text;
@@ -341,7 +341,10 @@
     // Громкости здесь нарочно нет: ползунок ведёт себя сам, а перерисовка
     // карточки на каждое его движение отбирала бы его прямо из-под руки.
     return [now.title, now.artist, now.requester, now.source,
-            now.provider, now.via, now.duration_ms, now.uncertain, now.paused];
+            now.provider, now.via, now.duration_ms, now.uncertain, now.paused,
+            // Обложка приезжает позже названия (за ней идёт отдельный запрос),
+            // и без неё в ключе карточка так и оставалась с ноткой.
+            now.cover_url];
   }
 
   // Последний игравший трек.
@@ -441,8 +444,8 @@
           ${own || !yt ? "" : `
           <span class="pvol">
             <button class="pbtn" data-play="mute" title="Заглушить">${icon("volume-2")}</button>
-            <input type="range" id="vol" min="0" max="100" step="1" value="${now.volume ?? 100}">
-            <b id="vol-val">${now.volume ?? 100}%</b>
+            <input type="range" id="vol" min="0" max="100" step="1" value="${(now.volume == null ? 100 : now.volume)}">
+            <b id="vol-val">${(now.volume == null ? 100 : now.volume)}%</b>
           </span>`}
         </div>
         <div class="acts">${own ? `
@@ -881,7 +884,7 @@
     const mode = config.youtube_mode || "ask";
     document.querySelectorAll('input[name="yt-mode"]').forEach((r) => { r.checked = r.value === mode; });
     $("yt-ask-opts").hidden = mode !== "ask";
-    $("yt-ask-seconds").value = String(config.youtube_ask_seconds ?? 60);
+    $("yt-ask-seconds").value = String((config.youtube_ask_seconds == null ? 60 : config.youtube_ask_seconds));
     $("yt-ask-else").value = config.youtube_ask_else || "skip";
   }
 
@@ -1202,6 +1205,19 @@
   };
 
   // ── Twitch ─────────────────────────────────────────────────────────
+
+  // renderPlusWarn — полоса на всю ширину, пока на аккаунте нет Плюса. В
+  // карточке подключения это легко не заметить, а без Плюса Яндекс отдаёт
+  // вместо трека 30-секундный отрывок — на стриме это выглядит как поломка.
+  function renderPlusWarn(y) {
+    const box = $("plus-warn");
+    if (!box) return;
+    if (!y || !y.connected || y.plus !== "no") { box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    box.innerHTML = `<b>На аккаунте Яндекса${y.account ? " «" + esc(y.account) + "»" : ""} нет Плюса.</b>
+      Заказы будут играть только 30-секундными отрывками. Подключи Яндекс Плюс
+      или войди в аккаунт, где он есть.`;
+  }
 
   let bannerTimer = null;
 
@@ -1525,21 +1541,21 @@
       $("dp-key").value = config.donatepay_key || "";
       $("dx-key").value = config.donatex_key || "";
       fillOBSFields();
-      $("donation-min").value = config.donation_min ?? "";
+      $("donation-min").value = (config.donation_min == null ? "" : config.donation_min);
       $("command-prefix").value = config.command_prefix || "!";
       $("yt-browser").value = config.youtube_browser || "";
       $("yt-device").value = config.audio_device || "";
-    $("yt-volume").value = config.youtube_volume ?? 100;
+    $("yt-volume").value = (config.youtube_volume == null ? 100 : config.youtube_volume);
     $("yt-volume-val").textContent = ($("yt-volume").value) + "%";
       fillYouTubeMode();
 
       $("reward-title").value = config.reward_title || "";
-      $("reward-cost").value = config.reward_cost ?? "";
+      $("reward-cost").value = (config.reward_cost == null ? "" : config.reward_cost);
       $("auto-reward").checked = !!config.auto_create_reward;
       fillPlaylistReward();
       // Внутри секунды, но человеку понятнее в минутах.
       $("max-minutes").value = Math.round((config.max_track_seconds || 0) / 60) || "";
-      $("max-per-user").value = config.max_per_user ?? "";
+      $("max-per-user").value = (config.max_per_user == null ? "" : config.max_per_user);
       $("donation-priority").checked = !!config.donation_priority;
       $("wait-current").checked = !!config.wait_for_current;
       $("reject-words").value = (config.reject_keywords || []).join(NL);
@@ -1586,16 +1602,11 @@
     field._savedTimer = setTimeout(() => field.classList.remove("saved"), 1800);
   }
 
-  // query нужен одному-единственному полю — адресу прокси. Пустое поле в
-  // обычном сохранении означает «я про него ничего не знаю» (вкладка могла
-  // быть открыта до того, как приложение нашло прокси само), и сервер такое
-  // пустое значение не применяет. Чтобы прокси действительно убрать, панель
-  // обязана сказать об этом прямо.
-  async function saveConfig(patch, query = "") {
+  async function saveConfig(patch) {
     try {
       const current = await (await fetch("/api/config")).json();
       Object.assign(current, patch);
-      const r = await fetch("/api/config" + query, {
+      const r = await fetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(current),
@@ -2048,7 +2059,7 @@
 
   $("save-ym-token").onclick = async () => {
     const token = $("ym-token").value.trim();
-    if (!token) { say("Поле пустое: вставь адрес из браузера после входа или сам токен.", true); return; }
+    if (!token) { say("Поле пустое: вставь адрес из строки браузера после входа — в нём есть access_token=.", true); return; }
     const d = await post("/api/yandex/token", $("save-ym-token"), { token });
     if (d) {
       $("ym-token").value = "";
@@ -2078,7 +2089,7 @@
       say("Сумма должна быть числом", true);
       // Возвращаем то, что сохранено: иначе на экране остаётся мусор, а
       // человек уходит уверенным, что порог изменён.
-      e.target.value = config.donation_min ?? "";
+      e.target.value = (config.donation_min == null ? "" : config.donation_min);
       return;
     }
     if (await saveConfig({ donation_min: value })) markSaved(e.target);
@@ -2163,7 +2174,7 @@
     if (config.playlist_cost > 0) return config.playlist_cost;
     const track = config.reward_cost || 0;
     const count = playlistCount();
-    const off = Math.min(90, Math.max(0, config.playlist_discount ?? 20));
+    const off = Math.min(90, Math.max(0, (config.playlist_discount == null ? 20 : config.playlist_discount)));
     return Math.max(track, Math.floor(track * count * (100 - off) / 100)) || 1;
   }
 
@@ -2178,7 +2189,7 @@
 
     $("pl-title").value = config.playlist_reward_title || "";
     $("pl-max").value = playlistCount();
-    const off = config.playlist_discount ?? 20;
+    const off = (config.playlist_discount == null ? 20 : config.playlist_discount);
     $("pl-off").value = off;
     $("pl-off-val").textContent = off + "%";
 
@@ -2287,93 +2298,115 @@
   // означала бы «скопируй новый адрес и вставь в OBS заново». Адрес один
   // и навсегда, а вид меняется на лету — и в кадре, и здесь в образце.
   //
-  // Образец рисуется тем же widget.css, что и настоящий виджет. Отдельная
-  // «похожая» вёрстка означала бы, что панель показывает одно, а стрим
-  // другое, — и разошлись бы они в первый же день.
+  // Образец — это сам виджет во фрейме, а не похожая вёрстка. Прошлая
+  // панель рисовала плашку у себя и масштабировала её своей переменной, на
+  // которую умножалась только часть размеров. На 200% текст рос, а обложка
+  // и отступы — нет, плашка разваливалась, и человек видел в панели одно,
+  // а в OBS другое. Теперь фрейм размером с настоящий кадр (1920×1080 и так
+  // далее) просто уменьшен целиком: каждый пиксель на своём месте.
 
+  // Образцы треков. Обложки рисуются на месте — настоящих картинок у
+  // панели нет, а без обложки не проверить ни цвета из обложки, ни
+  // свечение, ни обложку фоном. Цвета у всех четырёх разные нарочно: так
+  // видно, как плашка перекрашивается от трека к треку.
   const WX_TRACKS = [
-    ["Bohemian Rhapsody", "Queen", "zritel"],
-    ["Группа крови", "Кино", "mikhail"],
-    ["Everything In Its Right Place", "Radiohead", "nastya_k"],
-    ["Плот", "Юрий Лоза", "dobryak2000"],
+    { title: "Bohemian Rhapsody", artist: "Queen", by: "зритель", len: 354000, at: 149000,
+      paint: ["#ff6a3d", "#b3125b", "#2a0a3a"], art: "sun" },
+    { title: "Группа крови", artist: "Кино", by: "mikhail", len: 286000, at: 61000,
+      paint: ["#e8352f", "#5a0b0b", "#0d0606"], art: "stripes" },
+    { title: "Everything In Its Right Place", artist: "Radiohead", by: "nastya_k", len: 251000, at: 190000,
+      paint: ["#3ad0ff", "#1f47c9", "#081232"], art: "rings" },
+    { title: "Плот", artist: "Юрий Лоза", by: "dobryak2000", len: 232000, at: 35000,
+      paint: ["#d6f04a", "#2f9e6e", "#0b2a20"], art: "waves" },
   ];
   let wxTrack = 0;
   // Каким показать образец: заказом или своей музыкой. Выбирать набор надо,
   // видя оба случая — строка под артистом у них разная.
+  // «Сейчас играет» — образец берёт настоящий трек: свою обложку и
+  // название проверить на живом примере нагляднее, чем на выдуманном.
+  // Выбор помним между запусками — кто включил живой трек, хочет его и дальше.
   let wxSource = "order";
-  let wxTimer = null;
-  let wxSwapTimer = null;
+  try { wxSource = localStorage.getItem("wx-source") || "live"; } catch { wxSource = "live"; }
+  // Образец на паузе — по кнопке «Пауза» под кадром.
+  let wxPaused = false;
+  let wxTab = "style";
   let galleryBuilt = false;
+  // Временная правка поверх сохранённого: пока тянут ползунок, таскают
+  // плашку или примеряют стиль наведением. На диск она не пишется.
+  let wxLive = null;
+  let wxApi = null;
+  const wxCovers = {};
 
   function widget() {
     return (config && config.widget) || {};
   }
+  const wxView = () => Object.assign({}, widget(), wxLive || {});
 
-  // Одевает карточку по настройкам. Используется и образцом в кадре, и
-  // каждой плиткой галереи — поэтому набор принимается отдельным доводом.
-  function dressCard(card, w, preset) {
-    const { family, variant } = widgetPreset(preset || w.preset);
-    card.dataset.family = family.id;
-    card.dataset.variant = variant.id;
-    card.dataset.art = w.show_art === false ? "off" : "on";
-    card.dataset.source = wxSource;
-    card.dataset.bar = w.show_bar === false ? "off" : "on";
-    card.dataset.motion = w.motion === false ? "off" : "on";
-    return family;
-  }
-
-  // wxPlace ставит образец ровно туда же, куда виджет ставит плашку в кадре.
-  //
-  // Тот же расчёт, что в widget.html: девять точек привязки, раздельные
-  // отступы, обёртка держит место. Держать это двумя разными расчётами
-  // значило бы однажды показать в панели одно, а в OBS другое — и человек
-  // узнал бы об этом на стриме.
-  function wxPlace(w, family) {
-    const slot = $("wx-slot");
-    const card = $("wx-card");
-    const pos = w.position || "left-bottom";
-    const parts = pos.split("-");
-    const h = parts[0] || "left";
-    const v = parts[1] || "bottom";
-    const ticker = family.id === "ticker";
-
-    slot.dataset.family = family.id;
-    slot.dataset.h = ticker ? "wide" : h;
-    slot.dataset.v = v;
-    slot.style.left = slot.style.right = slot.style.top = slot.style.bottom = "";
-
-    if (ticker) {
-      slot.style.left = "0px";
-      slot.style.right = "0px";
-      slot.style[v === "top" ? "top" : "bottom"] = "0px";
-      card.dataset.pos = v === "top" ? "left-top" : "left-bottom";
-      return;
+  // wxCover рисует обложку образца: градиент и простая фигура. Абстрактная
+  // картинка, а не чужая обложка, — но с настоящими цветами, по которым
+  // работает всё, что зависит от обложки.
+  function wxCover(i) {
+    if (wxCovers[i]) return wxCovers[i];
+    const t = WX_TRACKS[i];
+    const c = document.createElement("canvas");
+    c.width = c.height = 240;
+    const g = c.getContext("2d");
+    const grad = g.createLinearGradient(0, 0, 240, 240);
+    grad.addColorStop(0, t.paint[0]);
+    grad.addColorStop(.55, t.paint[1]);
+    grad.addColorStop(1, t.paint[2]);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 240, 240);
+    g.globalAlpha = .9;
+    if (t.art === "sun") {
+      g.fillStyle = "#ffd36e";
+      g.beginPath(); g.arc(150, 96, 52, 0, Math.PI * 2); g.fill();
+      g.fillStyle = t.paint[2];
+      for (let y = 112; y < 160; y += 9) g.fillRect(90, y, 130, 4);
+    } else if (t.art === "stripes") {
+      g.fillStyle = "#f4efe6";
+      for (let x = -240; x < 240; x += 34) {
+        g.beginPath(); g.moveTo(x, 240); g.lineTo(x + 240, 0); g.lineTo(x + 252, 0); g.lineTo(x + 12, 240); g.fill();
+      }
+      g.fillStyle = "#0d0606";
+      g.beginPath(); g.arc(120, 120, 44, 0, Math.PI * 2); g.fill();
+    } else if (t.art === "rings") {
+      g.strokeStyle = "#bff3ff";
+      for (let r = 18; r < 170; r += 16) {
+        g.lineWidth = r % 32 ? 2 : 5;
+        g.beginPath(); g.arc(80, 170, r, 0, Math.PI * 2); g.stroke();
+      }
+    } else {
+      g.strokeStyle = "#f6ffd0";
+      g.lineWidth = 6;
+      for (let y = 70; y < 230; y += 26) {
+        g.beginPath();
+        for (let x = 0; x <= 240; x += 8) g.lineTo(x, y + Math.sin((x + y) / 22) * 10);
+        g.stroke();
+      }
     }
-
-    // Отступы в образце уменьшены во столько же раз, во сколько кадр меньше
-    // настоящего. Иначе отступ в 300 пикселей на образце шириной 600 увёл бы
-    // плашку за середину, а в кадре 1920 он всего лишь отодвинул бы её от
-    // края — и человек настроил бы не то, что увидел.
-    const k = wxRatio();
-    if (h === "center") slot.style.left = "50%";
-    else slot.style[h] = Math.round(wxGapX(w) * k) + "px";
-
-    if (v === "middle") slot.style.top = "50%";
-    else slot.style[v] = Math.round(wxGapY(w) * k) + "px";
-
-    card.dataset.pos = (h === "center" ? "left" : h) + "-" + (v === "middle" ? "bottom" : v);
+    wxCovers[i] = c.toDataURL("image/jpeg", .9);
+    // Пиксельная копия — для плиток «Пикселя»; в кадре её делает сам виджет.
+    const p = document.createElement("canvas");
+    p.width = p.height = 20;
+    p.getContext("2d").drawImage(c, 0, 0, 20, 20);
+    wxCovers["px" + i] = p.toDataURL("image/png");
+    return wxCovers[i];
   }
 
-  // wxRatio — во сколько раз образец меньше настоящего кадра.
-  //
-  // Считаем от ширины источника для выбранного формата (1920 у 16:9, 1440
-  // у 4:3…): точное разрешение сцены OBS приложению неоткуда узнать. Ошибка здесь не страшна
-  // (отступ на стриме окажется чуть другим), а вот отсутствие пересчёта
-  // страшно: без него ползунок отступа в образце уезжал бы вчетверо дальше.
-  function wxRatio() {
-    const box = $("wx-stage").getBoundingClientRect();
-    return box.width > 0 ? box.width / wxFrame(widget())[0] : 1;
+  function wxNow() {
+    const live = wxSource === "live" && lastState && lastState.now;
+    if (live) return Object.assign({}, lastState.now);
+    const t = WX_TRACKS[wxTrack];
+    return {
+      title: t.title, artist: t.artist, requester: t.by,
+      source: wxSource === "own" ? "own" : "order", provider: "yandex",
+      cover_url: wxCover(wxTrack), duration_ms: t.len, position_ms: t.at,
+      paused: wxPaused,
+    };
   }
+
+  // ── кадр ───────────────────────────────────────────────────────────
 
   // Форматы кадра и размер источника OBS для каждого. Высота у широких
   // форматов — 1080, как у обычного стрима: плашка в пикселях остаётся той
@@ -2391,229 +2424,358 @@
   };
   const wxFrame = (w) => WX_FRAMES[w.frame] || WX_FRAMES["16:9"];
 
-  // wxDrawFrame подгоняет образец под формат и подсказывает размер
-  // источника. Без этого стример ставил источник 800×600 по умолчанию OBS,
-  // и плашка в кадре стояла не там, где он её поставил в панели.
-  function wxDrawFrame(w) {
-    const [fw, fh] = wxFrame(w);
-    const box = $("widget");
-    box.style.setProperty("--wx-ar", fw + " / " + fh);
-    box.style.setProperty("--wx-arn", (fw / fh).toFixed(4));
-    const frame = WX_FRAMES[w.frame] ? w.frame : "16:9";
-    document.querySelectorAll("#wx-frame-pick button").forEach((b) => {
-      b.classList.toggle("on", b.dataset.frame === frame);
-    });
-    // Связь с OBS есть и источник найден — приложение подгоняет его само,
-    // и подсказка про ручную настройку только сбивала бы с толку.
-    $("wx-frame-hint").innerHTML = lastOBS.status === "ok"
-      ? `Источник в OBS подгоняется сам: <b>${fw} × ${fh}</b>, на весь кадр.`
-      : `Источник «Браузер» в OBS: ширина <b>${fw}</b>, высота <b>${fh}</b>, растянуть ` +
-        `на весь кадр. Проще — настроить «Связь с OBS» ниже, тогда размер ` +
-        `поставится сам.`;
-    // OBS понимает эти параметры у брошенной в сцену ссылки и сразу создаёт
-    // источник нужного размера. Самому виджету они не мешают.
-    $("wx-drag").href = location.origin + "/widget?layer-name=" +
-      encodeURIComponent("Заказ музыки") + "&layer-width=" + fw + "&layer-height=" + fh;
+  // Фрейм зовёт это, когда виджет внутри готов слушаться.
+  window.wxReady = () => {
+    try { wxApi = $("wx-frame").contentWindow.wxPreview; } catch { wxApi = null; }
+    if (!wxApi) return;
+    wxApi.setLang(I18N.lang());
+    wxPaint();
+    wxApi.track(wxNow());
+    $("wx-source-pick").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.source === wxSource));
+    wxLiveNote();
+  };
+
+  function wxBoot() {
+    const f = $("wx-frame");
+    if (!f.getAttribute("src")) f.src = "/widget?preview=1";
   }
 
-  const wxGapX = (w) => (Number.isFinite(w.gap_x) && w.gap_x > 0 ? w.gap_x : (Number.isFinite(w.gap) ? w.gap : 40));
-  const wxGapY = (w) => (Number.isFinite(w.gap_y) && w.gap_y > 0 ? w.gap_y : (Number.isFinite(w.gap) ? w.gap : 40));
-
-  // posName — место в кадре по-человечески. Внутри оно записано словами
-  // «left-bottom»: так его понимают и виджет, и настройки. Показывать это
-  // человеку нельзя — он читает подсказку, а не исходник.
-  function posName(pos) {
-    const [h, v] = String(pos || "left-bottom").split("-");
-    const across = { left: "слева", center: "по центру", right: "справа" }[h] || "слева";
-    const down = { top: "сверху", middle: "посередине", bottom: "снизу" }[v] || "снизу";
-    if (h === "center" && v === "middle") return "ровно посередине";
-    return across + " " + down;
+  // wxPaint отдаёт виджету во фрейме то, что сейчас видно в панели:
+  // сохранённое плюс временную правку.
+  function wxPaint() {
+    if (wxApi) wxApi.dress(wxView());
+    wxLayout();
   }
 
-  // wxAlign — тот же расчёт прижима текста, что и в виджете.
-  function wxAlign(w) {
-    let a = w.align || "auto";
-    if (a === "auto") {
-      const h = (w.position || "left-bottom").split("-")[0];
-      a = h === "right" ? "right" : h === "center" ? "center" : "left";
+  // wxRatio — во сколько раз образец меньше настоящего кадра.
+  function wxRatio() {
+    const box = $("wx-stage").getBoundingClientRect();
+    return box.width > 0 ? box.width / wxFrame(wxView())[0] : 1;
+  }
+
+  // Кадр образца целиком — честный, но плашка в нём мелкая: в кадре
+  // 1920×1080 она и правда занимает пятую часть ширины. Чтобы разглядеть
+  // шрифт и анимацию, кадр можно приблизить к плашке — «Крупно».
+  // wxCam — как сейчас показан кадр: масштаб и сдвиг в пикселях окошка.
+  let wxZoom = false;
+  let wxCam = { k: 1, x: 0, y: 0 };
+  // Пока плашку тащат, камера стоит: иначе кадр ехал бы за плашкой, а
+  // плашка — за курсором, и они догоняли бы друг друга.
+  let wxCamHold = false;
+
+  // wxLayout подгоняет фрейм под окошко образца: фрейм ровно размером с
+  // кадр OBS, а уменьшен целиком, одним преобразованием.
+  function wxLayout() {
+    const [fw, fh] = wxFrame(wxView());
+    const stage = $("wx-stage");
+    stage.style.setProperty("--wx-ar", fw + " / " + fh);
+    stage.style.setProperty("--wx-arn", (fw / fh).toFixed(4));
+    const f = $("wx-frame");
+    f.style.width = fw + "px";
+    f.style.height = fh + "px";
+
+    if (!wxCamHold) {
+      const box = stage.getBoundingClientRect();
+      const k = wxRatio();
+      wxCam = { k, x: 0, y: 0 };
+      if (wxZoom && wxApi && box.width > 0) {
+        const r = wxApi.slot.getBoundingClientRect();
+        // Плашка занимает примерно половину окошка — крупнее уже не видно,
+        // как она сидит в кадре.
+        const z = Math.max(1, Math.min(5, (box.width * .5) / Math.max(1, r.width * k)));
+        const K = k * z;
+        let x = box.width / 2 - (r.left + r.width / 2) * K;
+        let y = box.height / 2 - (r.top + r.height / 2) * K;
+        x = Math.min(0, Math.max(box.width - fw * K, x));
+        y = Math.min(0, Math.max(box.height - fh * K, y));
+        wxCam = { k: K, x, y };
+      }
     }
-    $("wx-card").dataset.align = a;
+    $("wx-frame-box").style.transform =
+      "translate(" + wxCam.x + "px, " + wxCam.y + "px) scale(" + wxCam.k + ")";
+    stage.classList.toggle("zoomed", wxZoom);
+    $("wx-zoom").classList.toggle("on", wxZoom);
+
+    const w = wxView();
+    $("wx-badge").textContent = fw + "×" + fh + " · " + Math.round((w.scale || 1) * 100) + "%" +
+      (wxZoom ? " · " + I18N.t("крупно") : "");
+    // В режиме своей картинки подсказка — про картинку: мышь в кадре
+    // сейчас двигает её, а не плашку.
+    try { if (mediaMode()) wxBadgeMedia(); } catch { /* до первой отрисовки */ }
   }
+  if (window.ResizeObserver) new ResizeObserver(() => wxLayout()).observe($("wx-stage"));
 
-  function drawWidget() {
-    const w = widget();
-    const card = $("wx-card");
-    const family = dressCard(card, w);
-
-    card.style.setProperty("--scale", w.scale || 1);
-    // Формат — до расстановки: отступы пересчитываются от ширины кадра.
-    wxDrawFrame(w);
-    wxPlace(w, family);
-    wxAlign(w);
-    $("wx-slot").style.opacity = (Number.isFinite(w.opacity) ? w.opacity : 100) / 100;
-    // Образец стоит на середине трека: так видно и полосу, и положение
-    // тонарма у винила.
-    card.style.setProperty("--progress", ".46");
-
-    // Тот же белый список, что и в самом виджете: предпросмотр не должен
-    // показывать то, чего в OBS не будет. Раньше панель применяла всё, что
-    // лежит в настройках, и ключи, которых виджет не знает, рисовались
-    // только здесь — то есть панель обещала оформление, которого на стриме
-    // не появится.
-    const allowed = new Set(WIDGET_TWEAKS.map((t) => t.key));
-    for (const t of WIDGET_TWEAKS) card.style.removeProperty(t.key);
-    for (const [key, value] of Object.entries(w.tweaks || {})) {
-      if (allowed.has(key)) card.style.setProperty(key, value);
+  // wxPlay проигрывает появление, смену или уход в кадре.
+  function wxPlay(kind) {
+    if (!wxApi) return;
+    if (kind === "next") {
+      wxTrack = (wxTrack + 1) % WX_TRACKS.length;
+      wxApi.next(wxNow());
+      return;
     }
-    $("wx-bar").style.width = "46%";
-
-    // Тикер занимает всю ширину — выбор угла для него ничего не значит,
-    // и делать вид, что значит, нечестно.
-    const ticker = family.id === "ticker";
-    $("wx-anchors").classList.toggle("narrow", ticker);
-    $("wx-gapx").disabled = ticker;
-    $("wx-gapy").disabled = ticker;
-    $("wx-pos-hint").textContent = ticker
-      ? "Тикер занимает всю ширину кадра: остаётся только выбрать верх или низ."
-      : "Плашку можно просто перетащить мышью прямо по кадру — точка привязки и отступы подставятся сами.";
-
-    const percent = Math.round((w.scale || 1) * 100);
-    $("wx-scale").value = percent;
-    $("wx-scale-val").textContent = percent + "%";
-
-    const gx = wxGapX(w), gy = wxGapY(w);
-    $("wx-gapx").value = gx;
-    $("wx-gapx-val").textContent = gx + " px";
-    $("wx-gapy").value = gy;
-    $("wx-gapy-val").textContent = gy + " px";
-
-    const op = Number.isFinite(w.opacity) ? w.opacity : 100;
-    $("wx-op").value = op;
-    $("wx-op-val").textContent = op + "%";
-
-    $("wx-align").value = w.align || "auto";
-    const chosenPos = w.position || "left-bottom";
-    $("wx-anchors").querySelectorAll("button").forEach((b) => {
-      b.classList.toggle("on", b.dataset.pos === chosenPos);
-    });
-
-    $("wx-art-on").checked = w.show_art !== false;
-    $("wx-by-on").checked = w.show_requester !== false;
-    $("wx-bar-on").checked = w.show_bar !== false;
-    $("wx-motion-on").checked = w.motion !== false;
-    $("wx-own-on").checked = w.show_own !== false;
-    $("wx-by").textContent = wxByLine(w);
-
-    // Как плашка держится в кадре: висит всегда или всплывает.
-    //
-    // Раньше это был один ползунок «убирать через N секунд» с нулём в
-    // значении «не убирать». Ноль-как-выключатель посреди шкалы человек не
-    // читает: он видит ползунок в крайнем положении и не понимает, что тот
-    // сейчас означает совсем другой режим работы.
-    const hold = w.hold_seconds || 0;
-    const flash = hold > 0;
-    $("wx-mode").value = flash ? "flash" : "always";
-    $("wx-flash").hidden = !flash;
-    $("wx-mode-hint").textContent = flash
-      ? "Плашка появляется, висит сколько сказано и уходит."
-      : "Плашка стоит в кадре, пока играет музыка.";
-
-    $("wx-hold").value = flash ? hold : 15;
-    $("wx-hold-val").textContent = (flash ? hold : 15) + " с";
-    $("wx-onchange").checked = w.show_on_change !== false;
-
-    const everyMin = Math.round((w.show_every || 0) / 60);
-    $("wx-every").value = everyMin;
-    $("wx-every-val").textContent = everyMin
-      ? "каждые " + everyMin + " " + plural(everyMin, "минуту", "минуты", "минут")
-      : "не напоминать";
-
-    const url = location.origin + "/widget";
-    $("wx-url").value = url;
-    $("wx-open").href = url + "?demo=1";
-
-    const chosen = widgetPreset(w.preset).id;
-    document.querySelectorAll("#wx-gallery .tile").forEach((tile) => {
-      tile.classList.toggle("on", tile.dataset.preset === chosen);
-    });
-    drawTweaks();
+    wxApi.play(kind);
   }
+
+  // Уход — и возврат: после ухода в кадре пусто, а настраивать дальше надо.
+  let wxBackTimer = null;
+  function wxLeaveAndBack() {
+    clearTimeout(wxBackTimer);
+    wxPlay("leave");
+    wxBackTimer = setTimeout(() => wxPlay("enter"), 1100);
+  }
+
+  // ── сохранение ─────────────────────────────────────────────────────
 
   // Настройки виджета лежат одним блоком: сливаем поверх текущего, а не
   // собираем заново, иначе каждая правка стирала бы остальные.
   async function saveWidget(patch) {
     const next = Object.assign({}, widget(), patch);
-    if (await saveConfig({ widget: next })) drawWidget();
+    // В режиме настройки своего стиля каждая правка вида сразу пишется и в
+    // сам стиль: человек настраивает стиль, а не «плашку, которую потом
+    // надо не забыть сохранить».
+    if (wxEditing && !("styles" in patch)) {
+      next.styles = (next.styles || []).map((st) => (st.id === wxEditing
+        ? Object.assign({ id: st.id, name: st.name }, lookOf(next)) : st));
+      next.style = wxEditing;
+    }
+    wxLive = null;
+    // Запоминаем сразу, не дожидаясь ответа: пока запись летит, следующая
+    // правка (колесо после перетаскивания) бралась бы из старых настроек
+    // и затирала только что сделанное.
+    if (config) config.widget = next;
+    const ok = await saveConfig({ widget: next });
+    drawWidget();
+    return ok;
+  }
+
+  // Ползунки двигают образец сразу, а на диск пишут по отпусканию: иначе
+  // каждое движение мыши было бы записью файла и рассылкой в OBS.
+  function live(input, onMove, onDone) {
+    input.oninput = () => onMove(parseInt(input.value, 10));
+    input.onchange = () => onDone(parseInt(input.value, 10));
+  }
+
+  function liveSet(patch) {
+    wxLive = Object.assign({}, wxLive || {}, patch);
+    wxPaint();
+  }
+
+  // ── вкладки ────────────────────────────────────────────────────────
+
+  $("wx-tabs").onclick = (e) => {
+    const b = e.target.closest("[data-wtab]");
+    if (!b) return;
+    wxTab = b.dataset.wtab;
+    document.querySelectorAll("#wx-tabs [data-wtab]").forEach((t) => t.classList.toggle("on", t === b));
+    document.querySelectorAll("#wx-side [data-wpane]").forEach((p) => { p.hidden = p.dataset.wpane !== wxTab; });
+    $("wx-side").scrollTop = 0;
+    if (wxTab === "media") loadFiles();
+    drawTools(curMedia());
+    if (!mediaMode()) wxLayout();
+  };
+
+  // ── стиль ──────────────────────────────────────────────────────────
+
+  // Мини-плашка для плитки. Та же вёрстка и тот же widget.css, что в кадре.
+  function miniCard(family, variant) {
+    return `<span class="card show" data-family="${family}" data-variant="${variant}"
+        data-pos="left-bottom" data-art="on" data-bar="on" data-align="left" style="--progress:.46">
+      <span class="aura"><i></i></span>
+      <span class="fx"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+      <span class="art"></span>
+      <span class="text">
+        <span class="title">Группа крови</span>
+        <span class="artist">Кино</span>
+        <span class="by">${esc(I18N.t("заказал {who}", { who: "mikhail" }))}</span>
+        <span class="bar"><i style="width:52%"></i></span>
+        <span class="meta"><span class="eq"><i></i><i></i><i></i><i></i><i></i></span></span>
+      </span>
+    </span>`;
   }
 
   function buildGallery() {
     if (galleryBuilt) return;
+    const cover = wxCover(1);
 
-    $("wx-gallery").innerHTML = WIDGET_FAMILIES.map((f) => {
-      const tiles = f.variants.map((v) => `
-        <button class="tile" data-preset="${f.id}/${v.id}" title="${esc(f.name)} · ${esc(v.name)}">
-          <span class="tile-stage">
-            <span class="card show" data-family="${f.id}" data-variant="${v.id}"
-                  data-pos="left-bottom" style="--scale:.6;--progress:.46">
-              <span class="art"></span>
-              <span class="text">
-                <span class="title">Группа крови</span>
-                <span class="artist">Кино</span>
-                <span class="by">заказал mikhail</span>
-                <span class="bar"><i style="width:52%"></i></span>
-              </span>
-            </span>
-          </span>
-          <span class="tile-name">${esc(v.name)}</span>
-        </button>`).join("");
-
-      return `<div class="fam">
-        <div class="fam-head">
-          <h3>${esc(f.name)}</h3>
-          <p>${esc(f.note)}</p>
-        </div>
-        <div class="tiles">${tiles}</div>
+    // Семнадцать плиток подряд не читаются. Делим на две полки: «живые» —
+    // те, что двигаются и в покое (снег, частицы, дрожащая линия), и
+    // классика — спокойные плашки. Это и есть главный выбор: нужен ли в
+    // кадре живой элемент или тихая подпись.
+    const tile = (f) => `
+      <button class="wxe-fam" data-family="${f.id}" title="${esc(I18N.t(f.note))}">
+        <span class="wxe-fam-stage">${miniCard(f.id, f.variants[0].id)}</span>
+        <span class="wxe-fam-name">${esc(I18N.t(f.name))}${f.fresh ? `<em>${I18N.t("новый")}</em>` : ""}</span>
+      </button>`;
+    const shelf = (title, note, list) => `
+      <div class="wxe-shelf">
+        <div class="wxe-shelf-head"><b>${esc(I18N.t(title))}</b><span>${esc(I18N.t(note))}</span></div>
+        <div class="wxe-fams">${list.map(tile).join("")}</div>
       </div>`;
-    }).join("");
+    $("wx-gallery").innerHTML =
+      shelf("Живые", "двигаются и в покое: свет, снег, дрожащая линия", WIDGET_FAMILIES.filter((f) => f.fresh)) +
+      shelf("Классика", "спокойные плашки", WIDGET_FAMILIES.filter((f) => !f.fresh));
 
-    $("wx-gallery").onclick = (e) => {
-      const tile = e.target.closest(".tile");
+    // Обложка в плитках — та же картинка, что у образца: пустой квадрат
+    // читался бы как «оформление сломалось».
+    $("wx-gallery").querySelectorAll(".art").forEach((a) => {
+      a.innerHTML = `<img src="${cover}" alt=""><img class="px" src="${wxCovers.px1}" alt="">`;
+    });
+    $("wx-gallery").querySelectorAll(".aura i").forEach((a) => { a.style.backgroundImage = `url(${cover})`; });
+
+    const gallery = $("wx-gallery");
+    gallery.onclick = (e) => {
+      const tile = e.target.closest("[data-family]");
+      if (!tile) return;
+      const fam = WIDGET_FAMILIES.find((f) => f.id === tile.dataset.family);
       // Смена набора сбрасывает ручную правку: иначе розовый акцент от
       // прошлого набора переехал бы в новый и испортил его.
+      const hadTweaks = Object.keys(widget().tweaks || {}).length > 0;
+      // На первом экране из своего стиля в готовый — включаем готовый
+      // начисто: без чужих гифок, шрифта и поворотов. Иначе в кадре была бы
+      // смесь, а наверху всё ещё стояло имя своего стиля.
+      const w0 = widget();
+      const fromOwn = !wxEditing && (w0.styles || []).some((s) => s.id === w0.style);
+      const patch = { preset: fam.id + "/" + fam.variants[0].id, tweaks: null };
+      if (!wxEditing) patch.style = "";
+      if (fromOwn) {
+        Object.assign(patch, STYLE_EMPTY, { preset: patch.preset });
+        // Все поля явно: сервер кладёт присланное поверх сохранённого.
+        const t0 = { scale: 100, x: 0, y: 0, rot: 0, flip: false };
+        patch.media = Object.assign({}, w0.media || {}, {
+          bg: "", cover: "", fallback: "", sticker: "", bg_dim: 35, bg_blur: 0,
+          bg_t: t0, cover_t: t0, fallback_t: t0, sticker_t: t0,
+        });
+      }
+      saveWidget(patch).then(() => {
+        wxPlay("enter");
+        // Молча стирать свои цвета нельзя: человек решит, что настройка
+        // сломалась. Говорим, что случилось.
+        if (hadTweaks) say(I18N.t("Свои цвета сброшены: у нового стиля свои. Задать заново — во вкладке «Цвет»."));
+      });
+    };
+    // Примерка: навёл — стиль встал в кадре, увёл — вернулся выбранный.
+    // Перебрать тринадцать стилей так быстрее, чем щёлкать каждый и
+    // щёлкать обратно.
+    gallery.onmouseover = (e) => {
+      const tile = e.target.closest("[data-family]");
       if (!tile) return;
-      saveWidget({ preset: tile.dataset.preset, tweaks: null }).then(() => wxPlay("enter"));
+      const fam = WIDGET_FAMILIES.find((f) => f.id === tile.dataset.family);
+      const preset = fam.id + "/" + fam.variants[0].id;
+      if (wxLive && wxLive.preset === preset) return;
+      if (widgetPreset(widget().preset).family.id === fam.id) { wxLive = null; wxPaint(); return; }
+      wxLive = { preset, tweaks: null };
+      wxPaint();
+    };
+    gallery.onmouseleave = () => {
+      if (!wxLive) return;
+      wxLive = null;
+      wxPaint();
     };
 
     galleryBuilt = true;
   }
 
-  // Тонкая настройка — всегда поверх набора: нетронутое остаётся набором,
-  // а не застывшим слепком его текущих значений.
-  function drawTweaks() {
-    const tweaks = widget().tweaks || {};
-    const computed = getComputedStyle($("wx-card"));
+  // wxProbe — вычисленные цвета набора без отрисовки плашки: для кружков
+  // окраски. Берём их у невидимой плашки на той же странице стилей.
+  function wxProbe(family, variant) {
+    let probe = $("wx-probe");
+    if (!probe) {
+      probe = document.createElement("div");
+      probe.id = "wx-probe";
+      probe.className = "card";
+      probe.style.cssText = "position:absolute;left:-9999px;top:0;visibility:hidden";
+      document.body.appendChild(probe);
+    }
+    probe.dataset.family = family;
+    probe.dataset.variant = variant;
+    const cs = getComputedStyle(probe);
+    return {
+      bg: cs.getPropertyValue("--w-bg").trim(),
+      accent: cs.getPropertyValue("--w-accent").trim(),
+      ink: cs.getPropertyValue("--w-ink").trim(),
+    };
+  }
 
-    $("wx-tweaks").innerHTML = WIDGET_TWEAKS.map((t) => {
-      const set = tweaks[t.key] !== undefined;
-      const now = (tweaks[t.key] || computed.getPropertyValue(t.key) || "").trim();
-      const off = set
-        ? `<button class="tweak-off" data-clear="${t.key}" title="вернуть как в наборе">×</button>`
-        : "";
-
-      if (t.kind === "color") {
-        return `<label class="tweak${set ? " set" : ""}" title="${esc(t.hint || t.name)}">
-          <input type="color" data-tweak="${t.key}" value="${esc(asHex(now))}">
-          <span class="tweak-name">${esc(t.name)}</span>${off}
-        </label>`;
-      }
-
-      const px = parseInt(now, 10) || 0;
-      return `<label class="tweak wide${set ? " set" : ""}">
-        <span class="tweak-name">${esc(t.name)} <b>${px} px</b>${off}</span>
-        <input type="range" data-tweak="${t.key}" min="${t.min}" max="${t.max}" value="${px}">
-      </label>`;
+  function drawVariants(w) {
+    const { family, variant } = widgetPreset(w.preset);
+    $("wx-fam-name").textContent = "· " + I18N.t(family.name);
+    $("wx-variants").innerHTML = family.variants.map((v) => {
+      const c = wxProbe(family.id, v.id);
+      // Подложка бывает «none» (открытый текст, неон) — тогда кружок рисуем
+      // на шахматке, как прозрачное в любом графическом редакторе.
+      const bg = !c.bg || c.bg === "none" || c.bg === "transparent" ? "" : c.bg;
+      return `<button class="wxe-sw${v.id === variant.id ? " on" : ""}" data-variant="${v.id}">
+        <span class="wxe-sw-dot${bg ? "" : " clear"}" style="${bg ? "--sw-bg:" + esc(bg) + ";" : ""}--sw-ac:${esc(c.accent)};--sw-ink:${esc(c.ink)}"><i></i></span>
+        <span>${esc(I18N.t(v.name))}</span>
+      </button>`;
     }).join("");
   }
+
+  $("wx-variants").onclick = (e) => {
+    const b = e.target.closest("[data-variant]");
+    if (!b) return;
+    const fam = widgetPreset(widget().preset).family;
+    saveWidget({ preset: fam.id + "/" + b.dataset.variant });
+  };
+  $("wx-variants").onmouseover = (e) => {
+    const b = e.target.closest("[data-variant]");
+    if (!b) return;
+    const fam = widgetPreset(widget().preset).family;
+    const preset = fam.id + "/" + b.dataset.variant;
+    if (wxLive && wxLive.preset === preset) return;
+    wxLive = { preset };
+    wxPaint();
+  };
+  $("wx-variants").onmouseleave = () => { if (wxLive) { wxLive = null; wxPaint(); } };
+
+  // ── обложка ────────────────────────────────────────────────────────
+
+  function drawShapes(w) {
+    const fam = widgetPreset(w.preset).family.id;
+    const can = widgetCan(fam, "shape");
+    const now = w.cover_shape || "";
+    $("wx-shapes").innerHTML = WIDGET_SHAPES.map((s) => `
+      <button class="wxe-shape${s.id === now ? " on" : ""}" data-shape="${s.id}" ${can ? "" : "disabled"}>
+        <span class="wxe-shape-ico" data-s="${s.id || "style"}"></span>
+        <span>${esc(I18N.t(s.name))}</span>
+      </button>`).join("");
+    $("wx-shape-hint").textContent = can ? "" :
+      I18N.t("У этого стиля обложка — часть предмета, её форма не меняется.");
+
+    // Обложка выключена — свечению и размеру обложки не к чему относиться.
+    // Гасим их, а не оставляем крутиться вхолостую.
+    const art = w.show_art !== false;
+    const glow = widgetCan(fam, "glow") && art;
+    const bg = widgetCan(fam, "coverbg");
+    $("wx-glow-row").classList.toggle("off", !glow);
+    $("wx-coverbg-row").classList.toggle("off", !bg);
+    $("wx-glow").disabled = !glow;
+    $("wx-coverbg").disabled = !bg;
+    $("wx-glow").checked = !!w.cover_glow && glow;
+    // У «Ауры» обложка фоном — сама суть стиля, выключатель всегда включён.
+    $("wx-coverbg").checked = fam === "aura" || (!!w.cover_bg && bg);
+    document.querySelector('[data-tweak-slider="--w-art"]').classList.toggle("off", !art);
+
+    // Серый выключатель без объяснения выглядит как поломка. Говорим, почему.
+    $("wx-glow-note").textContent = !art
+      ? I18N.t("Обложка выключена — светиться нечему.")
+      : glow ? I18N.t("Мягкий ореол вокруг обложки её же цветом.")
+      : I18N.t("У этого стиля свой свет — ореол с ним спорил бы.");
+    $("wx-coverbg-note").textContent = fam === "aura"
+      ? I18N.t("В «Ауре» это основа стиля — включено всегда.")
+      : bg ? I18N.t("Размытая обложка под плашкой: каждый трек плашка перекрашивается сама.")
+      : I18N.t("У этого стиля своя подложка — размытой обложке тут не место.");
+  }
+
+  $("wx-shapes").onclick = (e) => {
+    const b = e.target.closest("[data-shape]");
+    if (b && !b.disabled) saveWidget({ cover_shape: b.dataset.shape });
+  };
+  $("wx-art-on").onchange = (e) => saveWidget({ show_art: e.target.checked });
+  $("wx-glow").onchange = (e) => saveWidget({ cover_glow: e.target.checked });
+  $("wx-coverbg").onchange = (e) => saveWidget({ cover_bg: e.target.checked });
+
+  // ── цвет ───────────────────────────────────────────────────────────
 
   // input[type=color] понимает только #rrggbb, а из набора значение может
   // приехать как rgba(...). Берём то, что реально нарисовал браузер.
@@ -2629,27 +2791,1139 @@
     return "#" + rgb.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("");
   }
 
+  // Цвет набора без ручных правок: у невидимой плашки, а не у той, что в
+  // кадре, — на той уже лежат правки и цвета из обложки.
+  function presetToken(w, key) {
+    const { family, variant } = widgetPreset(w.preset);
+    wxProbe(family.id, variant.id);
+    return getComputedStyle($("wx-probe")).getPropertyValue(key).trim();
+  }
+
+  // Тонкая настройка — всегда поверх набора: нетронутое остаётся набором,
+  // а не застывшим слепком его текущих значений.
+  function drawTweaks(w) {
+    const tweaks = w.tweaks || {};
+    $("wx-tweaks").innerHTML = WIDGET_TWEAKS.filter((t) => t.kind === "color").map((t) => {
+      const set = tweaks[t.key] !== undefined;
+      const now = (tweaks[t.key] || presetToken(w, t.key) || "").trim();
+      const locked = t.key === "--w-accent" && w.magic;
+      return `<label class="wxe-color${set ? " set" : ""}${locked ? " locked" : ""}" title="${esc(I18N.t(t.hint || t.name))}">
+        <input type="color" data-tweak="${t.key}" value="${esc(asHex(now))}" ${locked ? "disabled" : ""}>
+        <span class="wxe-color-name">${esc(I18N.t(t.name))}<small>${locked ? esc(I18N.t("из обложки")) : set ? esc(asHex(now)) : esc(I18N.t("как в стиле"))}</small></span>
+        ${set ? `<button class="wxe-x" data-clear="${t.key}" title="${esc(I18N.t("вернуть как в стиле"))}">×</button>` : ""}
+      </label>`;
+    }).join("");
+
+    // Ползунки ручной настройки разложены по вкладкам (размер обложки — в
+    // «Обложке», кегль — в «Цвете»), но устроены одинаково.
+    document.querySelectorAll("[data-tweak-slider]").forEach((box) => {
+      const key = box.dataset.tweakSlider;
+      const set = tweaks[key] !== undefined;
+      const px = parseInt(tweaks[key] || presetToken(w, key), 10) || 0;
+      box.classList.toggle("set", set);
+      box.querySelector("input").value = px;
+      box.querySelector("b").textContent = px + " px";
+    });
+  }
+
   function setTweak(key, value) {
     const tweaks = Object.assign({}, widget().tweaks || {});
     if (value === null) delete tweaks[key];
     else tweaks[key] = value;
     saveWidget({ tweaks: Object.keys(tweaks).length ? tweaks : null });
   }
-
-  // Ползунки двигают образец сразу, а на диск пишут по отпусканию: иначе
-  // каждое движение мыши было бы записью файла и рассылкой в OBS.
-  function live(input, onMove, onDone) {
-    input.oninput = () => onMove(parseInt(input.value, 10));
-    input.onchange = () => onDone(parseInt(input.value, 10));
+  function liveTweak(key, value) {
+    const tweaks = Object.assign({}, widget().tweaks || {}, { [key]: value });
+    liveSet({ tweaks });
   }
 
-  // drawGap двигает образец, пока ведут ползунок отступа. На диск пишем по
-  // отпусканию — см. live().
-  function drawGap(axis, px) {
+  $("wx-tweaks").oninput = (e) => {
+    const key = e.target.dataset.tweak;
+    if (key) liveTweak(key, e.target.value);
+  };
+  $("wx-tweaks").onchange = (e) => {
+    const key = e.target.dataset.tweak;
+    if (key) setTweak(key, e.target.value);
+  };
+  document.querySelectorAll("[data-tweak-slider]").forEach((box) => {
+    const key = box.dataset.tweakSlider;
+    live(box.querySelector("input"), (v) => {
+      box.querySelector("b").textContent = v + " px";
+      liveTweak(key, v + "px");
+    }, (v) => setTweak(key, v + "px"));
+  });
+  // Крестик «вернуть как в стиле» — у цветов и у ползунков одинаковый.
+  $("widget").addEventListener("click", (e) => {
+    const clear = e.target.closest("[data-clear]");
+    if (!clear) return;
+    e.preventDefault();
+    setTweak(clear.dataset.clear, null);
+  });
+  $("wx-reset").onclick = () => saveWidget({ tweaks: null, font: "" });
+  $("wx-magic").onchange = (e) => saveWidget({ magic: e.target.checked });
+
+  function drawFonts(w) {
+    const now = w.font || "";
+    $("wx-fonts").innerHTML = WIDGET_FONTS.map((f) => `
+      <button class="wxe-font${f.id === now ? " on" : ""}" data-font="${f.id}">
+        <span class="wxe-font-aa" style="${f.css ? "font-family:" + esc(f.css) : ""}">Aa</span>
+        <span>${esc(I18N.t(f.name))}</span>
+      </button>`).join("");
+  }
+  $("wx-fonts").onclick = (e) => {
+    const b = e.target.closest("[data-font]");
+    if (b) saveWidget({ font: b.dataset.font });
+  };
+
+  live($("wx-op"), (v) => {
+    $("wx-op-val").textContent = v + "%";
+    liveSet({ opacity: v });
+  }, (v) => saveWidget({ opacity: v }));
+
+  // ── анимация ───────────────────────────────────────────────────────
+
+  function drawAnims(w) {
+    const chips = (now, out) => WIDGET_ANIMS.map((a) => {
+      const name = out ? a.out : a.name;
+      return `<button class="wxe-anim${a.id === now ? " on" : ""}" data-anim="${a.id}" title="${esc(I18N.t(a.hint || name))}">
+        <span class="wxe-anim-ico${out ? " out" : ""}" data-a="${a.id || "style"}"><i></i></span>
+        <span>${esc(I18N.t(name))}</span>
+      </button>`;
+    }).join("");
+    $("wx-in").innerHTML = chips(w.anim_in || "", false);
+    $("wx-out").innerHTML = chips(w.anim_out || "", true);
+  }
+  $("wx-in").onclick = async (e) => {
+    const b = e.target.closest("[data-anim]");
+    if (!b) return;
+    await saveWidget({ anim_in: b.dataset.anim });
+    wxPlay("enter");
+  };
+  $("wx-out").onclick = async (e) => {
+    const b = e.target.closest("[data-anim]");
+    if (!b) return;
+    await saveWidget({ anim_out: b.dataset.anim });
+    wxLeaveAndBack();
+  };
+  $("wx-motion-on").onchange = (e) => saveWidget({ motion: e.target.checked });
+
+  // ── своё: картинки, ролики, встроенные анимации ───────────────────
+
+  // Четыре места на плашке. «Если обложки нет» — страховка: у заказов с
+  // YouTube и у редких треков обложки не бывает, и вместо серой ноты
+  // встаёт своя картинка.
+  const WX_SLOTS = [
+    { id: "bg",       field: "bg",       name: "Фон плашки",       note: "во всю плашку, под текстом" },
+    { id: "cover",    field: "cover",    name: "Вместо обложки",   note: "всегда, на каждом треке" },
+    { id: "fallback", field: "fallback", name: "Если обложки нет", note: "страховка: обложка не пришла" },
+    { id: "sticker",  field: "sticker",  name: "Наклейка",         note: "у края плашки, торчит наружу" },
+  ];
+  let wxSlot = "bg";
+  // Загруженные файлы. Список спрашиваем у приложения, когда открыли
+  // вкладку, и после каждой загрузки или удаления.
+  let wxFiles = [];
+
+  const wxMedia = (w) => Object.assign({ bg_dim: 0, sticker_side: "right", sticker_size: 72 }, (w || widget()).media || {});
+  const isVid = (ref) => /\.(webm|mp4)$/.test(ref);
+
+  // Превью картинки для плиток. Ролик в плитке тоже играет — без звука:
+  // по застывшему первому кадру не понять, что это за анимация.
+  function mediaThumb(el, ref) {
+    if (el._fx) { el._fx.stop(); el._fx = null; }
+    el.innerHTML = "";
+    if (!ref) return;
+    if (ref.indexOf("fx:") === 0) {
+      el._fx = WidgetFX.mount(el, ref.slice(3), { accent: wxAccent() });
+      return;
+    }
+    const src = "/media/" + encodeURIComponent(ref);
+    el.innerHTML = isVid(ref)
+      ? `<video src="${esc(src)}" muted loop autoplay playsinline></video>`
+      : `<img src="${esc(src)}" alt="">`;
+  }
+
+  // Акцент плашки в кадре — им окрашены встроенные анимации.
+  function wxAccent() {
+    const v = presetToken(wxView(), "--w-accent");
+    const t = (widget().tweaks || {})["--w-accent"];
+    return asHex(t || v || "#c8f751");
+  }
+
+  function mediaName(ref) {
+    if (!ref) return I18N.t("пусто");
+    if (ref.indexOf("fx:") === 0) {
+      const fx = WidgetFX.list.find((f) => f.id === ref.slice(3));
+      return fx ? I18N.t(fx.name) : ref;
+    }
+    return isVid(ref) ? I18N.t("свой ролик") : I18N.t("своя картинка");
+  }
+
+  function drawSlots(w) {
+    const m = wxMedia(w);
+    const box = $("wx-slots");
+    // Плитки мест перерисовываем, только если поменялось содержимое:
+    // иначе ролик в превью начинал бы сначала на каждой правке ползунка.
+    const sig = WX_SLOTS.map((s) => m[s.field] || "").join("|") + "|" + wxSlot + "|" + I18N.lang();
+    if (box.dataset.sig !== sig) {
+      box.dataset.sig = sig;
+      box.innerHTML = WX_SLOTS.map((s) => `
+        <button class="wxe-slot${s.id === wxSlot ? " on" : ""}${m[s.field] ? " full" : ""}" data-slot="${s.id}">
+          <span class="wxe-slot-thumb" data-thumb="${s.id}"></span>
+          <span class="wxe-slot-text"><b>${esc(I18N.t(s.name))}</b><small>${esc(m[s.field] ? mediaName(m[s.field]) : I18N.t(s.note))}</small></span>
+          ${m[s.field] ? `<span class="wxe-x" data-unset="${s.field}" title="${esc(I18N.t("убрать"))}">×</span>` : ""}
+        </button>`).join("");
+      WX_SLOTS.forEach((s) => mediaThumb(box.querySelector(`[data-thumb="${s.id}"]`), m[s.field] || ""));
+    }
+
+    drawTools(m);
+    drawLib(m);
+  }
+
+  // drawLib — библиотека: свои файлы и встроенные анимации. Подсвечено
+  // то, что стоит в выбранном месте.
+  function drawLib(m) {
+    const now = m[WX_SLOTS.find((s) => s.id === wxSlot).field] || "";
+    const own = $("wx-lib-own");
+    const ownSig = wxFiles.map((f) => f.name).join("|");
+    if (own.dataset.sig !== ownSig) {
+      own.dataset.sig = ownSig;
+      own.innerHTML = wxFiles.map((f) => `
+        <button class="wxe-pick" data-ref="${esc(f.name)}" title="${esc((f.size / 1048576).toFixed(1) + " " + I18N.t("МБ"))}">
+          <span class="wxe-pick-thumb" data-thumb="${esc(f.name)}"></span>
+          <span class="wxe-x" data-del="${esc(f.name)}" title="${esc(I18N.t("удалить файл"))}">×</span>
+        </button>`).join("");
+      wxFiles.forEach((f) => mediaThumb(own.querySelector(`[data-thumb="${f.name}"]`), f.name));
+    }
+    const fx = $("wx-lib-fx");
+    const fxSig = I18N.lang() + wxAccent();
+    if (fx.dataset.sig !== fxSig) {
+      fx.dataset.sig = fxSig;
+      fx.innerHTML = WidgetFX.list.map((f) => `
+        <button class="wxe-pick" data-ref="fx:${f.id}">
+          <span class="wxe-pick-thumb" data-thumb="fx:${f.id}"></span>
+          <span class="wxe-pick-name">${esc(I18N.t(f.name))}</span>
+        </button>`).join("");
+      WidgetFX.list.forEach((f) => mediaThumb(fx.querySelector(`[data-thumb="fx:${f.id}"]`), "fx:" + f.id));
+    }
+    document.querySelectorAll("#wx-lib-own [data-ref], #wx-lib-fx [data-ref]").forEach((b) => {
+      b.classList.toggle("on", b.dataset.ref === now);
+    });
+  }
+
+  async function loadFiles() {
+    try {
+      wxFiles = await (await fetch("/api/widget/media")).json();
+    } catch { wxFiles = []; }
+    drawLib(wxMedia());
+  }
+
+  function saveMedia(patch) {
+    return saveWidget({ media: Object.assign(wxMedia(), patch) });
+  }
+  function liveMedia(patch) {
+    liveSet({ media: Object.assign(wxMedia(), (wxLive || {}).media || {}, patch) });
+  }
+
+  $("wx-slots").onclick = (e) => {
+    const unset = e.target.closest("[data-unset]");
+    if (unset) {
+      e.stopPropagation();
+      saveMedia({ [unset.dataset.unset]: "" });
+      return;
+    }
+    const b = e.target.closest("[data-slot]");
+    if (!b) return;
+    wxSlot = b.dataset.slot;
+    drawSlots(widget());
+  };
+
+  // Клик по картинке ставит её в выбранное место. Повторный клик по уже
+  // стоящей — убирает: так не надо искать крестик.
+  async function pickMedia(e) {
+    const del = e.target.closest("[data-del]");
+    if (del) {
+      e.stopPropagation();
+      const r = await fetch("/api/widget/media/" + encodeURIComponent(del.dataset.del) + "/delete", { method: "POST" });
+      if (r.ok) config = await r.json();
+      await loadFiles();
+      drawWidget();
+      return;
+    }
+    const b = e.target.closest("[data-ref]");
+    if (!b) return;
+    const field = WX_SLOTS.find((s) => s.id === wxSlot).field;
+    const ref = b.dataset.ref === wxMedia()[field] ? "" : b.dataset.ref;
+    // Фон без затемнения на пёстрой гифке не читается — первый раз ставим
+    // треть, дальше человек решает сам.
+    const patch = { [field]: ref };
+    if (field === "bg" && ref && !wxMedia().bg && !wxMedia().bg_dim) patch.bg_dim = 35;
+    await saveMedia(patch);
+    // Фон плашки не видно, если обложка уходит за него — проигрываем
+    // появление, чтобы было видно, что встало.
+    wxPlay("enter");
+  }
+  $("wx-lib-own").onclick = pickMedia;
+  $("wx-lib-fx").onclick = pickMedia;
+
+  // Загрузка: и через выбор файла, и перетаскиванием в рамку.
+  async function upload(files) {
+    let last = "";
+    for (const f of files) {
+      if (f.size > 10 * 1048576) {
+        say(I18N.t("Файл больше 10 МБ. Сожмите его или обрежьте ролик."), true);
+        continue;
+      }
+      $("wx-drop").classList.add("busy");
+      try {
+        const r = await fetch("/api/widget/media", { method: "POST", body: f });
+        if (!r.ok) {
+          say((await r.text()).trim() || I18N.t("Не получилось сохранить файл."), true);
+          continue;
+        }
+        last = (await r.json()).name;
+      } catch {
+        say(I18N.t("Не получилось сохранить файл."), true);
+      } finally {
+        $("wx-drop").classList.remove("busy");
+      }
+    }
+    await loadFiles();
+    // Только что загруженное сразу встаёт в выбранное место: человек
+    // загружал его ровно для этого.
+    if (last) {
+      const field = WX_SLOTS.find((s) => s.id === wxSlot).field;
+      const patch = { [field]: last };
+      if (field === "bg" && !wxMedia().bg_dim) patch.bg_dim = 35;
+      await saveMedia(patch);
+      wxPlay("enter");
+    }
+  }
+  $("wx-file").onchange = (e) => {
+    upload([...e.target.files]);
+    e.target.value = "";
+  };
+  const drop = $("wx-drop");
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = (e) => {
+    e.preventDefault();
+    drop.classList.remove("over");
+    upload([...e.dataTransfer.files]);
+  };
+
+  // ── инструменты картинки под кадром ────────────────────────────────
+
+  const slotField = () => WX_SLOTS.find((s) => s.id === wxSlot).field;
+  const T0 = {
+    scale: 100, x: 0, y: 0, rot: 0, flip: false, fit: "", opacity: 100, key: "",
+    bright: 100, contrast: 100, sat: 100, gray: false, speed: 100, mask: "", back: false,
+  };
+  const T_BOOL = { flip: true, gray: true, back: true };
+  // Медиа «как сейчас в кадре»: сохранённое плюс то, что ещё тянут.
+  const curMedia = () => Object.assign(wxMedia(), (wxLive || {}).media || {});
+  const curT = () => Object.assign({}, T0, curMedia()[slotField() + "_t"] || {});
+
+  // Правка сразу видна в кадре, а на диск ложится, когда рука отпустила:
+  // иначе каждое движение мыши было бы записью файла.
+  let mSaveTimer = null;
+  function mSet(patch, when) {
+    liveMedia(patch);
+    clearTimeout(mSaveTimer);
+    const save = () => saveWidget({ media: curMedia() });
+    if (when === "now") save();
+    else if (when === "later") mSaveTimer = setTimeout(save, 450);
+    drawTools(curMedia(), true);
+  }
+  function tSet(change, when) {
+    const t = Object.assign(curT(), change);
+    t.scale = Math.round(Math.min(500, Math.max(10, t.scale)));
+    t.x = Math.round(Math.min(150, Math.max(-150, t.x)));
+    t.y = Math.round(Math.min(150, Math.max(-150, t.y)));
+    t.rot = Math.round(((t.rot % 360) + 540) % 360 - 180);
+    mSet({ [slotField() + "_t"]: t }, when);
+  }
+
+  function parseK(k, raw) {
+    const [ns, name] = k.split(":");
+    let v = raw;
+    if (T_BOOL[name]) v = raw === "1" || raw === true;
+    else if (/^-?\d+$/.test(String(raw))) v = Number(raw);
+    return [ns, name, v];
+  }
+  function setK(k, raw, when) {
+    const [ns, name, v] = parseK(k, raw);
+    if (ns === "t") tSet({ [name]: v }, when);
+    else mSet({ [name]: v }, when);
+  }
+
+  // Режим «картинка в кадре»: открыта вкладка «Своё» и в выбранном месте
+  // что-то стоит. Тогда мышь в кадре двигает картинку, а не плашку.
+  const mediaMode = () => wxScreen === "edit" && wxTab === "media" && !!curMedia()[slotField()];
+
+  function drawTools(m, quick) {
+    const box = $("wx-tools");
+    const ref = m[slotField()] || "";
+    const on = wxScreen === "edit" && wxTab === "media" && !!ref;
+    box.hidden = !on;
+    $("wx-stage").classList.toggle("media-mode", on);
+    if (!on) return;
+    const slot = WX_SLOTS.find((s) => s.id === wxSlot);
+    if (!quick) {
+      $("wx-tools-title").textContent = I18N.t(slot.name) + " · " + mediaName(ref);
+      const th = $("wx-tools-thumb");
+      if (th.dataset.ref !== ref) { th.dataset.ref = ref; mediaThumb(th, ref); }
+    }
+    const t = Object.assign({}, T0, m[slot.field + "_t"] || {});
+    // «Как ложится» по умолчанию у места своё: фон заполняет, наклейка
+    // видна целиком. Подсвечиваем то, что на деле в кадре.
+    if (!t.fit) t.fit = wxSlot === "sticker" ? "contain" : "cover";
+    box.querySelectorAll("[data-k]").forEach((el) => {
+      const [ns, name] = el.dataset.k.split(":");
+      const v = ns === "t" ? t[name] : m[name];
+      if (el.classList.contains("wxe-slider")) {
+        const input = el.querySelector("input");
+        if (document.activeElement !== input) input.value = v;
+        el.querySelector("b").textContent = v + (el.dataset.unit || "");
+        el.classList.toggle("set", v !== (ns === "t" ? T0[name] : v));
+      } else {
+        const want = T_BOOL[name] ? (v ? "1" : "") : String(v === undefined ? "" : v);
+        el.querySelectorAll("[data-v]").forEach((b) => b.classList.toggle("on", b.dataset.v === want));
+      }
+    });
+    box.querySelectorAll("[data-slots]").forEach((sec) => { sec.hidden = sec.dataset.slots !== wxSlot; });
+    const anim = /^fx:|\.(webm|mp4)$/.test(ref);
+    box.querySelectorAll('[data-only="anim"]').forEach((el) => { el.hidden = !anim; });
+    if (!quick) wxBadgeMedia();
+  }
+
+  function wxBadgeMedia() {
+    if (mediaMode()) $("wx-badge").textContent = I18N.t("тащи картинку в кадре · колесо — размер · Shift — поворот");
+  }
+
+  const tools = $("wx-tools");
+  tools.addEventListener("input", (e) => {
+    const k = e.target.closest("[data-k]");
+    if (k && e.target.type === "range") setK(k.dataset.k, e.target.value, "");
+  });
+  tools.addEventListener("change", (e) => {
+    const k = e.target.closest("[data-k]");
+    if (k && e.target.type === "range") setK(k.dataset.k, e.target.value, "now");
+  });
+  tools.addEventListener("click", (e) => {
+    const v = e.target.closest("[data-v]");
+    if (v) { setK(v.closest("[data-k]").dataset.k, v.dataset.v, "now"); return; }
+    const a = e.target.closest("[data-tact]");
+    if (!a) return;
+    const t = curT();
+    switch (a.dataset.tact) {
+      case "rot-l": tSet({ rot: t.rot - 90 }, "now"); break;
+      case "rot-r": tSet({ rot: t.rot + 90 }, "now"); break;
+      case "flip": tSet({ flip: !t.flip }, "now"); break;
+      case "center": tSet({ x: 0, y: 0 }, "now"); break;
+      case "reset": tSet(Object.assign({}, T0), "now"); break;
+      case "remove": saveMedia({ [slotField()]: "" }); break;
+    }
+  });
+
+  // Картинка прямо в кадре: тащить — сдвиг, колесо — размер, с Shift —
+  // поворот. Перехватываем мышь раньше, чем её получит перетаскивание
+  // самой плашки: пока открыта вкладка «Своё», двигать плашку незачем.
+  (function () {
+    const hit = $("wx-hit");
+    let md = null;
+    hit.addEventListener("pointerdown", (e) => {
+      if (!mediaMode() || !wxApi || !wxApi.places) return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      const r = wxApi.places[wxSlot].getBoundingClientRect();
+      md = { x0: e.clientX, y0: e.clientY, w: r.width || 1, h: r.height || 1, t: curT() };
+      wxCamHold = true;
+      try { hit.setPointerCapture(e.pointerId); } catch { /* мышь уже ушла — дотащим и так */ }
+      hit.style.cursor = "grabbing";
+    }, true);
+    hit.addEventListener("pointermove", (e) => {
+      if (!mediaMode()) return;
+      e.stopImmediatePropagation();
+      hit.style.cursor = md ? "grabbing" : "move";
+      if (!md) return;
+      // Сдвиг мыши в окошке → в пиксели настоящего кадра → в проценты места.
+      const dx = (e.clientX - md.x0) / wxCam.k / md.w * 100;
+      const dy = (e.clientY - md.y0) / wxCam.k / md.h * 100;
+      tSet({ x: md.t.x + dx, y: md.t.y + dy }, "");
+    }, true);
+    const end = (e) => {
+      if (!md) return;
+      e.stopImmediatePropagation();
+      md = null;
+      wxCamHold = false;
+      hit.style.cursor = "move";
+      tSet({}, "now");
+    };
+    hit.addEventListener("pointerup", end, true);
+    hit.addEventListener("pointercancel", end, true);
+    hit.addEventListener("wheel", (e) => {
+      if (!mediaMode()) return;
+      e.preventDefault();
+      const t = curT();
+      const up = e.deltaY < 0;
+      if (e.shiftKey) tSet({ rot: t.rot + (up ? 5 : -5) }, "later");
+      else tSet({ scale: t.scale * (up ? 1.06 : 1 / 1.06) }, "later");
+    }, { passive: false });
+  })();
+
+  // ── свои стили ─────────────────────────────────────────────────────
+
+  // Что входит в стиль. Место в кадре, размер и расписание показа — нет:
+  // это про сцену, и переключение стиля не должно уводить плашку в другой
+  // угол.
+  const STYLE_FIELDS = ["preset", "tweaks", "font", "cover_shape", "cover_glow", "cover_bg",
+    "magic", "anim_in", "anim_out", "show_eq", "show_art", "opacity", "media"];
+
+  // Пустое пишем явно: настройки ложатся поверх сохранённых, и поле,
+  // которого в присланном нет, осталось бы от прошлого стиля — свой шрифт
+  // или форма обложки «прилипали» бы ко всем следующим.
+  const STYLE_EMPTY = {
+    tweaks: null, font: "", cover_shape: "", cover_glow: false, cover_bg: false,
+    magic: false, anim_in: "", anim_out: "", show_eq: false, show_art: true, opacity: 100,
+  };
+  function lookOf(w) {
+    const look = {};
+    for (const k of STYLE_FIELDS) look[k] = w[k] === undefined ? STYLE_EMPTY[k] : w[k];
+    look.media = Object.assign({}, w.media || {});
+    return look;
+  }
+
+  function drawMine(w) {
+    const box = $("wx-mine");
+    const styles = w.styles || [];
+    const sig = JSON.stringify(styles) + "|" + I18N.lang();
+    if (box.dataset.sig !== sig) {
+      box.dataset.sig = sig;
+      const cover = wxCover(1);
+      box.innerHTML = styles.map((st) => {
+        const { family, variant } = widgetPreset(st.preset);
+        return `<button class="wxe-fam" data-style="${esc(st.id)}">
+          <span class="wxe-fam-stage">${miniCard(family.id, variant.id)}
+            <span class="wxe-mine-acts">
+              <span class="wxe-mine-act" data-edit="${esc(st.id)}" title="${esc(I18N.t("войти в настройку этого стиля"))}">${esc(I18N.t("настроить"))}</span>
+              <span class="wxe-x" data-unstyle="${esc(st.id)}" title="${esc(I18N.t("удалить стиль"))}">×</span>
+            </span></span>
+          <span class="wxe-fam-name"><span class="wxe-fam-label">${esc(st.name)}</span></span>
+        </button>`;
+      }).join("") + `<button class="wxe-fam wxe-mine-new" data-new-style>
+          <span class="wxe-fam-stage"><span class="wxe-mine-plus">+</span></span>
+          <span class="wxe-fam-name">${esc(I18N.t("Создать свой стиль"))}</span>
+        </button>`;
+      // Плитка своего стиля — та же мини-плашка, одетая в его цвета,
+      // шрифт и фон. Иначе все свои стили одного семейства выглядели бы
+      // одинаково, и выбирать пришлось бы по названию.
+      styles.forEach((st) => {
+        const card = box.querySelector(`[data-style="${CSS.escape(st.id)}"] .card`);
+        for (const [k, v] of Object.entries(st.tweaks || {})) card.style.setProperty(k, v);
+        const font = WIDGET_FONTS.find((f) => f.id === st.font);
+        if (font && font.css) { card.style.setProperty("--w-title-font", font.css); card.dataset.font = st.font; }
+        if (st.cover_shape && widgetCan(card.dataset.family, "shape")) card.dataset.shape = st.cover_shape;
+        const art = card.querySelector(".art");
+        const m = st.media || {};
+        if (m.cover) mediaThumb(art, m.cover);
+        else art.innerHTML = `<img src="${cover}" alt=""><img class="px" src="${wxCovers.px1}" alt="">`;
+        if (m.bg) {
+          const bg = document.createElement("span");
+          bg.className = "mbg on";
+          bg.style.setProperty("--m-dim", ((m.bg_dim || 0) / 100).toFixed(2));
+          card.prepend(bg);
+          card.dataset.mbg = "on";
+          mediaThumb(bg, m.bg);
+        }
+      });
+    }
+    // Выбранный стиль, который потом поправили, помечаем: в кадре уже не
+    // совсем он, и «обновить» на плитке запишет правку в стиль.
+    box.querySelectorAll("[data-style]").forEach((t) => {
+      t.classList.toggle("on", t.dataset.style === w.style);
+      t.classList.toggle("editing", t.dataset.style === wxEditing);
+    });
+    drawEditing(w);
+  }
+
+  function openStyleForm(open) {
+    $("wx-style-form").hidden = !open;
+    if (open) {
+      $("wx-style-name").value = "";
+      $("wx-style-name").focus();
+    }
+  }
+  $("wx-style-cancel").onclick = () => openStyleForm(false);
+  $("wx-style-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const w = widget();
+    const name = $("wx-style-name").value.trim() ||
+      I18N.t("Мой стиль {n}", { n: (w.styles || []).length + 1 });
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const styles = (w.styles || []).concat([Object.assign({ id, name }, lookOf(w))]);
+    if (await saveWidget({ styles, style: id })) {
+      openStyleForm(false);
+      openEdit(id);
+      say(I18N.t("Вы в настройке стиля: всё, что поменяете во вкладках, сразу запишется в него."));
+    }
+  };
+
+  $("wx-mine").onclick = async (e) => {
+    const w = widget();
+    const del = e.target.closest("[data-unstyle]");
+    if (del) {
+      e.stopPropagation();
+      const styles = (w.styles || []).filter((s) => s.id !== del.dataset.unstyle);
+      if (wxEditing === del.dataset.unstyle) wxEditing = null;
+      saveWidget({ styles, style: w.style === del.dataset.unstyle ? "" : w.style });
+      return;
+    }
+    const edit = e.target.closest("[data-edit]");
+    if (edit) {
+      e.stopPropagation();
+      const st = (w.styles || []).find((s) => s.id === edit.dataset.edit);
+      if (!st) return;
+      wxEditing = null;
+      await saveWidget(Object.assign(lookOf(st), { style: st.id }));
+      openEdit(st.id);
+      return;
+    }
+    if (e.target.closest("[data-new-style]")) { openStyleForm(true); return; }
+    const tile = e.target.closest("[data-style]");
+    if (!tile) return;
+    const st = (w.styles || []).find((s) => s.id === tile.dataset.style);
+    if (!st) return;
+    const look = lookOf(st);
+    // Выбрали другой стиль — из настройки прежнего выходим, иначе его
+    // молча переписало бы видом нового.
+    if (wxEditing && wxEditing !== st.id) wxEditing = null;
+    await saveWidget(Object.assign(look, { style: st.id }));
+    wxPlay("enter");
+  };
+  // Примерка наведением — как у встроенных стилей.
+  $("wx-mine").onmouseover = (e) => {
+    const tile = e.target.closest("[data-style]");
+    if (!tile) return;
+    const st = (widget().styles || []).find((s) => s.id === tile.dataset.style);
+    if (!st || (wxLive && wxLive._style === st.id)) return;
+    wxLive = Object.assign(lookOf(st), { _style: st.id });
+    wxPaint();
+  };
+  $("wx-mine").onmouseleave = () => { if (wxLive) { wxLive = null; wxPaint(); } };
+
+  // ── два экрана: «Оформление» и настройка ───────────────────────────
+
+  // wxEditing — свой стиль, который сейчас настраивают (его id), или null:
+  // тогда настройка правит просто то, что в кадре.
+  let wxEditing = null;
+  let wxScreen = "home";
+
+  // Галерея готовых стилей одна, а нужна на обоих экранах: на первом — чтобы
+  // выбрать, в настройке — как «Основа» своего стиля. Переносим её туда,
+  // где она сейчас видна, вместо того чтобы строить вторую.
+  function showScreen(name) {
+    wxScreen = name;
+    $("wx-home").hidden = name !== "home";
+    $("wx-edit").hidden = name !== "edit";
+    const gallery = $("wx-gallery");
+    (name === "home" ? $("wx-gallery-home") : $("wx-gallery-group")).appendChild(gallery);
+    $("wx-side").scrollTop = 0;
+    if (name === "home") openStyleForm(false);
+    drawWidget();
+  }
+
+  // openEdit открывает настройку. С id — настройку своего стиля: всё, что
+  // поменяют во вкладках, сразу пишется в него.
+  function openEdit(id) {
+    wxEditing = id || null;
+    $("wx-saveas").hidden = true;
+    showScreen("edit");
+  }
+  function enterEditing(id) { openEdit(id); }
+
+  function drawEditing(w) {
+    const st = wxEditing && (w.styles || []).find((s) => s.id === wxEditing);
+    if (wxEditing && !st) wxEditing = null;
+    const { family, variant } = widgetPreset(w.preset);
+    const builtin = I18N.t(family.name) + " · " + I18N.t(variant.name);
+
+    // Первый экран: что сейчас в кадре.
+    const own = (w.styles || []).find((s) => s.id === w.style);
+    $("wx-cur-name").textContent = own ? own.name : I18N.t(family.name);
+    $("wx-cur-sub").textContent = own ? I18N.t("свой стиль · основа {base}", { base: builtin }) : I18N.t(variant.name);
+    $("wx-open-edit").lastChild.textContent = own ? I18N.t("Настроить «{name}»", { name: own.name }) : I18N.t("Настроить");
+
+    // Шапка настройки.
+    $("wx-topbar").classList.toggle("own", !!st);
+    $("wx-edit-tag").textContent = st ? I18N.t("Свой стиль") : I18N.t("Настройка вида");
+    $("wx-edit-name").hidden = !st;
+    $("wx-edit-title").hidden = !!st;
+    $("wx-edit-title").textContent = builtin;
+    $("wx-saveas-open").hidden = !!st || !$("wx-saveas").hidden;
+    if (st && document.activeElement !== $("wx-edit-name")) $("wx-edit-name").value = st.name;
+  }
+
+  // «Настроить» на первом экране: выбран свой стиль — настраиваем его,
+  // иначе просто то, что в кадре.
+  $("wx-open-edit").onclick = () => {
+    const w = widget();
+    const own = (w.styles || []).some((s) => s.id === w.style);
+    openEdit(own ? w.style : null);
+  };
+
+  // Открываемся с первого экрана.
+  $("wx-gallery-home").appendChild($("wx-gallery"));
+
+  function leaveEdit() {
+    const was = wxEditing;
+    wxEditing = null;
+    showScreen("home");
+    if (was) say(I18N.t("Стиль сохранён — он на полке «Мои стили»."));
+  }
+  $("wx-edit-done").onclick = leaveEdit;
+  $("wx-back").onclick = leaveEdit;
+
+  $("wx-edit-name").onchange = (e) => {
+    const name = e.target.value.trim();
+    if (!name || !wxEditing) return;
+    const styles = (widget().styles || []).map((st) => (st.id === wxEditing ? Object.assign({}, st, { name }) : st));
+    saveWidget({ styles });
+  };
+
+  // Настроили вид без своего стиля и понравилось — сохранить прямо отсюда,
+  // не возвращаясь на первый экран.
+  $("wx-saveas-open").onclick = () => {
+    $("wx-saveas").hidden = false;
+    $("wx-saveas-open").hidden = true;
+    $("wx-saveas-name").value = "";
+    $("wx-saveas-name").focus();
+  };
+  $("wx-saveas").onsubmit = async (e) => {
+    e.preventDefault();
+    const w = widget();
+    const name = $("wx-saveas-name").value.trim() ||
+      I18N.t("Мой стиль {n}", { n: (w.styles || []).length + 1 });
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const styles = (w.styles || []).concat([Object.assign({ id, name }, lookOf(w))]);
+    if (await saveWidget({ styles, style: id })) {
+      $("wx-saveas").hidden = true;
+      wxEditing = id;
+      drawWidget();
+      say(I18N.t("Стиль «{name}» сохранён — дальше правки пишутся в него.", { name }));
+    }
+  };
+
+  // ── место ──────────────────────────────────────────────────────────
+
+  // Ноль — честный отступ «вплотную к краю», а не «не задано»: настройки
+  // приходят уже приведёнными приложением.
+  const wxGapX = (w) => (Number.isFinite(w.gap_x) ? w.gap_x : 40);
+  const wxGapY = (w) => (Number.isFinite(w.gap_y) ? w.gap_y : 40);
+
+  // posName — место в кадре по-человечески. Внутри оно записано словами
+  // «left-bottom»: так его понимают и виджет, и настройки. Показывать это
+  // человеку нельзя — он читает подсказку, а не исходник.
+  function posName(pos) {
+    const [h, v] = String(pos || "left-bottom").split("-");
+    const across = { left: "слева", center: "по центру", right: "справа" }[h] || "слева";
+    const down = { top: "сверху", middle: "посередине", bottom: "снизу" }[v] || "снизу";
+    if (h === "center" && v === "middle") return I18N.t("ровно посередине");
+    if (I18N.lang() === "en") return I18N.t(down) + " " + I18N.t(across);
+    return across + " " + down;
+  }
+
+  // wxDrawFrame подсказывает размер источника. Без этого стример ставил
+  // источник 800×600 по умолчанию OBS, и плашка в кадре стояла не там, где
+  // он её поставил в панели.
+  function wxDrawFrame(w) {
+    const [fw, fh] = wxFrame(w);
+    const frame = WX_FRAMES[w.frame] ? w.frame : "16:9";
+    document.querySelectorAll("#wx-frame-pick button").forEach((b) => {
+      b.classList.toggle("on", b.dataset.frame === frame);
+    });
+    $("wx-anchors").style.setProperty("--wx-arn", (fw / fh).toFixed(4));
+    $("wx-anchors").style.setProperty("--wx-ar", fw + " / " + fh);
+    // Связь с OBS есть и источник найден — приложение подгоняет его само,
+    // и подсказка про ручную настройку только сбивала бы с толку.
+    $("wx-frame-hint").innerHTML = lastOBS.status === "ok"
+      ? `Источник в OBS подгоняется сам: <b>${fw} × ${fh}</b>, на весь кадр.`
+      : `Источник «Браузер» в OBS: ширина <b>${fw}</b>, высота <b>${fh}</b>, растянуть ` +
+        `на весь кадр. Проще — настроить «Связь с OBS» ниже, тогда размер ` +
+        `поставится сам.`;
+    // OBS понимает эти параметры у брошенной в сцену ссылки и сразу создаёт
+    // источник нужного размера. Самому виджету они не мешают.
+    $("wx-drag").href = location.origin + "/widget?layer-name=" +
+      encodeURIComponent(I18N.t("Заказ музыки")) + "&layer-width=" + fw + "&layer-height=" + fh;
+  }
+
+  $("wx-anchors").onclick = (e) => {
+    const btn = e.target.closest("[data-pos]");
+    if (btn) saveWidget({ position: btn.dataset.pos });
+  };
+  $("wx-align").onclick = (e) => {
+    const b = e.target.closest("[data-align]");
+    if (b) saveWidget({ align: b.dataset.align });
+  };
+
+  live($("wx-scale"), (v) => {
+    $("wx-scale-val").textContent = v + "%";
+    liveSet({ scale: v / 100 });
+  }, (v) => saveWidget({ scale: v / 100 }));
+  $("wx-scale-quick").onclick = (e) => {
+    const b = e.target.closest("[data-scale]");
+    if (b) saveWidget({ scale: Number(b.dataset.scale) / 100 });
+  };
+
+  live($("wx-gapx"), (v) => {
+    $("wx-gapx-val").textContent = v + " px";
+    liveSet({ gap_x: v });
+  }, (v) => saveWidget({ gap_x: v, gap: v }));
+  live($("wx-gapy"), (v) => {
+    $("wx-gapy-val").textContent = v + " px";
+    liveSet({ gap_y: v });
+  }, (v) => saveWidget({ gap_y: v }));
+
+  // Перетаскивание плашки прямо по кадру.
+  //
+  // Зачем оно вдобавок к девяти точкам. Точки отвечают на вопрос «к чему
+  // прижать», а отступы — «на сколько отодвинуть», и человек, который просто
+  // хочет поставить плашку вот сюда, вынужден переводить своё «вот сюда» в
+  // две цифры. Здесь он ставит её мышью, а цифры подставляются сами.
+  //
+  // Привязка при этом сохраняется: плашка прилипает к ближайшей стороне, а не
+  // повисает в кадре координатами. Кадр у OBS может быть другого размера, и
+  // координаты уехали бы, а привязка нет.
+  //
+  // Мышь ловит прозрачный слой поверх фрейма: в сам фрейм события не
+  // попадают, а плашку внутри мы меряем через его документ.
+  (() => {
+    const stage = $("wx-stage");
+    const hit = $("wx-hit");
+    let drag = null;
+
+    // cardBox — где плашка стоит в кадре, в пикселях настоящего кадра.
+    function cardBox() {
+      if (!wxApi) return null;
+      const r = wxApi.slot.getBoundingClientRect();
+      return { x: r.left, y: r.top, w: r.width, h: r.height };
+    }
+    function at(e) {
+      const box = stage.getBoundingClientRect();
+      return { x: (e.clientX - box.left - wxCam.x) / wxCam.k, y: (e.clientY - box.top - wxCam.y) / wxCam.k };
+    }
+    const inside = (p, c) => c && p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h;
+
+    hit.addEventListener("pointermove", (e) => {
+      if (drag) {
+        const p = dragPlace(at(e), drag);
+        liveSet(p);
+        hintDrag(p);
+        return;
+      }
+      const ticker = widgetPreset(widget().preset).family.id === "ticker";
+      hit.style.cursor = !ticker && inside(at(e), cardBox()) ? "grab" : "";
+    });
+
+    hit.addEventListener("pointerdown", (e) => {
+      if (widgetPreset(widget().preset).family.id === "ticker") return;
+      const p = at(e);
+      const c = cardBox();
+      if (!inside(p, c)) return;
+      const [fw, fh] = wxFrame(widget());
+      // Держим плашку за ту же точку, за которую взяли: иначе она прыгает
+      // серединой под курсор, и человек промахивается мимо задуманного.
+      drag = { dx: p.x - c.x, dy: p.y - c.y, w: c.w, h: c.h, fw, fh };
+      wxCamHold = true;
+      hit.setPointerCapture(e.pointerId);
+      stage.classList.add("dragging");
+      hit.style.cursor = "grabbing";
+      e.preventDefault();
+    });
+
+    const finish = (e) => {
+      if (!drag) return;
+      const p = dragPlace(at(e), drag);
+      drag = null;
+      wxCamHold = false;
+      stage.classList.remove("dragging");
+      hit.style.cursor = "grab";
+      saveWidget(p);
+    };
+    hit.addEventListener("pointerup", finish);
+    hit.addEventListener("pointercancel", () => {
+      drag = null;
+      wxCamHold = false;
+      stage.classList.remove("dragging");
+      wxLive = null;
+      drawWidget();
+    });
+
+    // dragPlace переводит место под курсором в «к чему прижать и на сколько».
+    function dragPlace(p, d) {
+      let x = p.x - d.dx;
+      let y = p.y - d.dy;
+      // Не выпускаем плашку за кадр: за краем её всё равно не будет видно, а
+      // вернуть обратно человек уже не сможет — тащить будет не за что.
+      x = Math.min(Math.max(0, x), Math.max(0, d.fw - d.w));
+      y = Math.min(Math.max(0, y), Math.max(0, d.fh - d.h));
+
+      // Ближайшая сторона по каждой оси. Середина берётся, только когда
+      // плашка и правда стоит посередине: иначе «почти по центру» щёлкало бы
+      // туда-сюда между центром и краем.
+      const cx = (x + d.w / 2) / d.fw;
+      const cy = (y + d.h / 2) / d.fh;
+      const h = cx < 0.36 ? "left" : cx > 0.64 ? "right" : "center";
+      const v = cy < 0.36 ? "top" : cy > 0.64 ? "bottom" : "middle";
+
+      const out = { position: h + "-" + v };
+      if (h !== "center") out.gap_x = Math.round(h === "left" ? x : d.fw - x - d.w);
+      if (v !== "middle") out.gap_y = Math.round(v === "top" ? y : d.fh - y - d.h);
+      return out;
+    }
+
+    // Пока тащат — говорим словами, куда попали и на сколько отступили.
+    // Человек должен видеть, что он настраивает, а не только куда ткнул.
+    function hintDrag(p) {
+      const parts = [posName(p.position)];
+      if (p.gap_x !== undefined) parts.push(I18N.t("отступ сбоку {n} px", { n: p.gap_x }));
+      if (p.gap_y !== undefined) parts.push(I18N.t("сверху-снизу {n} px", { n: p.gap_y }));
+      $("wx-badge").textContent = parts.join(" · ");
+    }
+  })();
+
+  // ── показ ──────────────────────────────────────────────────────────
+
+  $("wx-by-on").onchange = (e) => saveWidget({ show_requester: e.target.checked });
+  $("wx-bar-on").onchange = (e) => saveWidget({ show_bar: e.target.checked });
+  $("wx-time-on").onchange = (e) => saveWidget({ show_time: e.target.checked });
+  $("wx-eq-on").onchange = (e) => saveWidget({ show_eq: e.target.checked });
+  $("wx-own-on").onchange = (e) => saveWidget({ show_own: e.target.checked });
+  $("wx-pause-on").onchange = (e) => saveWidget({ hide_on_pause: e.target.checked });
+  $("wx-onchange").onchange = (e) => saveWidget({ show_on_change: e.target.checked });
+
+  // Режим показа. «Всё время» — это ноль секунд удержания; так это и
+  // хранится в настройках, а человеку показывается словами.
+  //
+  // Раньше это был один ползунок «убирать через N секунд» с нулём в
+  // значении «не убирать». Ноль-как-выключатель посреди шкалы человек не
+  // читает: он видит ползунок в крайнем положении и не понимает, что тот
+  // сейчас означает совсем другой режим работы.
+  $("wx-mode").onclick = (e) => {
+    const b = e.target.closest("[data-mode]");
+    if (!b) return;
+    const flash = b.dataset.mode === "flash";
+    saveWidget(flash
+      ? { hold_seconds: parseInt($("wx-hold").value, 10) || 15, show_on_change: true }
+      : { hold_seconds: 0, show_every: 0 });
+  };
+
+  live($("wx-hold"), (v) => {
+    $("wx-hold-val").textContent = I18N.t("{n} с", { n: v });
+  }, (v) => saveWidget({ hold_seconds: v }));
+
+  live($("wx-every"), (v) => {
+    $("wx-every-val").textContent = v
+      ? I18N.t("каждые {n} {min}", { n: v, min: plural(v, "минуту", "минуты", "минут", "minute", "minutes") })
+      : I18N.t("не напоминать");
+  }, (v) => saveWidget({ show_every: v * 60 }));
+
+  // «Показать, как это выглядит» — появление, ожидание, уход, всё подряд.
+  //
+  // Без этой кнопки настройку «всплывать на 15 секунд» проверить можно было
+  // бы только на живом стриме: в образце плашка висит всегда, иначе её не
+  // видно во время настройки.
+  let tryTimer = null;
+  $("wx-flash-try").onclick = () => {
+    const hold = parseInt($("wx-hold").value, 10) || 15;
+    clearTimeout(tryTimer);
+    wxPlay("enter");
+    // Ждём столько же, сколько будет ждать виджет, но не дольше десяти
+    // секунд: смотреть на неподвижную плашку минуту незачем, а увидеть надо
+    // именно уход.
+    tryTimer = setTimeout(() => {
+      wxPlay("leave");
+      tryTimer = setTimeout(() => wxPlay("enter"), 1400);
+    }, Math.min(hold, 10) * 1000);
+  };
+
+  // ── кадр: сцена, образец, проигрыш ─────────────────────────────────
+
+  $("wx-scene-pick").onclick = (e) => {
+    const btn = e.target.closest("[data-scene]");
+    if (!btn) return;
+    $("wx-stage").dataset.scene = btn.dataset.scene;
+    $("wx-scene-pick").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === btn));
+  };
+  $("wx-source-pick").onclick = (e) => {
+    const btn = e.target.closest("[data-source]");
+    if (!btn) return;
+    wxSource = btn.dataset.source;
+    try { localStorage.setItem("wx-source", wxSource); } catch { /* не запомнится — не беда */ }
+    $("wx-source-pick").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === btn));
+    if (wxApi) wxApi.next(wxNow());
+    wxOwnCheck();
+    wxLiveNote();
+  };
+  $("wx-play").onclick = () => wxPlay("enter");
+  // Пауза образца: столбики ложатся, полоса стоит, а с «Прятать на паузе»
+  // плашка уходит — ровно как на стриме.
+  $("wx-pause").onclick = () => {
+    wxPaused = !wxPaused;
+    $("wx-pause").classList.toggle("on", wxPaused);
+    if (wxApi) wxApi.track(wxNow());
+  };
+  $("wx-zoom").onclick = () => {
+    wxZoom = !wxZoom;
+    // Отъезд обратно тоже плавный: класс держим, пока камера едет.
+    const stage = $("wx-stage");
+    stage.classList.add("zooming");
+    wxLayout();
+    setTimeout(() => stage.classList.remove("zooming"), 550);
+  };
+  $("wx-leave").onclick = () => wxLeaveAndBack();
+  $("wx-next").onclick = () => wxPlay("next");
+
+  $("wx-copy").onclick = async () => {
+    try {
+      await navigator.clipboard.writeText($("wx-url").value);
+      say(I18N.t("Адрес скопирован — вставь его в источник «Браузер» в OBS."));
+    } catch {
+      // Буфер обмена доступен не везде; выделенный текст скопируется вручную.
+      $("wx-url").select();
+      say(I18N.t("Скопируй выделенный адрес: Ctrl+C"), true);
+    }
+  };
+
+  let wxLiveKey = null;
+  // Ничего не играет — честно говорим, что в кадре пример.
+  function wxLiveNote() {
+    const idle = wxSource === "live" && !(lastState && lastState.now);
+    $("wx-badge").classList.toggle("warn", idle);
+    if (idle) $("wx-badge").textContent = I18N.t("сейчас ничего не играет — показан пример");
+    else wxLayout();
+  }
+
+  // Своя музыка выключена, а образец показывает её — значит, на стриме
+  // плашки в этот момент не будет. Образец обязан показать то же самое.
+  function wxOwnCheck() {
+    if (!wxApi) return;
+    const hidden = wxSource === "own" && widget().show_own === false;
+    const shown = wxApi.card.classList.contains("show") && !wxApi.card.classList.contains("leave");
+    $("wx-badge").classList.toggle("warn", hidden);
+    if (hidden && shown) wxApi.play("leave");
+    else if (!hidden && !shown) wxPlay("enter");
+    if (hidden) $("wx-badge").textContent = I18N.t("своя музыка не показывается — включи во вкладке «Показ»");
+  }
+
+  // ── всё вместе ─────────────────────────────────────────────────────
+
+  const seg = (id, attr, value) => {
+    document.querySelectorAll("#" + id + " [data-" + attr + "]").forEach((b) => {
+      b.classList.toggle("on", b.dataset[attr] === String(value));
+    });
+  };
+
+  function drawWidget() {
+    wxBoot();
     const w = widget();
     const family = widgetPreset(w.preset).family;
-    if (family.id === "ticker") return;
-    wxPlace(Object.assign({}, w, axis === "x" ? { gap_x: px } : { gap_y: px }), family);
+
+    wxPaint();
+    wxDrawFrame(w);
+
+    // Стиль
+    $("wx-gallery").querySelectorAll("[data-family]").forEach((t) => {
+      t.classList.toggle("on", t.dataset.family === family.id);
+    });
+    drawVariants(w);
+
+    // Обложка
+    $("wx-art-on").checked = w.show_art !== false;
+    $("wx-shape-group").classList.toggle("off", w.show_art === false);
+    drawShapes(w);
+
+    // Цвет
+    $("wx-magic").checked = !!w.magic;
+    drawTweaks(w);
+    drawFonts(w);
+    const op = Number.isFinite(w.opacity) ? w.opacity : 100;
+    $("wx-op").value = op;
+    $("wx-op-val").textContent = op + "%";
+
+    // Своё и свои стили
+    drawSlots(w);
+    drawMine(w);
+
+    // Анимация
+    drawAnims(w);
+    $("wx-motion-on").checked = w.motion !== false;
+
+    // Место. Тикер занимает всю ширину — выбор угла для него ничего не
+    // значит, и делать вид, что значит, нечестно.
+    const ticker = family.id === "ticker";
+    $("wx-anchors").classList.toggle("narrow", ticker);
+    // Отступ от края по оси, где плашка стоит посередине, ни на что не
+    // влияет. Живой ползунок, который ничего не делает, хуже серого.
+    const [ph, pv] = (w.position || "left-bottom").split("-");
+    $("wx-gapx").disabled = ticker || ph === "center";
+    $("wx-gapy").disabled = ticker || pv === "middle";
+    $("wx-gapx").closest(".wxe-slider").classList.toggle("off", $("wx-gapx").disabled);
+    $("wx-gapy").closest(".wxe-slider").classList.toggle("off", $("wx-gapy").disabled);
+    $("wx-pos-hint").textContent = ticker
+      ? I18N.t("Тикер занимает всю ширину кадра: остаётся только выбрать верх или низ.")
+      : I18N.t("Плашку можно просто перетащить мышью прямо по кадру — точка привязки и отступы подставятся сами.");
+    const chosenPos = w.position || "left-bottom";
+    $("wx-anchors").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.pos === chosenPos));
+    const percent = Math.round((w.scale || 1) * 100);
+    $("wx-scale").value = percent;
+    $("wx-scale-val").textContent = percent + "%";
+    seg("wx-scale-quick", "scale", percent);
+    const gx = wxGapX(w), gy = wxGapY(w);
+    $("wx-gapx").value = gx;
+    $("wx-gapx-val").textContent = gx + " px";
+    $("wx-gapy").value = gy;
+    $("wx-gapy-val").textContent = gy + " px";
+    seg("wx-align", "align", w.align || "auto");
+
+    // Показ
+    $("wx-by-on").checked = w.show_requester !== false;
+    $("wx-bar-on").checked = w.show_bar !== false;
+    $("wx-time-on").checked = !!w.show_time;
+    $("wx-eq-on").checked = !!w.show_eq;
+    $("wx-own-on").checked = w.show_own !== false;
+    $("wx-pause-on").checked = !!w.hide_on_pause;
+
+    const hold = w.hold_seconds || 0;
+    const flash = hold > 0;
+    seg("wx-mode", "mode", flash ? "flash" : "always");
+    $("wx-flash").hidden = !flash;
+    $("wx-mode-hint").textContent = flash
+      ? I18N.t("Плашка появляется, висит сколько сказано и уходит.")
+      : I18N.t("Плашка стоит в кадре, пока играет музыка.");
+    $("wx-hold").value = flash ? hold : 15;
+    $("wx-hold-val").textContent = I18N.t("{n} с", { n: flash ? hold : 15 });
+    $("wx-onchange").checked = w.show_on_change !== false;
+    // «Не всплывать на смене» без напоминаний — плашка не появится никогда.
+    // Приложение такую пару всё равно чинит, но пусть человек видит это
+    // здесь, а не удивляется пустому кадру.
+    const never = !w.show_every;
+    $("wx-onchange").disabled = never;
+    $("wx-onchange").closest(".wxe-switch").classList.toggle("locked", never);
+    $("wx-onchange-note").textContent = never
+      ? I18N.t("Выключить можно, только если плашка напоминает о себе, — иначе она не появится вообще.")
+      : I18N.t("Главный повод показать плашку: заиграло что-то новое.");
+    const everyMin = Math.round((w.show_every || 0) / 60);
+    $("wx-every").value = everyMin;
+    $("wx-every-val").textContent = everyMin
+      ? I18N.t("каждые {n} {min}", { n: everyMin, min: plural(everyMin, "минуту", "минуты", "минут", "minute", "minutes") })
+      : I18N.t("не напоминать");
+
+    const url = location.origin + "/widget";
+    $("wx-url").value = url;
+    $("wx-open").href = url + "?demo=1";
+
+    if (wxApi) wxApi.setLang(I18N.lang());
+    wxOwnCheck();
   }
 
   // ── кнопки обновления ──────────────────────────────────────────────
@@ -2672,132 +3946,7 @@
 
   $("widget-toggle").onclick = () => toggleWidget();
 
-  // ── место в кадре ──────────────────────────────────────────────────
-
-  $("wx-anchors").onclick = (e) => {
-    const btn = e.target.closest("[data-pos]");
-    if (btn) saveWidget({ position: btn.dataset.pos });
-  };
-
-  // Перетаскивание плашки прямо по кадру.
-  //
-  // Зачем оно вдобавок к девяти точкам. Точки отвечают на вопрос «к чему
-  // прижать», а отступы — «на сколько отодвинуть», и человек, который просто
-  // хочет поставить плашку вот сюда, вынужден переводить своё «вот сюда» в
-  // две цифры. Здесь он ставит её мышью, а цифры подставляются сами — и
-  // остаются видимыми, чтобы их можно было поправить с точностью до пикселя.
-  //
-  // Привязка при этом сохраняется: плашка прилипает к ближайшей стороне, а не
-  // повисает в кадре координатами. Это не придирка — кадр у OBS может быть
-  // другого размера, и координаты уехали бы, а привязка нет.
-  (() => {
-    const stage = $("wx-stage");
-    const slot = $("wx-slot");
-    let drag = null;
-
-    slot.addEventListener("pointerdown", (e) => {
-      if (widgetPreset(widget().preset).family.id === "ticker") return;
-      const box = stage.getBoundingClientRect();
-      const card = slot.getBoundingClientRect();
-      drag = {
-        id: e.pointerId,
-        // Держим плашку за ту же точку, за которую взяли: иначе она прыгает
-        // серединой под курсор, и человек промахивается мимо задуманного.
-        dx: e.clientX - card.left,
-        dy: e.clientY - card.top,
-        w: card.width, h: card.height, box,
-      };
-      slot.setPointerCapture(e.pointerId);
-      stage.classList.add("dragging");
-      e.preventDefault();
-    });
-
-    slot.addEventListener("pointermove", (e) => {
-      if (!drag) return;
-      const p = dragPlace(e, drag);
-      // Ведём образец у себя, без записи на диск: писать файл на каждое
-      // движение мыши значило бы рассылать настройки в OBS сотнями.
-      wxPlace(Object.assign({}, widget(), p), widgetPreset(widget().preset).family);
-      wxAlign(Object.assign({}, widget(), p));
-      hintDrag(p);
-    });
-
-    const finish = (e) => {
-      if (!drag) return;
-      const p = dragPlace(e, drag);
-      drag = null;
-      stage.classList.remove("dragging");
-      saveWidget(p);
-    };
-    slot.addEventListener("pointerup", finish);
-    slot.addEventListener("pointercancel", () => {
-      drag = null;
-      stage.classList.remove("dragging");
-      drawWidget();
-    });
-
-    // dragPlace переводит место под курсором в «к чему прижать и на сколько».
-    function dragPlace(e, d) {
-      const k = wxRatio();
-      let x = e.clientX - d.box.left - d.dx;
-      let y = e.clientY - d.box.top - d.dy;
-      // Не выпускаем плашку за кадр: за краем её всё равно не будет видно, а
-      // вернуть обратно человек уже не сможет — тащить будет не за что.
-      x = Math.min(Math.max(0, x), Math.max(0, d.box.width - d.w));
-      y = Math.min(Math.max(0, y), Math.max(0, d.box.height - d.h));
-
-      // Ближайшая сторона по каждой оси. Середина берётся, только когда
-      // плашка и правда стоит посередине: иначе «почти по центру» щёлкало бы
-      // туда-сюда между центром и краем.
-      const cx = (x + d.w / 2) / d.box.width;
-      const cy = (y + d.h / 2) / d.box.height;
-      const h = cx < 0.36 ? "left" : cx > 0.64 ? "right" : "center";
-      const v = cy < 0.36 ? "top" : cy > 0.64 ? "bottom" : "middle";
-
-      const out = { position: h + "-" + v };
-      if (h !== "center") {
-        out.gap_x = Math.round((h === "left" ? x : d.box.width - x - d.w) / k);
-      }
-      if (v !== "middle") {
-        out.gap_y = Math.round((v === "top" ? y : d.box.height - y - d.h) / k);
-      }
-      return out;
-    }
-
-    // Пока тащат — говорим словами, куда попали и на сколько отступили.
-    // Человек должен видеть, что он настраивает, а не только куда ткнул.
-    function hintDrag(p) {
-      const parts = [posName(p.position)];
-      if (p.gap_x !== undefined) parts.push("отступ сбоку " + p.gap_x + " px");
-      if (p.gap_y !== undefined) parts.push("сверху-снизу " + p.gap_y + " px");
-      $("wx-pos-hint").textContent = parts.join(", ");
-    }
-  })();
-
-  $("wx-align").onchange = (e) => saveWidget({ align: e.target.value });
-  $("wx-art-on").onchange = (e) => saveWidget({ show_art: e.target.checked });
-  $("wx-by-on").onchange = (e) => saveWidget({ show_requester: e.target.checked });
-  $("wx-bar-on").onchange = (e) => saveWidget({ show_bar: e.target.checked });
-  $("wx-motion-on").onchange = (e) => saveWidget({ motion: e.target.checked });
-  $("wx-own-on").onchange = (e) => saveWidget({ show_own: e.target.checked });
-
-  // Ровно та же строка, что рисует настоящий виджет.
-  function wxByLine(w) {
-    if (wxSource === "own") return "музыка канала";
-    if (w.show_requester !== false) return "заказал " + WX_TRACKS[wxTrack][2];
-    return "заказ зрителя";
-  }
-
-  $("wx-source-pick").onclick = (e) => {
-    const btn = e.target.closest("[data-source]");
-    if (!btn) return;
-    wxSource = btn.dataset.source;
-    $("wx-source-pick").querySelectorAll("button").forEach((b) => {
-      b.classList.toggle("on", b === btn);
-    });
-    drawWidget();
-  };
-  $("wx-reset").onclick = () => saveWidget({ tweaks: null });
+  // ── формат кадра и перетаскивание в OBS ───────────────────────────
 
   $("wx-frame-pick").onclick = (e) => {
     const b = e.target.closest("button[data-frame]");
@@ -2809,150 +3958,6 @@
     e.preventDefault();
     say("Эту кнопку надо не нажать, а перетащить мышью в окно сцены OBS.");
   };
-
-  live($("wx-scale"), (v) => {
-    $("wx-scale-val").textContent = v + "%";
-    $("wx-card").style.setProperty("--scale", v / 100);
-  }, (v) => saveWidget({ scale: v / 100 }));
-
-  live($("wx-gapx"), (v) => {
-    $("wx-gapx-val").textContent = v + " px";
-    drawGap("x", v);
-  }, (v) => saveWidget({ gap_x: v, gap: v }));
-
-  live($("wx-gapy"), (v) => {
-    $("wx-gapy-val").textContent = v + " px";
-    drawGap("y", v);
-  }, (v) => saveWidget({ gap_y: v }));
-
-  live($("wx-op"), (v) => {
-    $("wx-op-val").textContent = v + "%";
-    $("wx-slot").style.opacity = v / 100;
-  }, (v) => saveWidget({ opacity: v }));
-
-  // Режим показа. «Висит всё время» — это ноль секунд удержания; так это и
-  // хранится в настройках, а человеку показывается словами.
-  $("wx-mode").onchange = (e) => {
-    const flash = e.target.value === "flash";
-    $("wx-flash").hidden = !flash;
-    saveWidget(flash
-      ? { hold_seconds: parseInt($("wx-hold").value, 10) || 15, show_on_change: true }
-      : { hold_seconds: 0, show_every: 0 });
-  };
-
-  $("wx-onchange").onchange = (e) => saveWidget({ show_on_change: e.target.checked });
-
-  live($("wx-hold"), (v) => {
-    $("wx-hold-val").textContent = v + " с";
-  }, (v) => saveWidget({ hold_seconds: v }));
-
-  live($("wx-every"), (v) => {
-    $("wx-every-val").textContent = v
-      ? "каждые " + v + " " + plural(v, "минуту", "минуты", "минут")
-      : "не напоминать";
-  }, (v) => saveWidget({ show_every: v * 60 }));
-
-  // «Показать, как это выглядит» — появление, ожидание, уход, всё подряд.
-  //
-  // Без этой кнопки настройку «всплывать на 15 секунд» проверить можно было
-  // бы только на живом стриме: в образце плашка висит всегда, иначе её не
-  // видно во время настройки.
-  let tryTimer = null;
-  $("wx-flash-try").onclick = () => {
-    const hold = parseInt($("wx-hold").value, 10) || 15;
-    clearTimeout(tryTimer);
-    wxPlay("enter");
-    // Ждём столько же, сколько будет ждать виджет, но не дольше десяти
-    // секунд: смотреть на неподвижную плашку минуту незачем, а увидеть надо
-    // именно уход.
-    tryTimer = setTimeout(() => {
-      wxPlay("leave");
-      // Возвращаем образец на место: он нужен для настройки всего
-      // остального, и оставлять пустой кадр после показа нельзя.
-      tryTimer = setTimeout(() => wxPlay("enter"), 1400);
-    }, Math.min(hold, 10) * 1000);
-  };
-
-  $("wx-tweaks").oninput = (e) => {
-    const key = e.target.dataset.tweak;
-    if (!key) return;
-    const value = e.target.type === "color" ? e.target.value : e.target.value + "px";
-    $("wx-card").style.setProperty(key, value);
-  };
-  $("wx-tweaks").onchange = (e) => {
-    const key = e.target.dataset.tweak;
-    if (!key) return;
-    setTweak(key, e.target.type === "color" ? e.target.value : e.target.value + "px");
-  };
-  $("wx-tweaks").onclick = (e) => {
-    const clear = e.target.closest("[data-clear]");
-    if (clear) setTweak(clear.dataset.clear, null);
-  };
-
-  $("wx-scene-pick").onclick = (e) => {
-    const btn = e.target.closest("[data-scene]");
-    if (!btn) return;
-    $("wx-stage").dataset.scene = btn.dataset.scene;
-    $("wx-scene-pick").querySelectorAll("button").forEach((b) => {
-      b.classList.toggle("on", b === btn);
-    });
-  };
-
-  // Появление, смена трека и уход — три разных состояния. Класс снимается
-  // после проигрыша, иначе он глушит постоянные анимации.
-  function wxPlay(kind) {
-    const card = $("wx-card");
-    clearTimeout(wxTimer);
-    card.classList.remove("enter", "swap-out", "swap-in", "leave", "show");
-    void card.offsetWidth;
-    card.classList.add("show", kind);
-    wxTimer = setTimeout(() => card.classList.remove(kind), 1600);
-  }
-
-  $("wx-play").onclick = () => wxPlay("enter");
-  $("wx-leave").onclick = () => wxPlay("leave");
-
-  // Смена трека — две фазы, как в настоящем виджете: старое уходит, текст
-  // подменяется, новое приходит. Длительность ухода объявлена оформлением.
-  $("wx-next").onclick = () => {
-    const card = $("wx-card");
-    const out = parseFloat(getComputedStyle(card).getPropertyValue("--swap-out")) || 150;
-    wxPlay("swap-out");
-    clearTimeout(wxSwapTimer);
-    wxSwapTimer = setTimeout(() => {
-      wxTrack = (wxTrack + 1) % WX_TRACKS.length;
-      const [title, artist, by] = WX_TRACKS[wxTrack];
-      $("wx-title").textContent = title;
-      $("wx-artist").textContent = artist;
-      $("wx-by").textContent = wxByLine(widget());
-      wxPlay("swap-in");
-    }, out);
-  };
-
-  $("wx-copy").onclick = async () => {
-    try {
-      await navigator.clipboard.writeText($("wx-url").value);
-      say("Адрес скопирован — вставь его в источник «Браузер» в OBS.");
-    } catch {
-      // Буфер обмена доступен не везде; выделенный текст скопируется вручную.
-      $("wx-url").select();
-      say("Скопируй выделенный адрес: Ctrl+C", true);
-    }
-  };
-
-  $("ban-login").onkeydown = (e) => {
-    if (e.key === "Enter") $("ban-add").click();
-  };
-
-  // Мастер первой настройки: показать ещё раз по просьбе. Сам мастер живёт в
-  // setup.js — здесь только кнопка.
-  const again = $("setup-again");
-  if (again) {
-    again.onclick = () => {
-      if (window.srSetupOpen) window.srSetupOpen();
-      else say("Мастер настройки не загрузился — перезапусти приложение", true);
-    };
-  }
 
   // ── сборка ─────────────────────────────────────────────────────────
 
@@ -2972,6 +3977,12 @@
     // Перемотка в Spotify не меняет ни трек, ни подпись — значит карточку не
     // перерисуют. Но время после неё другое, и полосу надо переставить.
     syncMeter(s.now);
+    // Живой образец в редакторе виджета идёт за настоящим треком: сменился
+    // трек, встал на паузу — образец делает то же самое.
+    if (wxSource === "live" && wxApi) {
+      const key = s.now ? nowKey(s.now) + "|" + !!s.now.paused : "";
+      if (key !== wxLiveKey) { wxLiveKey = key; wxApi.track(wxNow()); wxLiveNote(); }
+    }
     draw("orders", sig([s.queue, s.paused, s.twitch.reward_title,
                         s.twitch.reward_cost, s.twitch.reward_ready]), () => renderOrders(s));
     draw("update", sig(s.update), () => renderUpdate(s.update || {}));
@@ -2988,6 +3999,7 @@
     draw("tally", sig(s.session) + Math.floor(Date.now() / 60000), () => renderTally(s));
     draw("banner", sig([s.twitch.pending_code, s.twitch.pending_expires]), () => renderBanner(s.twitch));
     draw("ym-card", sig(s.yandex), () => renderYandexCard(s.yandex));
+    draw("plus-warn", sig([s.yandex.connected, s.yandex.plus, s.yandex.account]), () => renderPlusWarn(s.yandex));
     draw("tw-card", sig(s.twitch), () => renderTwitchCard(s.twitch));
 
     if (s.yandex.connected && !playlistsLoaded &&

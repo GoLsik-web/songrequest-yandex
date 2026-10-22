@@ -1,6 +1,8 @@
 package update
 
 import (
+	"archive/zip"
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -95,7 +97,9 @@ func TestReleasesPage(t *testing.T) {
 	if got := ReleasesPage("golsi/songrequest"); got != "https://github.com/golsi/songrequest/releases/latest" {
 		t.Fatalf("адрес выпусков %q", got)
 	}
-	if got := ReleasesPage("ерунда"); got != "" {
+	// Для негодного имени — страница по умолчанию: ссылка «скачай вручную»
+	// нужна как раз тогда, когда настройки сломаны.
+	if got := ReleasesPage("ерунда"); got != "https://github.com/"+DefaultRepo+"/releases/latest" {
 		t.Fatalf("для негодного имени выдан адрес %q", got)
 	}
 }
@@ -162,5 +166,34 @@ func TestApplyTwice(t *testing.T) {
 	got, _ := os.ReadFile(exe)
 	if string(got) != "версия 3" {
 		t.Fatalf("после двух подмен лежит %q", got)
+	}
+}
+
+func zipOf(t *testing.T, names ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	for _, n := range names {
+		w, err := zw.Create(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Write([]byte("MZ" + n))
+	}
+	zw.Close()
+	return buf.Bytes()
+}
+
+// Из архива берётся только songrequest-yandex*.exe и только если он один.
+func TestFromZipPicksOnlyOurExe(t *testing.T) {
+	got, err := fromZip(zipOf(t, "mpv.exe", "dist/songrequest-yandex-0.3.0.exe"))
+	if err != nil || string(got) != "MZdist/songrequest-yandex-0.3.0.exe" {
+		t.Fatalf("взял %q, ошибка %v", got, err)
+	}
+	if _, err := fromZip(zipOf(t, "songrequest-yandex.exe", "songrequest-yandex-old.exe")); err == nil {
+		t.Fatal("два кандидата — должен быть отказ")
+	}
+	if _, err := fromZip(zipOf(t, "mpv.exe", "songrequest.exe")); err == nil {
+		t.Fatal("чужой .exe принят за программу")
 	}
 }

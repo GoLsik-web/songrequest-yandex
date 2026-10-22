@@ -154,12 +154,14 @@ func TestTrackPauseDoesNotStopOrders(t *testing.T) {
 func TestChatCommandsBanAndUnban(t *testing.T) {
 	srv := commandServer(t)
 
-	srv.onChat(fromMod("!бан Вася надоел"))
-	if !banned(t, srv, "вася") {
+	// Логин Twitch бывает только латиницей: «Вася» — отображаемое имя, его
+	// бан отклоняется (см. TestBanRejectsBadLogin).
+	srv.onChat(fromMod("!бан Vasya надоел"))
+	if !banned(t, srv, "vasya") {
 		t.Fatal("«!бан» не закрыл заказы")
 	}
-	srv.onChat(fromMod("!разбан ВАСЯ"))
-	if banned(t, srv, "вася") {
+	srv.onChat(fromMod("!разбан VASYA"))
+	if banned(t, srv, "vasya") {
 		t.Fatal("«!разбан» не вернул заказы")
 	}
 
@@ -397,5 +399,28 @@ func TestPlaylistCommandsIgnoreViewers(t *testing.T) {
 	srv.onChat(fromViewer("!одобрить"))
 	if n := len(srv.pendingPlaylists()); n != 1 {
 		t.Fatal("зритель сам одобрил свой плейлист")
+	}
+}
+
+// «!бан» с мусором вместо ника ничего не записывает в бан-лист.
+func TestBanRejectsBadLogin(t *testing.T) {
+	srv := commandServer(t)
+	for _, bad := range []string{"!бан @", "!бан Вася", "!бан ab"} {
+		srv.onChat(fromMod(bad))
+	}
+	for _, login := range []string{"", "вася", "ab"} {
+		if banned(t, srv, login) {
+			t.Fatalf("в бан-лист попал мусор %q", login)
+		}
+	}
+}
+
+// Чужие слова с тем же знаком командами не считаются.
+func TestIsChatCommand(t *testing.T) {
+	if !isChatCommand("!скип", "!") || !isChatCommand("!SKIP 2", "!") {
+		t.Fatal("команда не узнана")
+	}
+	if isChatCommand("!дискорд", "!") || isChatCommand("скип", "!") {
+		t.Fatal("чужое принято за команду")
 	}
 }

@@ -13,6 +13,11 @@
 
 html, body { margin: 0; background: transparent; overflow: hidden; }
 body { -webkit-font-smoothing: antialiased; }
+/* Внутри панели виджет живёт во фрейме. Схема цвета обязана совпадать с
+   панелью: иначе браузер заливает фрейм непрозрачным белым. */
+html.preview { color-scheme: dark; }
+.boil-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+html.preview, html.preview body { width: 100%; height: 100%; }
 </style>
 </head>
 <body>
@@ -22,18 +27,43 @@ body { -webkit-font-smoothing: antialiased; }
      покачиванием винила, дрожью терминала. Прижать её к середине кадра можно
      только через translate(-50%), и он затирался бы первой же анимацией.
      Обёртка держит место, плашка внутри живёт своей жизнью. -->
+<!-- Фильтры «кипящей» линии для «Туши» и «Скетча». Три кадра шума с
+     разным зерном; оформление перебирает их ступенькой, и контур дрожит,
+     как в рисованной от руки анимации. -->
+<svg class="boil-defs" width="0" height="0" aria-hidden="true" focusable="false">
+  <filter id="boil-1"><feTurbulence type="fractalNoise" baseFrequency=".022" numOctaves="1" seed="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.2"/></filter>
+  <filter id="boil-2"><feTurbulence type="fractalNoise" baseFrequency=".022" numOctaves="1" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.2"/></filter>
+  <filter id="boil-3"><feTurbulence type="fractalNoise" baseFrequency=".022" numOctaves="1" seed="13" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.2"/></filter>
+</svg>
+
 <div class="slot" id="slot">
   <div class="card" id="card">
+    <div class="aura" id="aura"><i></i></div>
+    <!-- Свой фон плашки: гифка, ролик или встроенная анимация. Под ним
+         ничего, над ним — затемнение, чтобы читалось название. -->
+    <div class="mbg" id="mbg" aria-hidden="true"></div>
+    <!-- Слой эффектов: снег, частицы света, лепестки, спидлайны. Пустой у
+         всех, кроме семейств, которым он нужен. -->
+    <div class="fx" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <div class="art" id="art"></div>
     <div class="text">
       <div class="title" id="title"></div>
       <div class="artist" id="artist"></div>
       <div class="by" id="by"></div>
       <div class="bar"><i id="bar"></i></div>
+      <div class="meta">
+        <span class="eq"><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="time"><b id="t-now">0:00</b> / <b id="t-len">0:00</b></span>
+      </div>
     </div>
   </div>
+  <!-- Наклейка — соседка плашки, а не её часть: у многих стилей плашка
+       обрезает всё, что торчит за край, а наклейка как раз должна торчать. -->
+  <div class="sticker" id="sticker" aria-hidden="true"></div>
 </div>
 
+<script src="/static/i18n-ru.js"></script>
+<script src="/static/widget-fx.js"></script>
 <script src="/static/widget-presets.js"></script>
 <script>
 // Виджет живёт на том же сокете, что и панель: отдельного опроса нет.
@@ -61,11 +91,25 @@ body { -webkit-font-smoothing: antialiased; }
   // поднятый приложением, не знает: в панели обложка была видна, а в кадре —
   // нет. Приложение качает её через тот же обход и отдаёт со 127.0.0.1, а если
   // не смогло — переводит браузер на прямой адрес, как было раньше.
-  const coverSrc = (u) => "/cover?u=" + encodeURIComponent(u);
+  //
+  // Образцы обложек в панели рисуются на месте и приходят готовой картинкой
+  // (data:) — их через приложение гонять незачем.
+  //
+  // Заодно это делает картинку «своей» для страницы: цвета из обложки можно
+  // прочитать, только если она пришла с того же адреса, что и сам виджет.
+  const coverSrc = (u) => (/^data:/.test(u) ? u : "/cover?u=" + encodeURIComponent(u));
 
   const NOTE = `<svg class="no" viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/>
       <circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+
+  // Предпросмотр в панели. Панель показывает не похожую вёрстку, а этот
+  // самый виджет во фрейме — значит, в OBS будет ровно то, что в панели.
+  // Разница одна: здесь виджет не слушает сокет, им управляет панель. Иначе
+  // каждое обновление состояния возвращало бы ползунок, который человек
+  // ещё тянет, на сохранённое значение.
+  const preview = params.get("preview") === "1";
+  if (preview) document.documentElement.classList.add("preview");
 
   // ── оформление ─────────────────────────────────────────────────────
 
@@ -76,7 +120,27 @@ body { -webkit-font-smoothing: antialiased; }
   let showNick = true;
   // Настройки показа, которыми пользуется расписание. Держим отдельно, чтобы
   // не разбирать их заново на каждый тик.
-  let plan = { hold: 0, every: 0, onChange: true };
+  let plan = { hold: 0, every: 0, onChange: true, onPause: false };
+  // Цвета из обложки: включены ли и есть ли ручной акцент, который
+  // им уступает. Сам цвет считается на каждой новой обложке.
+  let magic = false;
+  let magicColor = null;
+
+  const FONTS = {
+    unbounded: "Unbounded, Manrope, sans-serif",
+    manrope: "Manrope, system-ui, sans-serif",
+    oswald: "Oswald, 'Arial Narrow', sans-serif",
+    playfair: "'Playfair Display', Georgia, serif",
+    mono: "'JetBrains Mono', Consolas, monospace",
+  };
+
+  // flag ставит или снимает признак на плашке. Пустое значение — снять:
+  // правила в widget.css срабатывают только на заданный признак, и «как в
+  // наборе» означает именно его отсутствие.
+  function flag(name, value) {
+    if (value) card.setAttribute("data-" + name, value);
+    else card.removeAttribute("data-" + name);
+  }
 
   function dress(w) {
     if (!w) return;
@@ -98,13 +162,33 @@ body { -webkit-font-smoothing: antialiased; }
     // а в OBS плашка продолжала дёргаться.
     card.dataset.motion = w.motion === false ? "off" : "on";
 
+    // Поверх набора. Каждый признак ставится, только если выбран: пустой
+    // признак значит «как задумано в наборе».
+    // Что неприменимо к стилю, не применяем, даже если сохранено: форма
+    // «пластинка», выбранная для «Эфира», не должна скруглять пиксельную
+    // обложку, когда стример переключился на «Пиксель». Настройка при этом
+    // не теряется — вернётся вместе со стилем, где она уместна.
+    const can = (what) => widgetCan(family.id, what);
+    flag("shape", can("shape") ? (w.cover_shape || "") : "");
+    flag("glow", can("glow") && w.cover_glow ? "on" : "");
+    flag("coverbg", can("coverbg") && w.cover_bg ? "on" : "");
+    flag("in", w.anim_in || "");
+    flag("out", w.anim_out || "");
+    flag("font", w.font || "");
+    flag("eq", w.show_eq ? "on" : "");
+    flag("time", w.show_time ? "on" : "");
+    if (FONTS[w.font]) card.style.setProperty("--w-title-font", FONTS[w.font]);
+    else card.style.removeProperty("--w-title-font");
+
     // Масштаб — через zoom, а не через растяжку источника в OBS. Растянутый
     // в OBS источник — это растянутая картинка, отсюда мыло. zoom же заново
     // раскладывает плашку в большем размере: шрифты, рамки и полоса
-    // рисуются чётко при любом масштабе, а не только то, что прописано
-    // через --scale. --scale остаётся единицей, им пользуется предпросмотр
-    // в панели.
-    card.style.setProperty("--scale", 1);
+    // рисуются чётко при любом масштабе.
+    //
+    // И только zoom. Раньше рядом жила переменная --scale, на которую
+    // умножалась часть размеров: шрифты росли, а обложка, отступы и
+    // скругления — нет, и на 200% плашка разваливалась. Теперь плашка
+    // нарисована в одном размере, а увеличивается вся целиком.
     card.style.zoom = Math.min(4, Math.max(0.5, Number(w.scale) || 1));
     requestAnimationFrame(fitRuns);
 
@@ -125,6 +209,9 @@ body { -webkit-font-smoothing: antialiased; }
     for (const [key, value] of Object.entries(w.tweaks || {})) {
       if (allowed.has(key)) card.style.setProperty(key, value);
     }
+    magic = !!w.magic;
+    paintMagic();
+    dressMedia(w);
 
     // Расписание показа. Пересобираем его на каждой правке настроек, иначе
     // стример ставит «убирать через 15 секунд», плашка прячется, он
@@ -134,7 +221,12 @@ body { -webkit-font-smoothing: antialiased; }
       hold: Math.max(0, Number(w.hold_seconds) || 0),
       every: Math.max(0, Number(w.show_every) || 0),
       onChange: w.show_on_change !== false,
+      onPause: !!w.hide_on_pause,
     };
+    // В панели плашка висит всегда — иначе её не видно, пока настраиваешь.
+    // А вот «прятать на паузе» в образце работает: его проверяют кнопкой
+    // «Пауза» под кадром.
+    if (preview) plan = { hold: 0, every: 0, onChange: true, onPause: plan.onPause };
     if (!first && shownTrack) schedule(true);
   }
 
@@ -195,6 +287,279 @@ body { -webkit-font-smoothing: antialiased; }
     card.dataset.align = a;
   }
 
+  // ── цвета из обложки ───────────────────────────────────────────────
+  //
+  // Плашка перекрашивается под каждый трек: акцент (ник, полоса, грань,
+  // столбики) берётся из самой обложки. Так плашка всегда «в тон» музыке,
+  // и стримеру не надо подбирать цвет, который подойдёт ко всему подряд.
+
+  // pickColor ищет на обложке самый заметный цвет — не средний (он почти
+  // всегда грязно-серый), а самый «цветной» из тех, что занимают место.
+  function pickColor(img) {
+    try {
+      const size = 28;
+      const c = document.createElement("canvas");
+      c.width = c.height = size;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0, size, size);
+      const d = ctx.getImageData(0, 0, size, size).data;
+
+      // Раскладываем точки по двенадцати оттенкам. Вес — насыщенность:
+      // серое и почти чёрное в акцент не годится, сколько бы его ни было.
+      const bins = [];
+      for (let i = 0; i < 12; i++) bins.push({ w: 0, r: 0, g: 0, b: 0 });
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        const l = (max + min) / 510;
+        const s = max === min ? 0 : (max - min) / (255 - Math.abs(max + min - 255));
+        if (l < 0.12 || l > 0.94 || s < 0.18) continue;
+        let h;
+        if (max === r) h = ((g - b) / (max - min) + 6) % 6;
+        else if (max === g) h = (b - r) / (max - min) + 2;
+        else h = (r - g) / (max - min) + 4;
+        const bin = bins[Math.floor(h * 2) % 12];
+        const weight = s * s * (1 - Math.abs(l - 0.55));
+        bin.w += weight; bin.r += r * weight; bin.g += g * weight; bin.b += b * weight;
+      }
+      bins.sort((a, b) => b.w - a.w);
+      const top = bins[0];
+      // Обложка вся серая — честно признаём, что цвета нет, и остаётся
+      // акцент набора. Выдуманный цвет был бы хуже.
+      if (top.w < 2) return null;
+      return [top.r / top.w, top.g / top.w, top.b / top.w];
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // tune подгоняет найденный цвет под подложку: на тёмной плашке акцент
+  // обязан быть светлым и сочным, на светлой — наоборот, иначе ник
+  // заказчика не прочитать.
+  function tune(rgb) {
+    let [r, g, b] = rgb.map((v) => v / 255);
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0;
+    const l0 = (max + min) / 2;
+    if (max !== min) {
+      const dd = max - min;
+      s = l0 > 0.5 ? dd / (2 - max - min) : dd / (max + min);
+      if (max === r) h = (g - b) / dd + (g < b ? 6 : 0);
+      else if (max === g) h = (b - r) / dd + 2;
+      else h = (r - g) / dd + 4;
+      h *= 60;
+    }
+    const ink = getComputedStyle(card).color.match(/\d+/g) || [255, 255, 255];
+    const darkPlate = (+ink[0] + +ink[1] + +ink[2]) / 3 > 128;
+    const sat = Math.max(0.62, Math.min(0.95, s * 1.15));
+    const light = darkPlate ? 0.66 : 0.36;
+    return "hsl(" + Math.round(h) + ", " + Math.round(sat * 100) + "%, " + Math.round(light * 100) + "%)";
+  }
+
+  // paintMagic кладёт цвет из обложки поверх набора — или убирает его.
+  // Ручной акцент из настройки «Своими руками» при включённых цветах из
+  // обложки не действует: два источника одного цвета не распутать.
+  function paintMagic() {
+    if (magic && magicColor) {
+      card.style.setProperty("--w-accent", magicColor);
+      card.style.setProperty("--w-glowc", magicColor);
+      card.dataset.magic = "on";
+      return;
+    }
+    card.removeAttribute("data-magic");
+    card.style.removeProperty("--w-glowc");
+    let tweak = null;
+    try { tweak = (JSON.parse(applied || "{}").tweaks || {})["--w-accent"]; } catch (e) { tweak = null; }
+    if (tweak) card.style.setProperty("--w-accent", tweak);
+    else card.style.removeProperty("--w-accent");
+  }
+
+  // ── свои картинки ──────────────────────────────────────────────────
+
+  // Что сейчас стоит по местам. Сравниваем со старым, чтобы не
+  // перезапускать гифку и ролик на каждом обновлении состояния: в кадре
+  // это выглядело бы как дёрганье с начала каждые несколько секунд.
+  let media = {};
+  let mediaSig = "";
+  let motionOn = true;
+  let lastCoverUrl = "";
+
+  const isVideoRef = (ref) => /\.(webm|mp4)$/.test(ref);
+
+  // mediaInto кладёт в место картинку, ролик или встроенную анимацию.
+  // Возвращает false, если класть нечего. Как она в месте сидит —
+  // размер, поворот, фильтры — задаёт relayout: он же вызывается на
+  // каждой правке, не перезапуская ролик с начала.
+  function mediaInto(el, ref, t, def, extra) {
+    if (el._fx) { el._fx.stop(); el._fx = null; }
+    el.innerHTML = "";
+    el._node = null;
+    el._t = t || {};
+    el._def = def;
+    el._extra = extra || "";
+    if (!ref || !window.WidgetFX) return false;
+    if (ref.indexOf("fx:") === 0) {
+      const accent = getComputedStyle(card).getPropertyValue("--w-accent").trim();
+      el._fx = WidgetFX.mount(el, ref.slice(3), { motion: motionOn, accent: /^#/.test(accent) ? accent : "" });
+      if (!el._fx) return false;
+      el._node = el._fx.canvas;
+      relayout(el);
+      return true;
+    }
+    const src = "/media/" + encodeURIComponent(ref);
+    if (isVideoRef(ref)) {
+      // Ролик без звука обязательно: со звуком браузер OBS не запустит его
+      // сам, а звук гифки поверх заказанной музыки никому не нужен.
+      el.innerHTML = `<video class="own" src="${esc(src)}" muted loop playsinline ${motionOn ? "autoplay" : ""} preload="auto"></video>`;
+    } else {
+      el.innerHTML = `<img class="own" src="${esc(src)}" alt="">`;
+    }
+    const node = el.firstChild;
+    el._node = node;
+    // Файл удалили из папки — убираем пустую рамку, а не показываем
+    // значок битой картинки на стриме.
+    node.onerror = () => { el.innerHTML = ""; el._node = null; el.classList.remove("on"); };
+    // Пропорции известны только после загрузки — тогда и раскладываем.
+    node.onload = () => relayout(el);
+    node.onloadedmetadata = () => relayout(el);
+    relayout(el);
+    return true;
+  }
+
+  // relayout раскладывает картинку в месте по её настройкам.
+  function relayout(el) {
+    const node = el._node;
+    if (!node) return;
+    const t = el._t || {};
+    const bw = el.clientWidth, bh = el.clientHeight;
+    if (!bw || !bh) return;
+    WidgetFX.layout(node, bw, bh, WidgetFX.ratioOf(node), t, el._def, el._extra);
+    const speed = (Number(t.speed) || 100) / 100;
+    if (node.tagName === "VIDEO") node.playbackRate = speed;
+    if (el._fx) el._fx.speed = speed;
+  }
+
+  // retune — новые настройки для уже стоящей картинки.
+  function retune(el, t, extra) {
+    el._t = t || {};
+    if (extra !== undefined) el._extra = extra;
+    relayout(el);
+  }
+
+  function dressMedia(w) {
+    const m = w.media || {};
+    motionOn = w.motion !== false;
+    card.style.setProperty("--m-dim", (Math.min(90, Math.max(0, Number(m.bg_dim) || 0)) / 100).toFixed(2));
+    const blur = Math.min(20, Math.max(0, Number(m.bg_blur) || 0));
+    const bgExtra = blur ? "blur(" + blur + "px)" : "";
+    const st = $("sticker");
+    st.dataset.side = m.sticker_side || "right";
+    const stt = m.sticker_t || {};
+    st.dataset.mask = stt.mask || "";
+    st.dataset.back = stt.back ? "on" : "";
+    // Наклейка растёт вместе с плашкой. Множим сами, а не через zoom: у
+    // наклейки место задано процентами от обёртки, а та уже увеличена —
+    // zoom сверху увёл бы наклейку вдвое дальше от края.
+    const z = Number(card.style.zoom) || 1;
+    st.style.setProperty("--st-size", (Number(m.sticker_size) || 72) * z + "px");
+    st.style.setProperty("--st-x", (Number(m.sticker_x) || 0) * z + "px");
+    st.style.setProperty("--st-y", (Number(m.sticker_y) || 0) * z + "px");
+
+    // Акцент входит в подпись: встроенные анимации берут его цвет.
+    const accent = getComputedStyle(card).getPropertyValue("--w-accent").trim();
+    media = m;
+    const sig = [m.bg, m.cover, m.fallback, m.sticker, motionOn, accent].join("|");
+    if (sig === mediaSig) {
+      // Картинки те же, сдвинули или повернули — только переставляем,
+      // не перезапуская ролик с начала.
+      retune($("mbg"), m.bg_t, bgExtra);
+      retune(st, m.sticker_t);
+      if (card.dataset.cover === "own") retune($("art"), lastOwnCover === m.cover ? m.cover_t : m.fallback_t);
+      return;
+    }
+    mediaSig = sig;
+    const bg = $("mbg");
+    flag("mbg", m.bg ? "on" : "");
+    // Сначала «on» — у скрытого места нет размера, и разложить картинку
+    // было бы не по чему.
+    bg.classList.toggle("on", !!m.bg);
+    bg.classList.toggle("on", mediaInto(bg, m.bg || "", m.bg_t, "cover", bgExtra));
+    st.classList.toggle("on", !!m.sticker);
+    st.classList.toggle("on", mediaInto(st, m.sticker || "", m.sticker_t, "contain"));
+    // Обложку перерисовываем: могла появиться или исчезнуть её замена.
+    if (shownTrack !== null) cover(lastCoverUrl);
+  }
+
+  let lastOwnCover = "";
+
+  // ownCover ставит свою картинку на место обложки. Цвета «из обложки»
+  // при этом не считаются: своя гифка — не альбом, и перекрашивать по ней
+  // плашку на каждом треке было бы странно.
+  function ownCover(ref, why) {
+    const art = $("art");
+    $("aura").firstChild.style.backgroundImage = "";
+    magicColor = null;
+    card.dataset.cover = why;
+    lastOwnCover = ref;
+    if (!mediaInto(art, ref, ref === media.cover ? media.cover_t : media.fallback_t, "cover")) art.innerHTML = NOTE;
+    paintMagic();
+  }
+
+  // cover ставит обложку в плашку и в размытую подложку и считает цвет.
+  function cover(url) {
+    lastCoverUrl = url || "";
+    const art = $("art");
+    const aura = $("aura").firstChild;
+    if (art._fx) { art._fx.stop(); art._fx = null; }
+    magicColor = null;
+    if (media.cover) { ownCover(media.cover, "own"); return; }
+    if (!url) {
+      if (media.fallback) { ownCover(media.fallback, "own"); return; }
+      art.innerHTML = NOTE;
+      aura.style.backgroundImage = "";
+      card.dataset.cover = "none";
+      paintMagic();
+      return;
+    }
+    const src = coverSrc(url);
+    art.innerHTML = `<img src="${esc(src)}" alt="">`;
+    card.dataset.cover = "yes";
+    const img = art.querySelector("img");
+    // Обложка не пришла — ставим ноту, а не значок битой картинки.
+    img.onerror = () => {
+      // Страховочная картинка — ровно для этого случая.
+      if (media.fallback) { ownCover(media.fallback, "own"); return; }
+      art.innerHTML = NOTE;
+      aura.style.backgroundImage = "";
+      card.dataset.cover = "none";
+    };
+    img.onload = () => {
+      aura.style.backgroundImage = "url(\"" + src.replace(/"/g, "%22") + "\")";
+      pixelCopy(img);
+      const rgb = pickColor(img);
+      magicColor = rgb ? tune(rgb) : null;
+      paintMagic();
+    };
+  }
+
+  // pixelCopy кладёт рядом с обложкой её пиксельную копию для «Пикселя»:
+  // картинка 20×20, растянутая без сглаживания. Браузер сам так уменьшать
+  // не умеет, а растянуть маленькую чётко — умеет. Делается один раз на
+  // обложку и лежит наготове: смена стиля не должна ждать перерисовки.
+  function pixelCopy(img) {
+    try {
+      const c = document.createElement("canvas");
+      c.width = c.height = 20;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0, 20, 20);
+      const px = document.createElement("img");
+      px.className = "px";
+      px.alt = "";
+      px.src = c.toDataURL("image/png");
+      $("art").appendChild(px);
+    } catch (e) { /* обложка чужая — пиксельной копии не будет, только и всего */ }
+  }
+
   // ── трек ───────────────────────────────────────────────────────────
 
   let shownTrack = null;
@@ -205,6 +570,8 @@ body { -webkit-font-smoothing: antialiased; }
   let leaveTimer = null;
   let stateTimer = null;
   let swapTimer = null;
+  let pauseTimer = null;
+  let pausedHidden = false;
 
   // Появление, смена трека и уход — три разных состояния с разными
   // анимациями. Класс обязательно снимается после проигрыша: пока он висит,
@@ -240,7 +607,7 @@ body { -webkit-font-smoothing: antialiased; }
     }, out);
   }
 
-  const visible = () => card.classList.contains("show");
+  const visible = () => card.classList.contains("show") && !card.classList.contains("leave");
 
   // appear показывает плашку. Уже висит — ничего не делаем: повторный въезд
   // посреди стрима выглядел бы дёрганьем.
@@ -259,12 +626,13 @@ body { -webkit-font-smoothing: antialiased; }
   //                                  чтобы зашедший в середине трека тоже
   //                                  узнал, что играет.
   //
-  // fresh=true означает «трек только что сменился»: только тогда показ
-  // заводится заново от нуля. Иначе (правка настроек) расписание просто
-  // пересобирается, не дёргая плашку.
+  // settingsChanged=true означает «правили настройки на живом треке»: показ
+  // не заводится заново, расписание просто пересобирается.
   function schedule(settingsChanged) {
     clearTimeout(holdTimer);
     clearInterval(everyTimer);
+
+    if (pausedHidden) return;
 
     if (plan.hold <= 0) {
       appear();
@@ -275,6 +643,7 @@ body { -webkit-font-smoothing: antialiased; }
     // сейчас: интервал ровный, и от смены настроек он не сбивается.
     if (plan.every > 0) {
       everyTimer = setInterval(() => {
+        if (pausedHidden) return;
         appear();
         armHide();
       }, plan.every * 1000);
@@ -301,6 +670,12 @@ body { -webkit-font-smoothing: antialiased; }
     holdTimer = setTimeout(hide, plan.hold * 1000);
   }
 
+  // fmt — время трека как на плеере: 3:07, а не 187 секунд.
+  function fmt(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  }
+
   function show(now) {
     const key = now.title + "|" + now.artist + "|" + now.requester;
     if (key !== shownTrack) {
@@ -312,10 +687,7 @@ body { -webkit-font-smoothing: antialiased; }
         runText($("title"), now.title);
         runText($("artist"), now.artist);
         $("by").textContent = byLine(now);
-        $("art").innerHTML = now.cover_url ? `<img src="${esc(coverSrc(now.cover_url))}" alt="">` : NOTE;
-        // Обложка не пришла — ставим ноту, а не значок битой картинки.
-        const img = $("art").querySelector("img");
-        if (img) img.onerror = () => { $("art").innerHTML = NOTE; };
+        cover(now.cover_url);
       };
 
       // Плашка уже висела — значит трек просто сменился, заново выезжать
@@ -331,26 +703,66 @@ body { -webkit-font-smoothing: antialiased; }
       }
     }
 
+    // Тот же трек, но обложка доехала только сейчас: за ней идёт отдельный
+    // запрос, и первое состояние приходит без неё. Раньше она так и не
+    // появлялась до следующего трека.
+    else if ((now.cover_url || "") !== lastCoverUrl) {
+      cover(now.cover_url);
+    }
+
+    pause(!!now.paused);
+
     // Полосу двигаем сами: приложение присылает состояние только при
     // изменениях, а прогресс должен идти плавно.
+    //
+    // На паузе — стоим. Раньше полоса ехала и на паузе: приложение молчит,
+    // виджет считает дальше, и через минуту «трек почти кончился».
     clearInterval(progressTimer);
+    flag("nolen", now.duration_ms > 0 ? "" : "1");
     if (now.duration_ms > 0) {
       const started = Date.now() - now.position_ms;
       const tick = () => {
-        const done = Math.min(1, (Date.now() - started) / now.duration_ms);
+        const at = now.paused ? now.position_ms : Date.now() - started;
+        const done = Math.min(1, at / now.duration_ms);
         $("bar").style.width = (done * 100) + "%";
         // Тем же числом живёт тонарм у винила: он ползёт к центру по
         // настоящему прогрессу, а не по отдельному таймеру.
         card.style.setProperty("--progress", done.toFixed(4));
+        $("t-now").textContent = fmt(Math.min(at, now.duration_ms));
+        $("t-len").textContent = fmt(now.duration_ms);
       };
       tick();
-      progressTimer = setInterval(tick, 1000);
+      if (!now.paused) progressTimer = setInterval(tick, 1000);
     } else {
       // Длительность неизвестна (так бывает у заказов с YouTube). Полосу
       // надо обнулить, а не оставлять там, где её бросил прошлый трек:
       // иначе зритель видит «трек почти кончился» в самом его начале.
       $("bar").style.width = "0%";
       card.style.setProperty("--progress", "0");
+      $("t-now").textContent = "";
+      $("t-len").textContent = "";
+    }
+  }
+
+  // pause — трек встал на паузу или пошёл дальше.
+  //
+  // Столбики эквалайзера замирают всегда. Убирать ли плашку целиком, решает
+  // настройка «Прятать на паузе»: ждём пару секунд, потому что пауза на
+  // мгновение (перемотка, смена устройства) не повод дёргать плашкой.
+  function pause(on) {
+    flag("paused", on ? "on" : "");
+    clearTimeout(pauseTimer);
+    if (on && plan.onPause) {
+      pauseTimer = setTimeout(() => {
+        pausedHidden = true;
+        clearTimeout(holdTimer);
+        hide();
+      }, 2000);
+      return;
+    }
+    if (!on && pausedHidden) {
+      pausedHidden = false;
+      schedule(false);
     }
   }
 
@@ -408,15 +820,27 @@ body { -webkit-font-smoothing: antialiased; }
     clearTimeout(leaveTimer);
     leaveTimer = setTimeout(() => {
       card.classList.remove("show", "leave");
-    }, 340);
+    }, 380);
   }
 
   // stop — музыка кончилась совсем: убираем плашку и забываем расписание.
   function stop() {
     clearInterval(progressTimer);
     clearInterval(everyTimer);
+    clearTimeout(pauseTimer);
+    pausedHidden = false;
     shownTrack = null;
     hide();
+  }
+
+  // Язык приходит вместе с состоянием. Сменился — переписываем подпись
+  // под артистом сразу, не дожидаясь следующего трека.
+  let lastNow = null;
+  function setLang(l) {
+    l = l === "en" ? "en" : "ru";
+    if (l === I18N.lang()) return;
+    I18N.setLang(l);
+    if (lastNow && shownTrack !== null) $("by").textContent = byLine(lastNow);
   }
 
   function render(state) {
@@ -426,6 +850,34 @@ body { -webkit-font-smoothing: antialiased; }
       return;
     }
     stop();
+  }
+
+  // ── предпросмотр в панели ──────────────────────────────────────────
+  //
+  // Панель берёт этот объект через фрейм и водит виджет сама: одевает по
+  // ещё не сохранённым настройкам, пока тянут ползунок, подставляет
+  // образцы треков и проигрывает появление, смену и уход по кнопкам.
+  if (preview) {
+    window.wxPreview = {
+      card, slot,
+      // Места своих картинок — панель таскает картинку прямо в кадре и
+      // пересчитывает сдвиг в проценты места.
+      places: { bg: $("mbg"), cover: $("art"), fallback: $("art"), sticker: $("sticker") },
+      dress: (w) => { applied = ""; dress(w); },
+      track: (now) => show(now),
+      // Смена трека с настоящей двухфазной анимацией, как на стриме.
+      next: (now) => { shownTrack = "—"; show(now); },
+      play: (kind) => {
+        if (kind === "leave") { hide(); return; }
+        card.classList.remove("show", "leave");
+        play(kind);
+      },
+      setLang,
+      fit: fitRuns,
+    };
+    window.dispatchEvent(new Event("wx-ready"));
+    if (window.parent && window.parent !== window && window.parent.wxReady) window.parent.wxReady();
+    return;
   }
 
   // ── демо ───────────────────────────────────────────────────────────
@@ -440,9 +892,9 @@ body { -webkit-font-smoothing: antialiased; }
     // В образце плашка висит всегда: человек в этот момент двигает ползунки
     // и должен видеть, что двигает. Прятать её по расписанию здесь значило
     // бы отвечать на правку исчезновением.
-    plan = { hold: 0, every: 0, onChange: true };
+    plan = { hold: 0, every: 0, onChange: true, onPause: false };
     show({
-      title: "Bohemian Rhapsody", artist: "Queen", requester: "zritel",
+      title: "Bohemian Rhapsody", artist: "Queen", requester: document.documentElement.lang === "en" ? "viewer" : "зритель",
       source: "order", cover_url: "", duration_ms: 354000, position_ms: 149000,
     });
   }
@@ -461,6 +913,7 @@ body { -webkit-font-smoothing: antialiased; }
 
     socket.onmessage = (e) => {
       const state = JSON.parse(e.data);
+      setLang(state.lang);
       // В демо-режиме настоящее состояние не должно стирать образец, но
       // оформление подхватывать надо: иначе в панели крутят настройки, а
       // предпросмотр в OBS остаётся прежним.

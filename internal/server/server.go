@@ -5,6 +5,7 @@
 package server
 
 import (
+	"io"
 	"context"
 	"embed"
 	"encoding/json"
@@ -159,6 +160,9 @@ type Server struct {
 	// skipActor — кто оборвал текущий заказ. Живёт до конца этого заказа:
 	// историю пишет плеер, а имя человека знает только панель.
 	skipActor string
+	// skipItemID — к какому заказу относится skipActor. Без него метка от
+	// скипа, который не успел сработать, доставалась следующему заказу.
+	skipItemID int64
 
 	// skipRefund — вернуть ли баллы за оборванный заказ.
 	//
@@ -269,6 +273,10 @@ func New(d Deps) (*Server, error) {
 	mux.HandleFunc("GET /{$}", s.page(sub, "index.html"))
 	mux.HandleFunc("GET /widget", s.page(sub, "widget.html"))
 	mux.HandleFunc("GET /cover", s.handleCover)
+	mux.HandleFunc("GET /media/{name}", s.handleMedia)
+	mux.HandleFunc("GET /api/widget/media", s.handleMediaList)
+	mux.HandleFunc("POST /api/widget/media", s.handleMediaUpload)
+	mux.HandleFunc("POST /api/widget/media/{name}/delete", s.handleMediaDelete)
 	mux.HandleFunc("GET /ws", s.handleWS)
 	mux.HandleFunc("GET /api/state", s.handleState)
 	mux.HandleFunc("GET /api/setup", s.handleSetup)
@@ -497,8 +505,15 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 	// принимал первый попавшийся трек. Починить это из панели было нельзя:
 	// полей в ней нет, а переживало оно перезапуск.
 	current := s.cfg.Get()
-	incoming := current
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&incoming); err != nil {
+	// Разбираем поверх глубокой копии: при ошибке живой конфиг не задет,
+	// а присланные карты (цвета, стили) заменяют старые, а не сливаются с ними.
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+	if err != nil {
+		failText(w, http.StatusBadRequest, "Не разобрал настройки.")
+		return
+	}
+	incoming, err := config.MergeJSON(current, body)
+	if err != nil {
 		failText(w, http.StatusBadRequest, "Не разобрал настройки.")
 		return
 	}
@@ -520,7 +535,10 @@ func (s *Server) handleSetConfig(w http.ResponseWriter, r *http.Request) {
 	// Раньше они доезжали туда лишь при следующем запуске: стример менял цену,
 	// на канале оставалась старая, и выглядело это как «настройки не работают».
 	rewardChanged := incoming.RewardTitle != current.RewardTitle ||
-		incoming.RewardCost != current.RewardCost
+		incoming.RewardCost != current.RewardCost ||
+		// Галочку «Создать награду самому» поставили — награда должна
+		// появиться сразу, а не после перезапуска.
+		incoming.AutoCreateReward && !current.AutoCreateReward
 	// Ключи донат-сервисов: вставил в панели — подключение обязано подняться
 	// сейчас, а не после перезапуска приложения.
 	donatePayChanged := incoming.DonatePayKey != current.DonatePayKey

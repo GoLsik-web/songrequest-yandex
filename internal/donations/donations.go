@@ -50,6 +50,10 @@ type Hub struct {
 	OnDonation func(Donation)
 	// OnStatus сообщает панели, жив ли сервис.
 	OnStatus StatusFn
+	// OnIdle — сервис не настроен. Отдельным вызовом, а не строкой в detail:
+	// раньше сервер сравнивал detail с «Не настроено», и любой перевод или
+	// правка текста молча превращали серую лампочку в красную.
+	OnIdle func(name string)
 
 	mu   sync.Mutex
 	seen map[string]time.Time
@@ -103,7 +107,9 @@ func (h *Hub) Restart(name string) {
 	h.Stop(name)
 
 	if !src.Configured() {
-		h.status(name, false, "Не настроено")
+		if h.OnIdle != nil {
+			h.OnIdle(name)
+		}
 		return
 	}
 

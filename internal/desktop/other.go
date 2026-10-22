@@ -40,3 +40,12 @@ func ShowError(title, text string) {
 
 // allowForeground на не-Windows не нужен.
 func allowForeground() {}
+
+// Lock на не-Windows — пустышка: единственность копии там не охраняется.
+type Lock struct{}
+
+// TryLock всегда «занял».
+func TryLock(string) (*Lock, bool, error) { return &Lock{}, true, nil }
+
+// Release ничего не делает.
+func (l *Lock) Release() {}

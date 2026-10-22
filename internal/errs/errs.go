@@ -153,6 +153,7 @@ const (
 	YandexStale        Code = "YM-13" // за время заказа музыку переключили руками
 	YandexNothing      Code = "YM-14" // возвращать нечего
 	YandexNotAvailable Code = "YM-15" // трек есть, но недоступен для прослушивания
+	YandexRegion       Code = "YM-16" // Яндекс не пускает: страна, сеть или ограничение аккаунта
 
 	// Диагностика
 	DiagExport Code = "DIAG-01" // не собрался архив с логом
@@ -212,7 +213,8 @@ func CodeOf(err error) Code {
 func Describe(err error) (Code, string) {
 	var e *Error
 	if !As(err, &e) {
-		return "", "Непонятная ошибка. Загляни в лог приложения."
+		return "", "Что-то пошло не так. Попробуй ещё раз. Если повторяется — в настройках " +
+			"нажми «Сохранить лог и историю» и пришли этот архив автору приложения."
 	}
 	text := e.Message
 	if root := rootMessage(e); root != "" && root != e.Message {

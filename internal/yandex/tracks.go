@@ -173,7 +173,13 @@ func (c *Client) SearchTracks(ctx context.Context, query string, limit int) ([]m
 	}
 	var out []match.Candidate
 	for _, t := range resp.Tracks.Results {
+		// Недоступное не выбрасываем, а помечаем: подбор его не возьмёт, но
+		// посчитает — и стример узнает «трек есть, но слушать нельзя»
+		// вместо «не нашлось».
 		if !t.available() {
+			c := t.candidate()
+			c.Markets = []string{match.Nowhere}
+			out = append(out, c)
 			continue
 		}
 		rememberTrack(t)

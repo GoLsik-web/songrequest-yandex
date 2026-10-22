@@ -267,7 +267,7 @@ func (y *Ynison) session(ctx context.Context) error {
 		Subprotocols: proto,
 	})
 	if err != nil {
-		return errs.Wrap(errs.YandexYnison, "Ynison не пустил к очереди.", err)
+		return errs.Wrap(errs.YandexYnison, "Яндекс Музыка не пустила к очереди.", err)
 	}
 	conn.SetReadLimit(16 << 20)
 	defer conn.CloseNow()
@@ -283,7 +283,7 @@ func (y *Ynison) session(ctx context.Context) error {
 	for {
 		_, data, err := conn.Read(ctx)
 		if err != nil {
-			return errs.Wrap(errs.YandexYnison, "Ynison закрыл соединение.", err)
+			return errs.Wrap(errs.YandexYnison, "Связь с Яндекс Музыкой оборвалась.", err)
 		}
 		var msg ynMessage
 		if err := json.Unmarshal(data, &msg); err != nil {
@@ -291,7 +291,7 @@ func (y *Ynison) session(ctx context.Context) error {
 			continue
 		}
 		if msg.Error != nil {
-			return errs.New(errs.YandexYnison, "Ynison отказал: "+msg.Error.Message)
+			return errs.New(errs.YandexYnison, "Яндекс Музыка отказала: "+msg.Error.Message)
 		}
 		y.apply(msg)
 	}
@@ -328,13 +328,13 @@ func (y *Ynison) redirect(ctx context.Context) (host, ticket, session string, er
 		Subprotocols: y.protocol(nil),
 	})
 	if err != nil {
-		return "", "", "", errs.Wrap(errs.YandexYnison, "Ynison не отвечает.", err)
+		return "", "", "", errs.Wrap(errs.YandexYnison, "Яндекс Музыка не отвечает.", err)
 	}
 	defer conn.CloseNow()
 
 	_, data, err := conn.Read(ctx)
 	if err != nil {
-		return "", "", "", errs.Wrap(errs.YandexYnison, "Ynison не сказал, куда подключаться.", err)
+		return "", "", "", errs.Wrap(errs.YandexYnison, "Яндекс Музыка не сказала, куда подключаться.", err)
 	}
 	var resp struct {
 		Host           string  `json:"host"`
@@ -342,7 +342,7 @@ func (y *Ynison) redirect(ctx context.Context) (host, ticket, session string, er
 		SessionID      flexInt `json:"session_id"`
 	}
 	if err := json.Unmarshal(data, &resp); err != nil || resp.Host == "" {
-		return "", "", "", errs.New(errs.YandexYnison, "Ynison ответил непонятно на первом шаге.")
+		return "", "", "", errs.New(errs.YandexYnison, "Яндекс Музыка ответила непонятно при подключении.")
 	}
 	_ = conn.Close(websocket.StatusNormalClosure, "")
 	return resp.Host, resp.RedirectTicket, strconv.FormatInt(int64(resp.SessionID), 10), nil
@@ -433,7 +433,7 @@ func (y *Ynison) write(ctx context.Context, conn *websocket.Conn, v any) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	if err := conn.Write(ctx, websocket.MessageText, raw); err != nil {
-		return errs.Wrap(errs.YandexYnison, "Не отправил команду в Ynison.", err)
+		return errs.Wrap(errs.YandexYnison, "Не отправил команду в Яндекс Музыку.", err)
 	}
 	return nil
 }
@@ -445,7 +445,7 @@ func (y *Ynison) send(ctx context.Context, body map[string]any) error {
 	ok := y.connected
 	y.mu.Unlock()
 	if conn == nil || !ok {
-		return errs.New(errs.YandexYnison, "Нет связи с Ynison — очередь Яндекса сейчас недоступна.")
+		return errs.New(errs.YandexYnison, "Нет связи с Яндекс Музыкой — очередь Яндекса сейчас недоступна.")
 	}
 	body["rid"] = randomUUID()
 	body["player_action_timestamp_ms"] = time.Now().UnixMilli()

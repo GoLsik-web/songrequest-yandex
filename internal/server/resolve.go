@@ -17,7 +17,7 @@ import (
 // повторами укладываются с запасом, а зритель не должен ждать минуту.
 const resolveTimeout = 25 * time.Second
 
-// resolveOrder ищет заказанный трек в Spotify и ставит его в очередь.
+// resolveOrder ищет заказанный трек в Яндекс Музыке и ставит его в очередь.
 //
 // Не нашли — баллы возвращаются, и зритель получает объяснение в чат. Заказ,
 // за который списали баллы и промолчали, — это жалоба в чат через минуту.
@@ -29,6 +29,19 @@ func (s *Server) resolveOrder(ctx context.Context, r twitch.Redemption) {
 	base := ctx
 	ctx, cancel := context.WithTimeout(ctx, resolveTimeout)
 	defer cancel()
+
+	// Команда вместо трека — зритель перепутал награду с чатом. Искать её
+	// нельзя: «!скип» находит какой-нибудь трек со словом skip, и баллы
+	// уходят за чужую песню. Отказ с возвратом и подсказкой.
+	if isChatCommand(r.UserInput, s.prefix()) {
+		s.log.Info("в награду написали команду", "зритель", r.UserLogin, "текст", r.UserInput)
+		s.state.SetOrderMatch(r.ID, app.OrderMatch{
+			State: app.MatchFailed,
+			Note:  "Это команда чата, а не трек",
+		})
+		s.rejectRedemption(base, r, "это команда — её пишут в чат, а в награду пиши артиста и название")
+		return
+	}
 
 	// Плейлист в награде за трек — отдельный разговор.
 	//
@@ -195,10 +208,10 @@ func (s *Server) resolveOrder(ctx context.Context, r twitch.Redemption) {
 		// сломан поиск.
 		note := "В Яндексе не нашлось"
 		if res.AbroadOnly > 0 {
-			note = "Есть в Яндексе, но не в стране аккаунта (" + opts.Market + ")"
-			s.state.NotifyWarn(errs.SpotifyCountry,
-				"«"+req.Clean+"» есть в Яндексе, но не издан в стране твоего аккаунта ("+
-					opts.Market+"). Такие треки играть нельзя — их не найдёт и поиск.")
+			note = "Есть в Яндексе, но слушать нельзя"
+			s.state.NotifyWarn(errs.YandexNotAvailable,
+				"«"+req.Clean+"» есть в Яндекс Музыке, но слушать его нельзя: трек закрыт "+
+					"в стране твоего аккаунта или убран правообладателем.")
 		}
 		s.state.SetOrderMatch(r.ID, app.OrderMatch{
 			State: app.MatchMissing,
@@ -212,7 +225,7 @@ func (s *Server) resolveOrder(ctx context.Context, r twitch.Redemption) {
 		}
 		if res.AbroadOnly > 0 {
 			s.rejectRedemption(s.afterSearch(base), r,
-				"этот трек недоступен в стране аккаунта стримера")
+				"трек есть в Яндекс Музыке, но слушать его сейчас нельзя")
 			return
 		}
 		if s.youtubeOff() {
@@ -257,14 +270,20 @@ func (s *Server) resolveOrder(ctx context.Context, r twitch.Redemption) {
 
 // rejectRedemption возвращает баллы и объясняет зрителю, почему.
 func (s *Server) rejectRedemption(ctx context.Context, r twitch.Redemption, reason string) {
-	if r.ID != "" && r.RewardID != "" {
-		if err := s.twitch.RefundRedemption(ctx, r.RewardID, r.ID); err != nil {
-			s.log.Error("не смог вернуть баллы за неудачный заказ", "ошибка", err)
-			s.state.NotifyError(err)
-		} else {
-			s.state.SetRedemptionStatus(r.ID, app.OrderRefunded)
-		}
+	if r.ID == "" || r.RewardID == "" {
+		// Заказ не за баллы — и говорить про баллы нечего.
+		s.say(ctx, "@"+r.UserName+", "+reason+".")
+		return
 	}
+	if err := s.twitch.RefundRedemption(ctx, r.RewardID, r.ID); err != nil {
+		s.log.Error("не смог вернуть баллы за неудачный заказ", "ошибка", err)
+		s.state.NotifyError(err)
+		// Обещать «вернул», когда Twitch возврат не принял, нельзя: зритель
+		// ждёт баллы, которых не будет, пока стример не вернёт их сам.
+		s.say(ctx, "@"+r.UserName+", "+reason+". Баллы вернёт стример вручную.")
+		return
+	}
+	s.state.SetRedemptionStatus(r.ID, app.OrderRefunded)
 	s.say(ctx, "@"+r.UserName+", "+reason+". Баллы вернул.")
 }
 

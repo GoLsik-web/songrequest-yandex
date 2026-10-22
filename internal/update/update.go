@@ -29,6 +29,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -63,7 +64,7 @@ type Release struct {
 
 // Latest спрашивает GitHub про последний выпуск.
 //
-// repo — «владелец/репозиторий», как в адресе: «golsi/songrequest».
+// repo — «владелец/репозиторий», как в адресе: «golsi/songrequest-yandex».
 func Latest(ctx context.Context, repo string) (Release, error) {
 	repo = strings.TrimSpace(repo)
 	if !validRepo(repo) {
@@ -94,6 +95,7 @@ func Latest(ctx context.Context, repo string) (Release, error) {
 			"GitHub не нашёл такой репозиторий или в нём ещё нет ни одного выпуска. "+
 				"Проверь имя в настройках и что выпуск не помечен черновиком.")
 	case resp.StatusCode != http.StatusOK:
+		slog.Warn("GitHub ответил ошибкой при проверке обновлений", "код_http", resp.StatusCode)
 		return Release{}, errs.Wrap(errs.UpdateCheck,
 			"GitHub ответил ошибкой. Попробуй ещё раз чуть позже.", fmt.Errorf("HTTP %d", resp.StatusCode))
 	}
@@ -127,15 +129,34 @@ func Latest(ctx context.Context, repo string) (Release, error) {
 	}
 
 	// Ищем, что качать. Голый .exe лучше архива: его не надо распаковывать.
+	//
+	// Берём только файлы с именем songrequest-yandex*: к выпуску может быть приложено
+	// что-то ещё (установщик mpv, утилита), и «первый попавшийся .exe» однажды
+	// подменил бы программу чужим файлом. Два подходящих — не гадаем, а
+	// отказываем: какой из них наш, решать не нам.
+	exes, zips := 0, 0
 	for _, a := range out.Assets {
 		low := strings.ToLower(a.Name)
+		if !ourName(low) {
+			continue
+		}
 		if strings.HasSuffix(low, ".exe") {
+			exes++
 			rel.URL, rel.Name, rel.Size, rel.Zip = a.URL, a.Name, a.Size, false
-			break
 		}
-		if strings.HasSuffix(low, ".zip") && rel.URL == "" {
-			rel.URL, rel.Name, rel.Size, rel.Zip = a.URL, a.Name, a.Size, true
+	}
+	if exes == 0 {
+		for _, a := range out.Assets {
+			low := strings.ToLower(a.Name)
+			if ourName(low) && strings.HasSuffix(low, ".zip") {
+				zips++
+				rel.URL, rel.Name, rel.Size, rel.Zip = a.URL, a.Name, a.Size, true
+			}
 		}
+	}
+	if exes > 1 || zips > 1 {
+		return Release{}, errs.New(errs.UpdateNoFile,
+			"В выпуске на GitHub несколько файлов программы, и непонятно, какой ставить.")
 	}
 	if rel.URL == "" {
 		return Release{}, errs.New(errs.UpdateNoFile,
@@ -171,6 +192,7 @@ func Download(ctx context.Context, rel Release, dir string) (string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		slog.Warn("GitHub не отдал файл обновления", "код_http", resp.StatusCode)
 		return "", errs.Wrap(errs.UpdateDownload,
 			"GitHub не отдал файл обновления. Попробуй ещё раз чуть позже.", fmt.Errorf("HTTP %d", resp.StatusCode))
 	}
@@ -235,6 +257,9 @@ func Apply(exePath, freshPath string) error {
 
 // CleanOld убирает отставленный файл прошлой версии. Зовётся при запуске:
 // раньше его удалять нельзя — он ещё работает.
+//
+// Зовётся только после того, как новая версия подняла панель: если она
+// падает при старте, .old — единственная рабочая копия, и удалять её рано.
 func CleanOld(exePath string) {
 	_ = os.Remove(exePath + ".old")
 }
@@ -333,10 +358,21 @@ func fromZip(raw []byte) ([]byte, error) {
 	if err != nil {
 		return nil, errs.Wrap(errs.UpdateDownload, "Архив выпуска не открылся.", err)
 	}
+	// Та же осторожность, что и с файлами выпуска: только songrequest-yandex*.exe и
+	// ровно один.
+	var found *zip.File
 	for _, f := range r.File {
-		if !strings.HasSuffix(strings.ToLower(f.Name), ".exe") {
+		if !ourName(strings.ToLower(filepath.Base(f.Name))) ||
+			!strings.HasSuffix(strings.ToLower(f.Name), ".exe") {
 			continue
 		}
+		if found != nil {
+			return nil, errs.New(errs.UpdateNoFile,
+				"В архиве выпуска несколько программ, и непонятно, какую ставить.")
+		}
+		found = f
+	}
+	if f := found; f != nil {
 		if f.UncompressedSize64 > maxSize {
 			return nil, errs.New(errs.UpdateDownload, "Программа внутри архива неправдоподобно большая.")
 		}
@@ -385,10 +421,20 @@ func client() *http.Client {
 	}
 }
 
+// DefaultRepo — откуда берутся обновления, если в настройках пусто или мусор.
+const DefaultRepo = "GoLsik-web/songrequest-yandex"
+
+// ourName — имя файла похоже на нашу программу (songrequest-yandex*, в нижнем регистре).
+func ourName(low string) bool { return strings.HasPrefix(low, "songrequest-yandex") }
+
 // ReleasesPage — куда отправить человека, если обновиться само не вышло.
+//
+// Ссылка нужна всегда: именно когда в настройках сломан репозиторий, человеку
+// больше всего нужен путь «скачать руками».
 func ReleasesPage(repo string) string {
+	repo = strings.TrimSpace(repo)
 	if !validRepo(repo) {
-		return ""
+		repo = DefaultRepo
 	}
 	return "https://github.com/" + url.PathEscape(strings.SplitN(repo, "/", 2)[0]) +
 		"/" + url.PathEscape(strings.SplitN(repo, "/", 2)[1]) + "/releases/latest"

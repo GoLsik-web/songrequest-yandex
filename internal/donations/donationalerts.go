@@ -364,9 +364,21 @@ func parseDonation(raw json.RawMessage) (Donation, bool) {
 		return Donation{}, false
 	}
 
-	amount := p.Data.AmountMain
-	if amount == 0 {
-		amount = p.Data.Amount
+	// amount_main — сумма в валюте основного счёта стримера, и именно с ней
+	// сравнивается порог. Подпись валюты зрителя к ней не подходит, а саму
+	// валюту счёта DonationAlerts в донате не присылает — поэтому пусто, и
+	// сервер подпишет «в валюте счёта». Валюту зрителя оставляем, только
+	// если сумма и есть сумма зрителя.
+	amount, currency := p.Data.AmountMain, ""
+	if amount == 0 || amount == p.Data.Amount {
+		amount, currency = p.Data.Amount, p.Data.Currency
+	}
+
+	// Без номера доната ID пустой: «0» у всех таких донатов совпал бы, и
+	// фильтр повторов склеил бы разные донаты в один.
+	id := ""
+	if p.Data.ID != 0 {
+		id = fmt.Sprintf("%d", p.Data.ID)
 	}
 
 	at := time.Now()
@@ -377,12 +389,12 @@ func parseDonation(raw json.RawMessage) (Donation, bool) {
 	}
 
 	return Donation{
-		ID:       fmt.Sprintf("%d", p.Data.ID),
+		ID:       id,
 		Source:   "donationalerts",
 		Username: p.Data.Username,
 		Message:  p.Data.Message,
 		Amount:   amount,
-		Currency: p.Data.Currency,
+		Currency: currency,
 		At:       at,
 	}, true
 }

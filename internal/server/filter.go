@@ -34,7 +34,7 @@ func (s *Server) check(requester string, item queue.Item, cfg config.Config) *Re
 	// заказы копятся, и стример получает десять треков подряд, как только
 	// снимет паузу.
 	if s.player != nil && s.player.Paused() {
-		return &Rejection{Reason: "стример остановил приём заказов, баллы вернул"}
+		return &Rejection{Reason: "стример остановил приём заказов"}
 	}
 
 	// Бан-лист хранит логин. Отображаемое имя может быть совсем другим —

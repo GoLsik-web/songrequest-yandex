@@ -59,6 +59,10 @@ type Player struct {
 	// ipc — канал управления запущенным mpv. Через него меняется громкость
 	// на ходу: другого способа mpv не даёт.
 	ipc string
+	// preURL, preStream — прямой адрес звука, найденный заранее (см.
+	// Prefetch), и для какого он ролика. Play берёт его и не ждёт yt-dlp.
+	preURL    string
+	preStream string
 }
 
 // NewPlayer создаёт плеер.
@@ -342,6 +346,14 @@ func (p *Player) Play(ctx context.Context, url string) error {
 	if mpv == "" {
 		return errs.New(errs.YouTubeNoMpv, "mpv не найден — играть звук нечем.")
 	}
+	// Заранее найденный адрес забираем до Stop: Stop его сбрасывает.
+	p.mu.Lock()
+	target := url
+	if p.preURL == url && p.preStream != "" {
+		target = p.preStream
+	}
+	p.preURL, p.preStream = "", ""
+	p.mu.Unlock()
 	p.Stop()
 
 	p.mu.Lock()
@@ -373,7 +385,7 @@ func (p *Player) Play(ctx context.Context, url string) error {
 		args = append(args, "--ytdl-raw-options=cookies-from-browser="+b)
 	}
 	// Тот же разделитель, что и у yt-dlp: адрес не должен превратиться в ключ.
-	args = append(args, "--", url)
+	args = append(args, "--", target)
 
 	cmd := exec.Command(mpv, args...)
 	hideWindow(cmd)
@@ -390,7 +402,54 @@ func (p *Player) Play(ctx context.Context, url string) error {
 	p.mu.Unlock()
 
 	p.log.Info("играю с YouTube", "адрес", url, "устройство", p.Device,
-		"громкость_mpv", volume, "громкость_spotify", p.baseVolume)
+		"заранее", target != url, "громкость_mpv", volume, "громкость_яндекса", p.baseVolume)
+	return nil
+}
+
+// Prefetch заранее находит прямой адрес звука, пока в эфире ещё играет
+// Яндекс. Без этого Яндекс вставал на паузу, а mpv ещё секунды (иногда
+// десятки секунд) ждал ответа yt-dlp — и в эфире стояла тишина.
+//
+// Не нашёл — не беда: Play отдаст mpv исходную ссылку, как раньше. Ошибку
+// отдаём только при отмене (скип во время запуска).
+func (p *Player) Prefetch(ctx context.Context, url string) error {
+	ytdlp, _ := p.tools.Paths()
+	if ytdlp == "" {
+		return nil
+	}
+	fctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
+	args := []string{"-g", "-f", "bestaudio/best", "--no-warnings", "--no-playlist"}
+	if b := p.browser(); b != "" {
+		args = append(args, "--cookies-from-browser", b)
+	}
+	args = append(args, "--", url)
+	cmd := exec.CommandContext(fctx, ytdlp, args...)
+	hideWindow(cmd)
+	var errBuf bytes.Buffer
+	cmd.Stderr = &errBuf
+	out, err := cmd.Output()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	stream := ""
+	if err == nil {
+		for _, line := range strings.Split(string(out), "\n") {
+			if line = strings.TrimSpace(line); strings.HasPrefix(line, "http") {
+				stream = line
+				break
+			}
+		}
+	}
+	if stream == "" {
+		p.log.Warn("не нашёл звук ролика заранее — mpv возьмёт его сам",
+			"адрес", url, "ошибка", err, "жалобы", strings.TrimSpace(errBuf.String()))
+		return nil
+	}
+	p.mu.Lock()
+	p.preURL, p.preStream = url, stream
+	p.mu.Unlock()
 	return nil
 }
 
@@ -460,6 +519,8 @@ func (p *Player) Stop() {
 	p.playing = ""
 	p.ipc = ""
 	p.gen++
+	// Найденное заранее, но так и не сыгранное (запуск скипнули), — тоже.
+	p.preURL, p.preStream = "", ""
 	p.mu.Unlock()
 
 	if cmd == nil || cmd.Process == nil {

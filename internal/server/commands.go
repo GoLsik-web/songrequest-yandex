@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -96,6 +97,35 @@ func parseCommand(text, prefix string) (cmd string, args []string, ok bool) {
 	return strings.ToLower(fields[0]), fields[1:], true
 }
 
+// chatCommands — таблица команд чата. Нужна onChat (чужие команды
+// отсекаются до проверки прав) и resolveOrder (зритель пишет «!скип» в
+// награду вместо чата, и искать такое как трек нельзя).
+var chatCommands = map[string]bool{
+	"очередь": true, "queue": true, "q": true, "трек": true, "что": true,
+	"сейчас": true, "now": true, "np": true, "скип": true, "skip": true, "s": true,
+	"вернуть": true, "undo": true, "назад": true, "плейлисты": true, "плейлист": true,
+	"playlists": true, "pl": true, "одобрить": true, "принять": true, "approve": true,
+	"ok": true, "отклонить": true, "отказать": true, "reject": true, "удалить": true,
+	"remove": true, "rm": true, "вверх": true, "поднять": true, "top": true,
+	"громкость": true, "volume": true, "vol": true, "пауза": true, "pause": true,
+	"продолжить": true, "resume": true, "play": true, "очистить": true, "clear": true,
+	"бан": true, "ban": true, "разбан": true, "unban": true, "стоп": true,
+	"stop": true, "старт": true, "start": true, "помощь": true, "help": true,
+	"команды": true, "пауза-трека": true, "паузатрека": true, "стопзаказы": true,
+}
+
+// viewerCommands — то, что можно писать любому зрителю, без прав модератора.
+var viewerCommands = map[string]bool{
+	"очередь": true, "queue": true, "q": true,
+	"помощь": true, "help": true, "команды": true,
+}
+
+// isChatCommand — текст заказа на деле команда чата.
+func isChatCommand(text, prefix string) bool {
+	cmd, _, ok := parseCommand(text, prefix)
+	return ok && chatCommands[cmd]
+}
+
 // onChat разбирает сообщение из чата.
 func (s *Server) onChat(msg twitch.ChatMessage) {
 	cfg := s.cfg.Get()
@@ -109,6 +139,14 @@ func (s *Server) onChat(msg twitch.ChatMessage) {
 		return
 	}
 
+	// Чужие команды (других ботов с тем же знаком) отсекаем до проверки
+	// прав: иначе на каждое «!дискорд» от зрителя шёл запрос к Twitch
+	// «а не модератор ли он». В лог — чтобы были видны опечатки.
+	if !chatCommands[cmd] {
+		s.log.Debug("незнакомая команда", "кто", msg.Login, "команда", cmd)
+		return
+	}
+
 	actor := msg.DisplayName
 	if actor == "" {
 		actor = msg.Login
@@ -116,6 +154,18 @@ func (s *Server) onChat(msg twitch.ChatMessage) {
 
 	ctx, cancel := context.WithTimeout(s.baseContext(), 30*time.Second)
 	defer cancel()
+
+	// Справку и очередь можно всем: зритель, который спрашивает «что
+	// играет дальше», ничего не ломает, а молчание в ответ выглядит поломкой.
+	if viewerCommands[cmd] && !msg.CanCommand() {
+		switch cmd {
+		case "очередь", "queue", "q":
+			s.say(ctx, s.queueLine())
+		default:
+			s.say(ctx, helpLine(prefix))
+		}
+		return
+	}
 
 	// В чате отказ молчаливый — спорить со зрителем при всех незачем. А вот в
 	// логе он обязан быть: жалоба «пишу !скип, ничего не происходит» иначе
@@ -169,12 +219,23 @@ func (s *Server) onChat(msg twitch.ChatMessage) {
 		s.cmdHold(ctx, actor, false)
 
 	case "очистить", "clear":
-		if err := s.clearQueue(ctx, true, actor); err != nil {
+		res, err := s.clearQueue(ctx, true, actor)
+		if err != nil {
 			s.log.Warn("не очистил очередь", "ошибка", err)
 			s.say(ctx, "@"+actor+", очередь очистить не вышло — посмотри в приложении")
 			return
 		}
-		s.say(ctx, "Очередь очищена, баллы вернулись")
+		// Про баллы говорим только то, что правда случилось: раньше
+		// «баллы вернулись» звучало и при пустой очереди, и когда Twitch
+		// возврат не принял.
+		line := "Очередь очищена"
+		if res.Refunded > 0 {
+			line += ", баллы вернул"
+		}
+		if len(res.Lost) > 0 {
+			line += ". Не вернулись баллы у " + strings.Join(res.Lost, ", ") + " — стример вернёт вручную"
+		}
+		s.say(ctx, line)
 
 	case "бан", "ban":
 		s.cmdBan(ctx, actor, args)
@@ -183,7 +244,7 @@ func (s *Server) onChat(msg twitch.ChatMessage) {
 		s.cmdUnban(ctx, actor, args)
 
 	case "стоп", "стопзаказы", "stop":
-		s.player.SetPaused(true)
+		s.setOrdersPaused(ctx, true)
 		s.modLog(actor, "остановил приём заказов", "")
 		// Прямо говорим, чего эта команда НЕ делает. Именно на этом месте
 		// люди спотыкались чаще всего: писали «!стоп», ожидая, что музыка
@@ -192,26 +253,31 @@ func (s *Server) onChat(msg twitch.ChatMessage) {
 			"остановить её это "+prefix+"пауза")
 
 	case "старт", "start":
-		s.player.SetPaused(false)
+		s.setOrdersPaused(ctx, false)
 		s.modLog(actor, "возобновил приём заказов", "")
 		s.say(ctx, "Заказы снова принимаются")
 
-	default:
-		// Знак команды угадан верно, а слово — нет. Молчим в чате (мало ли
-		// что там пишут другие боты с тем же знаком), но пишем в лог: так
-		// видно опечатки и чужие команды, которые к нам не относятся.
-		s.log.Debug("незнакомая команда", "кто", actor, "команда", cmd)
-
 	case "помощь", "help", "команды":
-		s.say(ctx, "Команды: "+prefix+"очередь, "+prefix+"трек, "+prefix+
-			"скип (можно "+prefix+"скип 2 или "+prefix+"скип название), "+
-			prefix+"вернуть, "+prefix+"удалить N, "+prefix+"вверх N, "+
-			prefix+"громкость 40, "+prefix+"пауза, "+prefix+"продолжить, "+
-			prefix+"плейлисты, "+prefix+"одобрить, "+prefix+"отклонить, "+
-			prefix+"очистить, "+prefix+"бан ник, "+prefix+"разбан ник, "+
-			prefix+"стоп, "+prefix+"старт")
+		s.say(ctx, helpLine(prefix))
 	}
 }
+
+// helpLine — список команд для чата.
+func helpLine(prefix string) string {
+	return "Команды: " + prefix + "очередь, " + prefix + "трек, " + prefix +
+		"скип (можно " + prefix + "скип 2 или " + prefix + "скип название), " +
+		prefix + "вернуть, " + prefix + "удалить N, " + prefix + "вверх N, " +
+		prefix + "громкость 40, " + prefix + "пауза, " + prefix + "продолжить, " +
+		prefix + "плейлисты, " + prefix + "одобрить, " + prefix + "отклонить, " +
+		prefix + "очистить, " + prefix + "бан ник, " + prefix + "разбан ник, " +
+		prefix + "стоп, " + prefix + "старт. Зрителям доступны " + prefix + "очередь и " +
+		prefix + "помощь, остальное — только модераторам."
+}
+
+// loginRe — так выглядит логин Twitch: 3–25 латинских букв, цифр и «_».
+var loginRe = regexp.MustCompile(`^[a-z0-9_]{3,25}$`)
+
+func validLogin(login string) bool { return loginRe.MatchString(login) }
 
 // queueLine — очередь одной строкой для чата.
 func (s *Server) queueLine() string {
@@ -339,7 +405,10 @@ func (s *Server) skipOnAir(ctx context.Context, actor string) {
 		s.say(ctx, "Не жду конца трека канала, включаю заказ")
 		return
 	}
-	s.say(ctx, "Скипнул: "+trackLine(res.Item)+refundTail(res.Refunded))
+	// Про баллы здесь не говорим: возврат за оборванный трек делает плеер,
+	// когда трек действительно закончится, и сам сообщает зрителю, если
+	// Twitch возврат принял.
+	s.say(ctx, "Скипнул: "+trackLine(res.Item))
 }
 
 // skipAt убирает заказ по номеру из «!очередь».
@@ -620,11 +689,22 @@ func (s *Server) cmdRemove(ctx context.Context, actor string, args []string) {
 
 func (s *Server) cmdBan(ctx context.Context, actor string, args []string) {
 	if len(args) == 0 {
-		s.say(ctx, "@"+actor+", нужен ник: бан ник причина")
+		s.say(ctx, "@"+actor+", нужен ник: "+s.prefix()+"бан ник причина")
 		return
 	}
 	login := strings.TrimPrefix(strings.ToLower(args[0]), "@")
 	reason := strings.Join(args[1:], " ")
+
+	// Опечатка вроде «!бан @» или «!бан причина» записывала в бан-лист
+	// мусор, а бан самого канала закрывал заказы стримеру.
+	if !validLogin(login) {
+		s.say(ctx, "@"+actor+", «"+login+"» не похоже на ник Twitch")
+		return
+	}
+	if ch := s.state.Snapshot().Twitch.Channel; ch != "" && strings.EqualFold(ch, login) {
+		s.say(ctx, "@"+actor+", стримера забанить нельзя")
+		return
+	}
 
 	if err := s.banMusic(login, reason); err != nil {
 		s.log.Warn("не забанил", "ошибка", err)
@@ -638,11 +718,13 @@ func (s *Server) cmdBan(ctx context.Context, actor string, args []string) {
 
 func (s *Server) cmdUnban(ctx context.Context, actor string, args []string) {
 	if len(args) == 0 {
-		s.say(ctx, "@"+actor+", нужен ник: разбан ник")
+		s.say(ctx, "@"+actor+", нужен ник: "+s.prefix()+"разбан ник")
 		return
 	}
 	login := strings.TrimPrefix(strings.ToLower(args[0]), "@")
 
+	// Разбан ник не проверяет нарочно: так из бан-листа убирается мусор,
+	// записанный туда до появления проверки.
 	if err := s.unbanMusic(login); err != nil {
 		s.log.Warn("не разбанил", "ошибка", err)
 		s.say(ctx, "@"+actor+", не получилось вернуть заказы для "+login)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"songrequest-yandex/internal/app"
+	"songrequest-yandex/internal/config"
 	"songrequest-yandex/internal/errs"
 	"songrequest-yandex/internal/twitch"
 )
@@ -115,12 +116,17 @@ func (s *Server) startTwitch(ctx context.Context) {
 		return
 	}
 
+	// На награду — свой срок: проверка аккаунта могла съесть почти все
+	// тридцать секунд, и тогда награда не создавалась из-за чужой задержки.
+	rewardCtx, cancelReward := context.WithTimeout(ctx, 30*time.Second)
+	defer cancelReward()
+
 	knownID, _, err := s.db.GetKV(kvRewardID)
 	if err != nil {
 		s.log.Warn("не прочитал прежнюю награду", "ошибка", err)
 	}
 
-	reward, err := s.twitch.EnsureReward(checkCtx, knownID)
+	reward, err := s.ensureMainReward(rewardCtx, knownID)
 	if err != nil {
 		s.state.NotifyError(err)
 		code, text := errs.Describe(err)
@@ -128,11 +134,14 @@ func (s *Server) startTwitch(ctx context.Context) {
 			t.Note = text
 			t.NoteCode = string(code)
 		})
+		// Без награды чат всё равно нужен: команды и ответы зрителям идут
+		// через то же соединение. Раньше отсюда просто выходили, и вместе с
+		// наградой молчало всё остальное.
+		s.startEventSub(ctx, nil)
+		if s.rewardRetryable(err) {
+			go s.retryReward(ctx)
+		}
 		return
-	}
-
-	if err := s.db.SetKV(kvRewardID, reward.ID); err != nil {
-		s.log.Warn("не запомнил награду", "ошибка", err)
 	}
 
 	s.mu.Lock()
@@ -146,14 +155,14 @@ func (s *Server) startTwitch(ctx context.Context) {
 		t.Note = ""
 		t.NoteCode = ""
 	})
-	s.state.Notify("info", "Награда «"+reward.Title+"» готова, стоит "+strconv.Itoa(reward.Cost)+" баллов")
+	s.state.Notify("info", "Награда «"+reward.Title+"» готова, стоит "+strconv.Itoa(reward.Cost)+" "+pointsWord(reward.Cost))
 
 	// Вторая награда — за плейлист. Её может не быть вовсе: это отдельная
 	// галочка в настройках, и включают её не все.
 	//
 	// Отказ здесь не роняет первую награду: заказы поштучно должны работать,
 	// даже если со второй наградой что-то не заладилось.
-	playlistID := s.ensurePlaylistReward(checkCtx)
+	playlistID := s.ensurePlaylistReward(rewardCtx)
 
 	// Предупреждаем заранее: доступ к Twitch у публичных приложений живёт
 	// тридцать дней, и «заказы перестали приходить» посреди стрима — худший
@@ -280,6 +289,17 @@ func (s *Server) onRedemption(r twitch.Redemption) {
 	// Подбор идёт в фоне: EventSub ждать нельзя, иначе следующие заказы
 	// встанут в очередь за этим.
 	if playlist := s.playlistReward(); playlist != "" && r.RewardID == playlist {
+		// Пауза приёма касается и плейлистов: раньше награда за плейлист
+		// принималась и при остановленных заказах.
+		if s.player != nil && s.player.Paused() {
+			go func() {
+				ctx, cancel := context.WithTimeout(s.baseContext(), 20*time.Second)
+				defer cancel()
+				s.state.SetOrderMatch(r.ID, app.OrderMatch{State: app.MatchFailed, Note: "Приём заказов остановлен"})
+				s.rejectRedemption(ctx, r, "стример остановил приём заказов")
+			}()
+			return
+		}
 		go s.resolvePlaylist(s.baseContext(), r)
 		return
 	}
@@ -291,10 +311,11 @@ func (s *Server) handleRedemptionAction(w http.ResponseWriter, r *http.Request) 
 	id := r.PathValue("id")
 	action := r.URL.Query().Get("action")
 
-	var rewardID string
+	var rewardID, user string
 	for _, item := range s.state.Snapshot().Redemptions {
 		if item.ID == id {
 			rewardID = item.RewardID
+			user = item.User
 			break
 		}
 	}
@@ -339,6 +360,11 @@ func (s *Server) handleRedemptionAction(w http.ResponseWriter, r *http.Request) 
 	s.state.SetRedemptionStatus(id, status)
 	if status == app.OrderRefunded {
 		s.state.Notify("info", "Баллы за заказ возвращены")
+		// Зритель не видит панель: без строки в чате заказ у него просто
+		// пропадал, и было непонятно, вернулись ли баллы.
+		if user != "" {
+			s.say(ctx, "@"+user+", заказ снят, баллы вернул")
+		}
 	} else {
 		s.state.Notify("info", "Заказ принят, баллы не возвращаются")
 	}
@@ -438,7 +464,7 @@ func (s *Server) pushReward() {
 	ctx, cancel := context.WithTimeout(s.baseContext(), 20*time.Second)
 	defer cancel()
 
-	reward, err := s.twitch.EnsureReward(ctx, id)
+	reward, err := s.ensureMainReward(ctx, id)
 	if err != nil {
 		s.log.Error("не обновил награду на канале", "ошибка", err)
 		s.state.NotifyError(err)
@@ -579,3 +605,88 @@ func (s *Server) playlistReward() string {
 	defer s.mu.Unlock()
 	return s.playlistRewardID
 }
+
+// ensureMainReward заводит награду за трек и запоминает её номер.
+//
+// Частый случай у тех, кто раньше пользовался другим приложением заказов:
+// награда «Заказ трека» на канале уже есть, но создана не нами, и Twitch
+// отказывает в такой же. Человек при этом видит «награда не создалась» и не
+// понимает, что делать. Поэтому один раз пробуем своё название с пометкой и,
+// если вышло, записываем его в настройки — иначе при следующем запуске
+// приложение попыталось бы вернуть прежнее и упёрлось бы в тот же отказ.
+func (s *Server) ensureMainReward(ctx context.Context, knownID string) (*twitch.Reward, error) {
+	reward, err := s.twitch.EnsureReward(ctx, knownID)
+	if err != nil && errs.CodeOf(err) == errs.TwitchForeignAward {
+		title := s.cfg.Get().RewardTitle
+		alt := title + " (Яндекс)"
+		if len([]rune(alt)) > 45 { // предел длины названия у Twitch
+			alt = "Трек в Яндекс Музыке"
+		}
+		s.log.Info("название награды занято чужой наградой, беру другое",
+			"было", title, "стало", alt)
+		if uerr := s.cfg.Update(func(c *config.Config) { c.RewardTitle = alt }); uerr != nil {
+			return nil, err
+		}
+		reward, err = s.twitch.EnsureReward(ctx, knownID)
+		if err != nil {
+			// Не вышло и так — возвращаем настройку как была, чтобы не
+			// оставлять человеку название, которого он не выбирал.
+			s.cfg.Update(func(c *config.Config) { c.RewardTitle = title })
+			return nil, err
+		}
+		s.state.NotifyWarn(errs.TwitchForeignAward, fmt.Sprintf(
+			"Награда «%s» на канале уже была, но от другого приложения, поэтому создал свою — «%s». Название можно поменять в настройках.",
+			title, alt))
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.db.SetKV(kvRewardID, reward.ID); err != nil {
+		s.log.Warn("не запомнил награду", "ошибка", err)
+	}
+	return reward, nil
+}
+
+// rewardRetryable — стоит ли пробовать создать награду ещё раз самим.
+//
+// Нет баллов, занятое название и выключенная галочка от повтора не
+// пройдут — тут нужен человек. Всё прочее (Twitch задумался, сеть моргнула)
+// обычно проходит через минуту, и ждать от стримера повторного входа ради
+// этого незачем.
+func (s *Server) rewardRetryable(err error) bool {
+	switch errs.CodeOf(err) {
+	case errs.TwitchNoAffiliate, errs.TwitchForeignAward, errs.TwitchAuthExpired, errs.TwitchScopes:
+		return false
+	}
+	return s.cfg.Get().AutoCreateReward
+}
+
+// retryReward ещё несколько раз пробует завести награду после неудачи при
+// подключении. Получилось — поднимает подписку уже с наградой.
+func (s *Server) retryReward(ctx context.Context) {
+	for _, wait := range []time.Duration{20 * time.Second, time.Minute, 3 * time.Minute, 10 * time.Minute} {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+		s.mu.Lock()
+		done := s.rewardID != ""
+		s.mu.Unlock()
+		if done || !s.twitch.Connected() {
+			return
+		}
+		s.log.Info("пробую ещё раз создать награду")
+		s.pushReward()
+		s.mu.Lock()
+		done = s.rewardID != ""
+		s.mu.Unlock()
+		if done {
+			return
+		}
+	}
+}
+
+// pointsWord — «балл/балла/баллов» по числу: «стоит 1 баллов» резало глаз.
+func pointsWord(n int) string { return plural(n, "балл", "балла", "баллов") }

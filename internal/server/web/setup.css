@@ -644,3 +644,14 @@ body.has-titlebar .setup { top: 38px; }
   .setup-progress { left: 0; }
   .setup-body { padding: var(--s6) var(--s5); }
 }
+
+/* Ручной вход в Яндекс: свёрнут, пока окно входа работает само. */
+.setup-manual { margin: 14px 0 4px; }
+.setup-manual > summary {
+  cursor: pointer;
+  color: var(--dim);
+  font-size: 13px;
+}
+.setup-manual > summary:hover,
+.setup-manual[open] > summary { color: inherit; }
+.setup-manual[open] > summary { margin-bottom: 10px; }

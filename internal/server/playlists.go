@@ -94,6 +94,18 @@ type pendingPlaylist struct {
 	RedemptionID string    `json:"redemption_id"`
 	RewardID     string    `json:"reward_id"`
 	At           time.Time `json:"at"`
+
+	// Done и Added — сколько треков уже разобрано при одобрении и сколько из
+	// них встало в очередь. Пишутся в базу после каждого трека: если
+	// программу закрыли посреди одобрения, повторное «одобрить» продолжит с
+	// места остановки, а не поставит уже добавленные треки второй раз.
+	Done  int `json:"done,omitempty"`
+	Added int `json:"added,omitempty"`
+
+	// busy — плейлист прямо сейчас одобряют: треки ставятся в очередь.
+	// Из ожидания его вынимают только после этого (см. approvePlaylist), а
+	// пока он здесь, второе «одобрить» или «отклонить» его не трогает.
+	busy bool
 }
 
 // TotalMs — сколько играть всю пачку.
@@ -203,11 +215,85 @@ func (s *Server) takePending(id string) (pendingPlaylist, error) {
 
 	for i, p := range s.playlists {
 		if p.ID == id {
+			if p.busy {
+				return pendingPlaylist{}, errs.New(errs.PlaylistNone, "Этот плейлист уже одобряют — треки ставятся в очередь.")
+			}
 			s.playlists = append(s.playlists[:i], s.playlists[i+1:]...)
 			return p, nil
 		}
 	}
 	return pendingPlaylist{}, errs.New(errs.PlaylistNone, "Плейлиста с таким номером в ожидании нет.")
+}
+
+// claimPending помечает плейлист «одобряется», не вынимая его из ожидания.
+//
+// Раньше одобрение сразу вынимало плейлист, а треки ставились потом, по
+// одному, с поиском. Оборвись это посередине (перезапуск, сеть) — плейлиста
+// нет ни в ожидании, ни целиком в очереди, а баллы списаны.
+func (s *Server) claimPending(id string) (pendingPlaylist, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.playlists) == 0 {
+		return pendingPlaylist{}, errs.New(errs.PlaylistNone, "Сейчас ни один плейлист не ждёт решения.")
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		if len(s.playlists) > 1 {
+			return pendingPlaylist{}, errs.New(errs.PlaylistNone,
+				"Решения ждёт больше одного плейлиста — скажи, какой именно, по номеру.")
+		}
+		id = s.playlists[0].ID
+	}
+	for i := range s.playlists {
+		if s.playlists[i].ID == id {
+			if s.playlists[i].busy {
+				return pendingPlaylist{}, errs.New(errs.PlaylistNone, "Этот плейлист уже одобряют — треки ставятся в очередь.")
+			}
+			s.playlists[i].busy = true
+			return s.playlists[i], nil
+		}
+	}
+	return pendingPlaylist{}, errs.New(errs.PlaylistNone, "Плейлиста с таким номером в ожидании нет.")
+}
+
+// releasePending снимает пометку «одобряется»: с удалением из ожидания или,
+// если удалять не надо, оставляя плейлист ждать дальше.
+func (s *Server) releasePending(id string, remove bool) {
+	s.mu.Lock()
+	for i := range s.playlists {
+		if s.playlists[i].ID == id {
+			if remove {
+				s.playlists = append(s.playlists[:i], s.playlists[i+1:]...)
+			} else {
+				s.playlists[i].busy = false
+			}
+			break
+		}
+	}
+	list := make([]pendingPlaylist, len(s.playlists))
+	copy(list, s.playlists)
+	s.mu.Unlock()
+	s.savePlaylists(list)
+	s.syncPlaylists()
+}
+
+// notePlaylistProgress запоминает в базе, докуда дошло одобрение плейлиста.
+func (s *Server) notePlaylistProgress(id string, done, added int) {
+	s.mu.Lock()
+	found := false
+	for i := range s.playlists {
+		if s.playlists[i].ID == id {
+			s.playlists[i].Done, s.playlists[i].Added = done, added
+			found = true
+			break
+		}
+	}
+	list := make([]pendingPlaylist, len(s.playlists))
+	copy(list, s.playlists)
+	s.mu.Unlock()
+	if found {
+		s.savePlaylists(list)
+	}
 }
 
 // syncPlaylists переносит список ждущих в панель.
@@ -394,18 +480,30 @@ func fromYandexCollection(col links.Collection) playlistCollection {
 
 // approvePlaylist ставит плейлист в очередь.
 func (s *Server) approvePlaylist(ctx context.Context, id, actor string) (pendingPlaylist, int, error) {
-	p, err := s.takePending(id)
+	p, err := s.claimPending(id)
 	if err != nil {
 		return pendingPlaylist{}, 0, err
 	}
 
 	cfg := s.cfg.Get()
-	added := 0
-	for _, t := range p.Tracks {
+	added := p.Added
+	cut := false
+	start := p.Done
+	if start > len(p.Tracks) {
+		start = len(p.Tracks)
+	}
+	for i := start; i < len(p.Tracks); i++ {
+		t := p.Tracks[i]
+		if ctx.Err() != nil {
+			// Срок вышел посреди плейлиста (поиск бывает долгим).
+			cut = true
+			break
+		}
 		item, ok := s.playlistItem(ctx, p, t, cfg)
 		if !ok {
 			s.log.Info("трек плейлиста не удалось поставить",
 				"плейлист", p.Title, "трек", t.line())
+			s.notePlaylistProgress(p.ID, i+1, added)
 			continue
 		}
 		// В очередь кладём напрямую, а не через enqueue.
@@ -417,15 +515,26 @@ func (s *Server) approvePlaylist(ctx context.Context, id, actor string) (pending
 		// подряд от бота — это не ответ, а спам.
 		if _, err := s.queue.Add(item, false); err != nil {
 			s.log.Warn("не поставил трек плейлиста в очередь", "трек", t.line(), "ошибка", err)
+			s.notePlaylistProgress(p.ID, i+1, added)
 			continue
 		}
 		added++
+		s.notePlaylistProgress(p.ID, i+1, added)
+	}
+	// Из ожидания вынимаем только теперь, когда треки уже в очереди.
+	s.releasePending(p.ID, true)
+
+	if cut {
+		s.log.Warn("плейлист поставлен не целиком: вышел срок",
+			"плейлист", p.Title, "поставлено", added, "всего", len(p.Tracks))
 	}
 
 	if added == 0 {
 		// Одобрили, а играть нечего. Баллы возвращаем: зритель ни в чём не
-		// виноват, а плейлист из ожидания уже вынут.
-		s.refundPlaylist(ctx, p, "из плейлиста не удалось сыграть ни один трек")
+		// виноват. Срок исходного запроса мог уже выйти — берём свой.
+		rctx, rcancel := context.WithTimeout(s.baseContext(), 20*time.Second)
+		defer rcancel()
+		s.refundPlaylist(rctx, p, "из плейлиста не удалось сыграть ни один трек")
 		s.modLog(actor, "одобрил плейлист, но играть нечего", p.Title)
 		return p, 0, errs.New(errs.PlaylistEmpty,
 			"Из этого плейлиста не удалось поставить ни один трек. Баллы вернул.")
@@ -438,7 +547,11 @@ func (s *Server) approvePlaylist(ctx context.Context, id, actor string) (pending
 	// Заказ на Twitch отмечаем выполненным: плейлист сыграет, баллы
 	// потрачены не зря. Иначе он навсегда останется висеть в очереди наград.
 	if p.RedemptionID != "" {
-		if err := s.twitch.FulfillRedemption(ctx, p.RewardID, p.RedemptionID); err != nil {
+		// Свой срок: исходный мог выйти, пока ставились треки.
+		fctx, fcancel := context.WithTimeout(s.baseContext(), 20*time.Second)
+		err := s.twitch.FulfillRedemption(fctx, p.RewardID, p.RedemptionID)
+		fcancel()
+		if err != nil {
 			s.log.Warn("не отметил плейлист выполненным", "ошибка", err)
 		} else {
 			s.state.SetRedemptionStatus(p.RedemptionID, app.OrderFulfilled)

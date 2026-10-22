@@ -354,8 +354,13 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, form
 	}
 
 	switch {
-	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
-		return errs.New(errs.YandexAuthExpired, "Вход в Яндекс слетел — войдите заново.")
+	case resp.StatusCode == http.StatusUnauthorized:
+		return errs.New(errs.YandexAuthExpired, "Вход в Яндекс слетел — войди заново.")
+	case resp.StatusCode == http.StatusForbidden:
+		// 403 — это не «вход слетел»: вход живой, но Яндекс не пускает.
+		// Обычно из-за страны (VPN, сеть за границей) или ограничений
+		// аккаунта. Перевход тут не поможет, и говорить про него нельзя.
+		return errRegion()
 	case resp.StatusCode == http.StatusTooManyRequests:
 		c.mu.Lock()
 		c.lastRate = time.Now()
@@ -372,8 +377,11 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, form
 		return errs.Wrap(errs.YandexBadResponse, "Яндекс ответил непонятно.", err)
 	}
 	if env.Error != nil {
-		if env.Error.Name == "session-expired" || env.Error.Name == "not-allowed" {
-			return errs.New(errs.YandexAuthExpired, "Вход в Яндекс слетел — войдите заново.")
+		if env.Error.Name == "session-expired" {
+			return errs.New(errs.YandexAuthExpired, "Вход в Яндекс слетел — войди заново.")
+		}
+		if env.Error.Name == "not-allowed" {
+			return errRegion()
 		}
 		return errs.New(errs.YandexBadResponse, "Яндекс отказал: "+firstNonEmpty(env.Error.Message, env.Error.Name))
 	}
@@ -405,3 +413,11 @@ func firstNonEmpty(ss ...string) string {
 }
 
 var errNoState = errors.New("ynison ещё не прислал состояние")
+
+// errRegion — Яндекс отказал, хотя вход в порядке.
+func errRegion() error {
+	return errs.New(errs.YandexRegion,
+		"Яндекс Музыка не пускает с этого подключения. Чаще всего мешает VPN или прокси "+
+			"с адресом за границей — выключи его для Яндекса. Если не помогло, проверь, "+
+			"что на music.yandex.ru в браузере музыка играет с этого же аккаунта.")
+}

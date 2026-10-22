@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -137,29 +138,36 @@ func run() error {
 			"испорченный_файл", cfg.Broken)
 	}
 
-	// Отставленный файл прошлой версии больше не нужен: мы уже работаем из
-	// нового. Раньше его удалить было нельзя — он был запущен.
-	if exe, err := os.Executable(); err == nil {
-		update.CleanOld(exe)
-	}
-
-	// Обновились — ждём, пока прежняя копия освободит порт.
+	// Единственность копии — именованным мьютексом Windows, а не только по
+	// порту: порт открывается через секунду-другую после запуска, и два
+	// быстрых щелчка по .exe давали две живые копии на одну базу.
 	if *afterUpdate {
-		waitForPrevious(log, cfg.Get().Port)
-	}
-
-	// Вторая копия ничего не запускает, а показывает окно первой.
-	//
-	// Человек, не найдя окна на экране, спокойно щёлкает по .exe ещё раз —
-	// и раньше получал две программы на одну базу: две подписки на заказы и
-	// два mpv на одно звуковое устройство.
-	if running, raised := desktop.RaiseRunning(cfg.Get().Port); running {
-		log.Info("приложение уже запущено, вторая копия не нужна", "окно_показано", raised)
-		if !raised {
-			desktop.ShowInfo(windowTitle+" уже работает",
-				"Программа уже запущена. Её значок — возле часов, справа внизу.")
+		// Обновились — ждём, пока прежняя копия отпустит мьютекс и порт.
+		// Выходить по «уже запущено» здесь нельзя: запущена как раз та, что
+		// нас позвала и сейчас закрывается.
+		lock := waitForPrevious(log, cfg.Get().Port)
+		defer lock.Release()
+	} else {
+		lock, ok, err := desktop.TryLock(lockName())
+		if err != nil {
+			log.Warn("не создал знак единственной копии, проверяю только по порту", "ошибка", err)
 		}
-		return nil
+		defer lock.Release()
+		if !ok && err == nil {
+			// Первая копия ещё может подниматься: даём ей время открыть панель,
+			// чтобы показать её окно, а не молча выйти.
+			raiseFirst(log, cfg.Get().Port)
+			return nil
+		}
+		// Мьютекс наш, но рядом может работать сборка постарше, которая
+		// мьютекса не знает. Её ловит прежняя проверка по порту.
+		if running, raised := desktop.RaiseRunning(cfg.Get().Port); running {
+			log.Info("приложение уже запущено, вторая копия не нужна", "окно_показано", raised)
+			if !raised {
+				alreadyRunningInfo()
+			}
+			return nil
+		}
 	}
 
 	db, err := store.Open(dir)
@@ -207,6 +215,10 @@ func run() error {
 			state.Notify("error", "Панель управления остановилась: "+humanErr(err))
 		}
 	}()
+
+	// Отставленный файл прошлой версии удаляем только когда новая версия
+	// доказала, что живёт: панель ответила.
+	go cleanOldWhenServing(ctx, log, srv.Addr())
 
 	// Если вход был сохранён с прошлого раза, проверяем его сразу: лучше
 	// увидеть «Яндекс отвалился» до стрима, а не во время первого заказа.
@@ -496,21 +508,107 @@ func openBrowser(url string, log *logx.Logger) {
 // порт, базу и звуковое устройство. Ждём с запасом, но не бесконечно: если
 // старая почему-то зависла, лучше честно попробовать и получить понятное
 // «уже запущено», чем висеть молча.
-func waitForPrevious(log *logx.Logger, port int) {
+//
+// Ждём двух вещей: мьютекса (его держит прежняя копия новой сборки) и
+// свободного порта (сборки постарше мьютекса не знают). Порт проверяем без
+// показа окна — раньше прежняя копия на каждой проверке мигала окном.
+func waitForPrevious(log *logx.Logger, port int) *desktop.Lock {
 	const (
 		limit = 30 * time.Second
 		step  = 300 * time.Millisecond
 	)
 	log.Info("обновился, жду, пока закроется прежняя копия")
 	deadline := time.Now().Add(limit)
+	var lock *desktop.Lock
 	for time.Now().Before(deadline) {
-		if running, _ := desktop.RaiseRunning(port); !running {
+		if lock == nil {
+			l, ok, err := desktop.TryLock(lockName())
+			if err != nil {
+				log.Warn("не создал знак единственной копии", "ошибка", err)
+				lock = &desktop.Lock{}
+			} else if ok {
+				lock = l
+			}
+		}
+		if lock != nil && !desktop.IsRunning(port) {
 			log.Info("прежняя копия закрылась, продолжаю запуск")
-			return
+			return lock
 		}
 		time.Sleep(step)
 	}
 	log.Warn("прежняя копия не закрылась вовремя, запускаюсь как есть")
+	return lock
+}
+
+// lockName — имя мьютекса единственной копии: Local\songrequest-yandex. У
+// пробной сборки своё — она нарочно живёт рядом с рабочей.
+func lockName() string {
+	return `Local\` + appName()
+}
+
+// raiseFirst показывает окно уже запущенной копии. Та может ещё подниматься,
+// поэтому ждём её ответа до десяти секунд.
+func raiseFirst(log *logx.Logger, port int) {
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if running, raised := desktop.RaiseRunning(port); running {
+			log.Info("приложение уже запущено, вторая копия не нужна", "окно_показано", raised)
+			if !raised {
+				alreadyRunningInfo()
+			}
+			return
+		}
+		if time.Now().After(deadline) {
+			log.Info("приложение уже запущено, но панель не ответила")
+			alreadyRunningInfo()
+			return
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+}
+
+func alreadyRunningInfo() {
+	desktop.ShowInfo(windowTitle+" уже работает",
+		"Программа уже запущена. Её значок — возле часов, справа внизу.")
+}
+
+// cleanOldWhenServing удаляет .old прошлой версии, как только панель
+// ответила. Не ответила за минуту — оставляем файл: пригодится для отката.
+// Раньше .old удалялся первой строкой запуска, и если новая сборка падала
+// дальше, откатываться было не на что.
+func cleanOldWhenServing(ctx context.Context, log *logx.Logger, addr string) {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	if _, err := os.Stat(exe + ".old"); err != nil {
+		return
+	}
+	port := portOf(addr)
+	deadline := time.Now().Add(time.Minute)
+	for time.Now().Before(deadline) {
+		if desktop.IsRunning(port) {
+			update.CleanOld(exe)
+			log.Info("новая версия поднялась, убрал файл прошлой")
+			return
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+	log.Warn("панель не ответила, файл прошлой версии оставил для отката")
+}
+
+// portOf достаёт порт из адреса панели вида «http://127.0.0.1:8992».
+func portOf(addr string) int {
+	i := strings.LastIndex(addr, ":")
+	if i < 0 {
+		return 0
+	}
+	n, _ := strconv.Atoi(strings.TrimRight(addr[i+1:], "/"))
+	return n
 }
 
 // humanErr — текст ошибки для окна и панели. Наши ошибки с кодом уже

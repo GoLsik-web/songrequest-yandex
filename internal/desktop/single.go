@@ -27,29 +27,11 @@ import (
 // Проверяем не занятость порта, а ответ приложения: на 8977 может сидеть
 // что-нибудь чужое, и молча выходить из-за этого нельзя.
 func RaiseRunning(port int) (running, raised bool) {
-	if port <= 0 {
+	if !IsRunning(port) {
 		return false, false
 	}
 	base := fmt.Sprintf("http://127.0.0.1:%d", port)
 	client := &http.Client{Timeout: 3 * time.Second}
-
-	resp, err := client.Get(base + "/api/state")
-	if err != nil {
-		return false, false
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return false, false
-	}
-	var state struct {
-		App string `json:"app"`
-	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&state); err != nil {
-		return false, false
-	}
-	if state.App != app.Marker {
-		return false, false
-	}
 
 	req, err := http.NewRequest(http.MethodPost, base+"/api/window/show", nil)
 	if err != nil {
@@ -68,4 +50,31 @@ func RaiseRunning(port int) (running, raised bool) {
 	defer r.Body.Close()
 	// 503 означает «я работаю, но окна у меня нет» — панель открыта в браузере.
 	return true, r.StatusCode == http.StatusNoContent
+}
+
+// IsRunning — отвечает ли на порту наше приложение. Окно при этом не трогает.
+//
+// Нужна для ожидания после обновления: раньше ждали через RaiseRunning, и
+// прежняя копия каждые 300 мс получала «покажи окно» — окно мигало до самого
+// закрытия.
+func IsRunning(port int) bool {
+	if port <= 0 {
+		return false
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/api/state", port))
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+	var state struct {
+		App string `json:"app"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&state); err != nil {
+		return false
+	}
+	return state.App == app.Marker
 }

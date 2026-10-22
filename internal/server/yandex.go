@@ -99,7 +99,7 @@ func (s *Server) handleYandexCheck(w http.ResponseWriter, r *http.Request) {
 			text += " · играет на «" + device + "»"
 		}
 	} else {
-		text += " · очередь Ynison недоступна, заказы пойдут в плейлист"
+		text += " · управлять очередью приложения Яндекс Музыки пока не получается, заказы пойдут в плейлист «" + yandex.OrdersPlaylistTitle + "»"
 	}
 	s.state.Notify("info", text)
 	if problem := yandex.PlusProblem(me); problem != nil {

@@ -14,7 +14,7 @@
 (() => {
   const $ = (id) => document.getElementById(id);
 
-  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
+  const esc = (s) => String((s == null ? "" : s)).replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
   ));
 
@@ -171,21 +171,36 @@
         <div class="setup-acts">
           <button class="s-btn key" data-act="ym-login">Войти в Яндекс</button>
         </div>
-        <label class="setup-field">
-          <span>Окно не открылось? Вставь сюда адрес из браузера после входа</span>
-          <input type="password" id="su-ym-token" spellcheck="false" autocomplete="off"
-                 placeholder="https://music.yandex.ru/#access_token=…">
-        </label>
-        <div class="setup-acts">
-          <button class="s-btn" data-act="ym-token">Сохранить</button>
-        </div>
         <div class="check" id="su-check"></div>
-        <p class="why">Токен никому не виден: он ложится в хранилище паролей Windows.
+        <details class="setup-manual" id="su-ym-manual">
+          <summary>Окно входа не открылось или не закрылось само?</summary>
+          <ol class="steps-list">
+            <li>Нажми <b>Войти в Яндекс</b> ещё раз — если окно не появится, вход откроется в обычном браузере</li>
+            <li>Войди в аккаунт и разреши доступ</li>
+            <li>Браузер перейдёт на страницу Яндекс Музыки. Щёлкни по строке адреса вверху,
+                выдели адрес целиком (Ctrl+A) и скопируй (Ctrl+C). В нём должно быть
+                <b>access_token=</b></li>
+            <li>Вставь адрес в поле ниже и нажми <b>Сохранить</b></li>
+          </ol>
+          <label class="setup-field">
+            <span>Адрес из браузера после входа</span>
+            <input type="password" id="su-ym-token" spellcheck="false" autocomplete="off"
+                   placeholder="https://music.yandex.ru/#access_token=…">
+          </label>
+          <div class="setup-acts">
+            <button class="s-btn" data-act="ym-token">Сохранить</button>
+          </div>
+        </details>
+        <p class="why">Вход никому не виден: приложение хранит его в хранилище паролей Windows.
           <br>Открой приложение Яндекс Музыки и включи любой трек — так заказам будет куда встать.</p>`,
       check: (s) => {
         const y = (s && s.yandex) || {};
         if (!y.connected) return { ok: false, text: "Вход пока не выполнен." };
-        if (y.plus === "no") return { ok: false, text: y.plus_note || "На аккаунте нет Плюса." };
+        if (y.plus === "no") {
+          return { ok: false, text: "Яндекс подключён" + (y.account ? ": " + y.account : "") +
+            ", но на аккаунте нет Плюса: заказы будут играть только 30-секундными отрывками. " +
+            "Подключи Плюс или войди другим аккаунтом." };
+        }
         let text = "Яндекс подключён" + (y.account ? ": " + y.account : "");
         if (!y.ynison && y.ynison_note) text += ". " + y.ynison_note;
         return { ok: true, text };
@@ -329,9 +344,16 @@
         $("su-reward-title").value = (cfg && cfg.reward_title) || "Заказ трека";
         $("su-reward-cost").value = (cfg && cfg.reward_cost) || 1000;
       },
-      check: (s) => s && s.twitch && s.twitch.reward_ready
-        ? { ok: true, text: "Награда на канале создана." }
-        : { ok: false, text: "Награды пока нет. Она появится сразу после подключения Twitch." },
+      check: (s) => {
+        const tw = (s && s.twitch) || {};
+        if (tw.reward_ready) return { ok: true, text: "Награда на канале создана." };
+        if (tw.connected && !tw.has_points) {
+          return { ok: true, text: "На канале нет баллов, шаг пропущен. Заказы за донат работают." };
+        }
+        return { ok: false, text: tw.connected
+          ? "Награды пока нет. Нажми «Сохранить» — приложение создаст её само."
+          : "Сначала подключи Twitch (предыдущий шаг): без входа награду создать нельзя." };
+      },
     },
 
     {
@@ -384,7 +406,7 @@
           <input type="text" id="su-dx" spellcheck="false" autocomplete="off" placeholder="если пользуешься">
         </label>
         <label class="setup-field">
-          <span>Донат от какой суммы считается заказом, ₽</span>
+          <span>Донат от какой суммы считается заказом (в валюте твоего счёта в сервисе)</span>
           <input type="number" id="su-donation-min" min="1" placeholder="100">
         </label>
         <div class="setup-acts">
@@ -429,15 +451,15 @@
 
         <rect x="280" y="42" width="336" height="146" rx="0" fill="${C.raise}" stroke="${C.line}"/>
         ${fieldArt(298, 60, 300, "URL", widgetURL, true)}
-        ${fieldArt(298, 118, 140, "ШИРИНА", "640", false)}
-        ${fieldArt(458, 118, 140, "ВЫСОТА", "200", false)}
+        ${fieldArt(298, 118, 140, "ШИРИНА", "1920", false)}
+        ${fieldArt(458, 118, 140, "ВЫСОТА", "1080", false)}
       </svg>`,
       body: () => `
         <ol class="steps-list">
           <li>Скопируй адрес виджета</li>
           <li>В OBS в списке <b>Источники</b> нажми <b>+</b> и выбери <b>Браузер</b></li>
           <li>В поле <b>URL</b> вставь адрес, сотри то, что было по умолчанию</li>
-          <li>Поставь ширину <b>640</b>, высоту <b>200</b> и нажми ОК</li>
+          <li>Поставь ширину <b>1920</b>, высоту <b>1080</b>, нажми ОК и растяни источник на весь кадр</li>
         </ol>
         <div class="copyline">
           <code>${esc(widgetURL)}</code>
@@ -459,18 +481,21 @@
       must: false,
       short: "как плашка выглядит",
       title: "Оформление виджета",
-      why: "Сорок пять наборов на выбор. Семейство задаёт устройство плашки, вариант — только " +
-        "краску. Меняется на лету: в OBS видно сразу, ничего перезапускать не надо.",
+      why: "Восемнадцать стилей, у каждого несколько окрасок. Стиль задаёт устройство плашки, " +
+        "окраска — только цвета. Меняется на лету: в OBS видно сразу, ничего перезапускать не надо.",
       art: null,
       body: () => `
         <div class="preset-stage" id="su-stage">
           <div class="card show" id="su-card" style="left:24px; bottom:24px">
+            <div class="aura"><i></i></div>
+            <div class="fx"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
             <div class="art" id="su-art"></div>
             <div class="text">
               <div class="title">Bohemian Rhapsody</div>
               <div class="artist">Queen</div>
-              <div class="by">заказал zritel</div>
+              <div class="by">заказал зритель</div>
               <div class="bar"><i style="width:46%"></i></div>
+              <div class="meta"><span class="eq"><i></i><i></i><i></i><i></i><i></i></span></div>
             </div>
           </div>
         </div>
@@ -495,7 +520,11 @@
   let skipped = {};      // какие шаги пропущены
   let done = {};         // какие сданы (по последней проверке)
   let finished = false;  // дошли до экрана «готово»
-  let copiedWidget = false;
+  // Адрес виджета вставляют в OBS один раз и навсегда — помним это между
+  // запусками, иначе при повторном проходе мастера шаг снова «не сдан».
+  let copiedWidget = (() => {
+    try { return localStorage.getItem("sr-widget-copied") === "1"; } catch (e) { return false; }
+  })();
   let open = false;
 
   // Панель отдаёт сюда каждый снимок состояния. Пока мастер закрыт, просто
@@ -530,7 +559,7 @@
   }
 
   // post зовёт ручку приложения и разбирает ответ так же, как панель: у
-  // отказа есть код (SP-19, OB-02) и человеческий текст.
+  // отказа есть код (YM-03, TW-02) и человеческий текст.
   async function post(path, body) {
     const r = await fetch(path, {
       method: "POST",
@@ -578,7 +607,8 @@
   }
 
   function doneHTML() {
-    const left = STEPS.filter((s) => !done[s.id]);
+    // Шаги «можно потом» в «осталось» не считаем: их пропуск — норма.
+    const left = STEPS.filter((s) => !done[s.id] && s.must);
     return `<div class="setup-done">
       <div class="tick">
         <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor"
@@ -630,6 +660,8 @@
 
     const line = $("su-check");
     if (line) {
+      // Шаг сдан — старая ошибка больше не правда, стираем её.
+      if (res.ok) line.dataset.bad = "";
       line.className = "check " + (res.ok ? "ok" : line.dataset.bad ? "bad" : "");
       if (line.dataset.bad) {
         line.textContent = line.dataset.bad;
@@ -715,8 +747,11 @@
       else goto(at + 1);
     },
     finish: () => { post("/api/setup/done", { done: true }).catch(() => {}); close(); },
+    // «Закрыть и настроить потом» — мастер не пройден, отмечать его
+    // пройденным нельзя: при следующем запуске он должен открыться снова.
+    close: () => close(),
     "go-left": () => {
-      const i = STEPS.findIndex((s) => !done[s.id]);
+      const i = STEPS.findIndex((s) => !done[s.id] && s.must);
       goto(i < 0 ? 0 : i);
     },
 
@@ -724,6 +759,7 @@
     "copy-widget": (btn) => {
       copy(btn.dataset.text);
       copiedWidget = true;
+      try { localStorage.setItem("sr-widget-copied", "1"); } catch (e) { /* не страшно */ }
       refresh();
     },
 
@@ -731,6 +767,8 @@
       const d = await post("/api/yandex/login", {});
       if (!d.in_app) {
         window.open(d.url, "_blank", "noopener");
+        const m = $("su-ym-manual");
+        if (m) m.open = true;
         say("Открыл вход в браузере. После входа скопируй адрес из строки браузера и вставь в поле ниже.");
         return;
       }
@@ -742,12 +780,18 @@
       if (!token) { say("Поле пустое.", true); return; }
       await post("/api/yandex/token", { token });
       $("su-ym-token").value = "";
-      say("Яндекс подключён.");
+      say("Готово: вход в Яндекс сохранён. Через пару секунд здесь появится твой аккаунт.");
       refresh();
     }),
 
     "save-twitch-id": (btn) => busy(btn, async () => {
-      const ok = await saveConfig({ twitch_client_id: $("su-twitch-id").value.trim() });
+      const id = $("su-twitch-id").value.trim();
+      // У Twitch Client ID — около тридцати латинских букв и цифр без пробелов.
+      if (!/^[a-z0-9]{20,40}$/i.test(id)) {
+        say("Не похоже на Client ID Twitch: это около 30 латинских букв и цифр. Скопируй его заново в Manage.", true);
+        return;
+      }
+      const ok = await saveConfig({ twitch_client_id: id });
       say(ok ? "Ключ сохранён." : "Не смог сохранить.", !ok);
       refresh();
     }),
@@ -766,7 +810,10 @@
         reward_title: $("su-reward-title").value.trim() || "Заказ трека",
         reward_cost: Number.isFinite(cost) && cost > 0 ? cost : 1000,
       });
-      say(ok ? "Сохранено. Награду приложение создаст само." : "Не смог сохранить.", !ok);
+      const tw = (state && state.twitch) || {};
+      say(!ok ? "Не смог сохранить."
+        : tw.connected ? "Сохранено. Награда появится на канале через пару секунд."
+          : "Сохранено. Награду приложение создаст, когда подключишь Twitch.", !ok);
       refresh();
     }),
 
@@ -865,7 +912,7 @@
       card.dataset.art = "on";
       card.dataset.bar = "on";
       card.dataset.motion = "off";
-      card.style.setProperty("--scale", .9);
+      card.style.zoom = .9;
 
       $("su-families").innerHTML = window.WIDGET_FAMILIES.map((f) =>
         `<button data-family="${f.id}" class="${f.id === family.id ? "on" : ""}">${esc(f.name)}</button>`).join("");
@@ -915,9 +962,30 @@
     await loadConfig();
     await post("/api/setup/done", { done: false }).catch(() => {});
     skipped = {};
-    copiedWidget = false;
     openWizard(0);
   };
+
+  // Enter — «Дальше», Esc — закрыть. На кнопке, в выпадающем списке и на
+  // ссылке Enter остаётся своим. В поле ввода Enter жмёт «Сохранить» этого
+  // поля — как в обычной форме, — а не уводит на следующий шаг.
+  document.addEventListener("keydown", (e) => {
+    if (!open || e.isComposing) return;
+    if (e.key === "Escape") { e.preventDefault(); close(); return; }
+    if (e.key !== "Enter") return;
+    const el = e.target;
+    const tag = (el && el.tagName) || "";
+    if (tag === "BUTTON" || tag === "SELECT" || tag === "TEXTAREA" || tag === "A" || tag === "SUMMARY") return;
+    e.preventDefault();
+    if (finished) { acts.finish(); return; }
+    if (tag === "INPUT") {
+      let n = el.closest(".setup-field");
+      n = n && n.nextElementSibling;
+      while (n && !n.classList.contains("setup-acts")) n = n.nextElementSibling;
+      const save = n && n.querySelector("button[data-act]");
+      if (save) { save.click(); return; }
+    }
+    acts.next();
+  });
 
   $("setup").addEventListener("click", (e) => {
     const go = e.target.closest("[data-go]");
