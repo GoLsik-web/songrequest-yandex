@@ -323,9 +323,11 @@ func parseDonateX(raw json.RawMessage) (Donation, bool) {
 		return Donation{}, false
 	}
 
-	amount := p.AmountInRub
+	// Сумма и подпись валюты обязаны говорить об одном и том же: раньше
+	// бралась сумма в рублях, а подпись — валюта зрителя («5000 USD»).
+	amount, currency := p.AmountInRub, "RUB"
 	if amount == 0 {
-		amount = p.Amount
+		amount, currency = p.Amount, p.Currency
 	}
 
 	message := strings.TrimSpace(p.Message)
@@ -343,7 +345,6 @@ func parseDonateX(raw json.RawMessage) (Donation, bool) {
 		}
 	}
 
-	currency := p.Currency
 	if currency == "" {
 		currency = "RUB"
 	}

@@ -22,9 +22,22 @@ type Candidate struct {
 	Markets []string
 }
 
+// Nowhere в Markets означает «трек есть, но слушать его нельзя нигде» —
+// так источник помечает недоступное, не выбрасывая его из выдачи: иначе
+// стример не узнает, что трек нашёлся, а играть его нельзя.
+const Nowhere = "-"
+
 // PlayableIn сообщает, доступен ли трек в стране аккаунта.
 func (c Candidate) PlayableIn(country string) bool {
-	if country == "" || len(c.Markets) == 0 {
+	if len(c.Markets) == 0 {
+		return true
+	}
+	for _, m := range c.Markets {
+		if m == Nowhere {
+			return false
+		}
+	}
+	if country == "" {
 		return true
 	}
 	for _, m := range c.Markets {

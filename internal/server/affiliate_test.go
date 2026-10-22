@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"context"
 	"net/http"
 	"strings"
@@ -128,13 +129,13 @@ func TestForbiddenOnRewardBecomesHumanText(t *testing.T) {
 		t.Fatalf("причина должна быть названа: %q", info.Note)
 	}
 
-	// Приложение осталось живым: подписку на события не поднимали,
-	// но и не свалились.
+	// Приложение осталось живым: награды нет, но соединение ради чата
+	// поднято — команды и ответы зрителям работать обязаны.
 	srv.mu.Lock()
-	running := srv.eventsRunning
+	running, reward := srv.eventsRunning, srv.eventsReward
 	srv.mu.Unlock()
-	if running {
-		t.Fatal("без награды подписываться не на что")
+	if !running || reward != "" {
+		t.Fatalf("ждали подписку только на чат, получили running=%v награды=%q", running, reward)
 	}
 }
 
@@ -166,5 +167,48 @@ func TestAffiliateGetsRewardAndGreenLight(t *testing.T) {
 	}
 	if info.NoteCode != "" {
 		t.Fatalf("жаловаться не на что, а в панели: %q %q", info.NoteCode, info.Note)
+	}
+}
+
+// Награда «Заказ трека» на канале уже есть, но от другого приложения
+// заказов. Раньше на этом всё и кончалось: награда не создавалась, а
+// человек не понимал почему. Теперь приложение заводит свою, с пометкой.
+func TestForeignRewardTitleGetsOwnName(t *testing.T) {
+	var titles []string
+	srv, _ := newTestServer(t,
+		func(c *config.Config) { c.TwitchClientID = "есть" },
+		func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.URL.Path == "/users":
+				writeTestJSON(w, map[string]any{"data": []any{
+					map[string]any{"id": "42", "login": "стример", "broadcaster_type": "affiliate"},
+				}})
+			case strings.Contains(r.URL.Path, "custom_rewards") && r.Method == http.MethodPost:
+				var body struct {
+					Title string `json:"title"`
+				}
+				json.NewDecoder(r.Body).Decode(&body)
+				titles = append(titles, body.Title)
+				if body.Title == "Заказ трека" {
+					w.WriteHeader(http.StatusBadRequest)
+					w.Write([]byte(`{"error":"Bad Request","status":400,"message":"CREATE_CUSTOM_REWARD_DUPLICATE_REWARD"}`))
+					return
+				}
+				writeTestJSON(w, map[string]any{"data": []any{
+					map[string]any{"id": "награда-2", "title": body.Title, "cost": 1000, "is_enabled": true},
+				}})
+			default:
+				w.WriteHeader(http.StatusNoContent)
+			}
+		})
+
+	srv.startTwitch(context.Background())
+
+	info := twitchState(srv)
+	if !info.RewardReady || info.RewardTitle != "Заказ трека (Яндекс)" {
+		t.Fatalf("ждали свою награду с пометкой, получили %+v (пробовали %q)", info, titles)
+	}
+	if got := srv.cfg.Get().RewardTitle; got != "Заказ трека (Яндекс)" {
+		t.Fatalf("новое название должно остаться в настройках, а там %q", got)
 	}
 }

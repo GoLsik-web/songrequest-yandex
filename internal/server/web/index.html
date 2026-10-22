@@ -80,6 +80,7 @@
 
 <!-- Код для входа в Twitch: пока он не введён, это самое важное на экране. -->
 <div id="banner" hidden></div>
+<div id="plus-warn" role="alert" hidden></div>
 
 <main>
   <section class="stage" id="stage"></section>
@@ -182,16 +183,16 @@
       <div class="account" id="ynison-state"></div>
 
       <label class="field" style="margin-top:16px">
-        <span>Токен вручную — если окно входа не открылось</span>
+        <span>Вход вручную — если окно входа не открылось</span>
         <input type="password" id="ym-token" spellcheck="false" autocomplete="off"
-               placeholder="адрес из браузера после входа или сам токен">
+               placeholder="https://music.yandex.ru/#access_token=…">
       </label>
       <div class="acts">
-        <button class="act small" id="save-ym-token">Сохранить токен</button>
+        <button class="act small" id="save-ym-token">Сохранить вход</button>
       </div>
       <div class="hint">
         Кнопка «Войти в Яндекс» открывает окно входа. После входа оно само
-        заберёт токен и закроется — больше ничего делать не надо.
+        запомнит вход и закроется — больше ничего делать не надо.
         <br><br>
         <b>Окно не открылось?</b> Нажми кнопку ещё раз — откроется браузер.
         Войди, и когда браузер перекинет на music.yandex.ru, скопируй адрес
@@ -614,215 +615,501 @@
   </div>
 </section>
 
-<section class="panel" id="widget" hidden>
-  <div class="wx">
+<!-- Редактор виджета.
+     Прошлая версия была простынёй: образец слева, справа тридцать полей
+     подряд, а сорок пять наборов — где-то внизу, под ними. Чтобы сменить
+     набор и посмотреть, как он встал, приходилось ездить вверх-вниз.
 
-    <div class="wx-left">
-      <div class="wx-stage" id="wx-stage" data-scene="dark">
+     Теперь как в редакторе: слева живой кадр, он никуда не уезжает; справа
+     вкладки по смыслу — стиль, обложка, цвет, анимация, место, показ. В кадре
+     не «похожая» вёрстка, а сам виджет во фрейме: что в панели, то и в OBS. -->
+<!-- Фильтры «кипящей» линии — те же, что в виджете: плитки стилей и мастер
+     настройки рисуются на этой странице и без них не дрожали бы. -->
+<svg class="boil-defs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+  <filter id="boil-1"><feTurbulence type="fractalNoise" baseFrequency=".022" numOctaves="1" seed="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.2"/></filter>
+  <filter id="boil-2"><feTurbulence type="fractalNoise" baseFrequency=".022" numOctaves="1" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.2"/></filter>
+  <filter id="boil-3"><feTurbulence type="fractalNoise" baseFrequency=".022" numOctaves="1" seed="13" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.2"/></filter>
+</svg>
+<section class="panel wxe-panel" id="widget" hidden>
+  <div class="wxe">
+
+    <div class="wxe-view thin-scroll">
+      <div class="wx-stage wxe-stage" id="wx-stage" data-scene="dark">
         <div class="wx-scene"></div>
+        <div class="wxe-frame" id="wx-frame-box">
+          <iframe id="wx-frame" title="Виджет" tabindex="-1" scrolling="no"></iframe>
+        </div>
         <!-- Сетка точек привязки. Видна только пока плашку тащат: постоянная
              разметка поверх кадра мешала бы смотреть на сам виджет. -->
         <div class="wx-grid" id="wx-grid" aria-hidden="true"></div>
-        <div class="slot" id="wx-slot">
-          <div class="card show" id="wx-card">
-            <div class="art" id="wx-art"><svg class="no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
-            <div class="text">
-              <div class="title" id="wx-title">Bohemian Rhapsody</div>
-              <div class="artist" id="wx-artist">Queen</div>
-              <div class="by" id="wx-by">заказал zritel</div>
-              <div class="bar"><i id="wx-bar"></i></div>
-            </div>
-          </div>
-        </div>
+        <!-- Ловушка для мыши поверх фрейма: таскать плашку можно прямо в кадре. -->
+        <div class="wxe-hit" id="wx-hit"></div>
+        <div class="wxe-badge" id="wx-badge"></div>
       </div>
 
-      <div class="wx-stage-bar">
-        <div class="chips" id="wx-source-pick">
+      <div class="wxe-bar">
+        <div class="wxe-scenes" id="wx-scene-pick" role="group" aria-label="Фон кадра">
+          <button data-scene="dark" class="on" title="Тёмная сцена"></button>
+          <button data-scene="light" title="Светлая сцена"></button>
+          <button data-scene="busy" title="Пёстрая сцена"></button>
+          <button data-scene="game" title="Игра"></button>
+        </div>
+        <div class="wxe-seg small" id="wx-source-pick">
+          <button data-source="live" title="Трек, который играет сейчас в Яндекс Музыке. Ничего не играет — покажется пример.">сейчас играет</button>
           <button data-source="order" class="on">заказ</button>
           <button data-source="own">своя музыка</button>
         </div>
-        <div class="chips" id="wx-scene-pick">
-          <button data-scene="dark" class="on">тёмная сцена</button>
-          <button data-scene="light">светлая</button>
-          <button data-scene="busy">пёстрая</button>
-        </div>
-        <div class="wx-replay">
-          <button class="link-btn" id="wx-play">появление</button>
-          <button class="link-btn" id="wx-leave">уход</button>
-          <button class="link-btn" id="wx-next">следующий трек</button>
+        <button class="wxe-ibtn" id="wx-zoom" title="Приблизить кадр к плашке"><svg><use href="#i-search"></use></svg><span>Крупно</span></button>
+        <div class="wxe-replay">
+          <button class="wxe-ibtn" id="wx-play" title="Показать появление"><svg><use href="#i-play"></use></svg><span>Появление</span></button>
+          <button class="wxe-ibtn" id="wx-next" title="Сменить трек"><svg><use href="#i-skip-forward"></use></svg><span>Смена</span></button>
+          <button class="wxe-ibtn" id="wx-leave" title="Показать уход"><svg><use href="#i-square-stop"></use></svg><span>Уход</span></button>
+          <button class="wxe-ibtn" id="wx-pause" title="Поставить образец на паузу — видно, как плашка ведёт себя на паузе"><svg><use href="#i-pause"></use></svg><span>Пауза</span></button>
         </div>
       </div>
 
-      <div class="hint">Так плашка выглядит в кадре, в натуральную величину.
-        Правки видны в OBS сразу — адрес переклеивать не нужно.</div>
 
-      <label class="field" style="margin-top:16px">
-        <span>Адрес для OBS — один раз и навсегда</span>
-        <input type="text" id="wx-url" readonly spellcheck="false">
-      </label>
-      <div class="acts">
-        <button class="act small key" id="wx-copy">Скопировать адрес</button>
-        <a class="act small" id="wx-open" target="_blank" rel="noopener">Открыть в браузере</a>
-        <a class="act small" id="wx-drag" draggable="true"
-           title="Перетащите кнопку мышью в окно сцены OBS — источник появится сразу нужного размера">Перетащить в OBS</a>
+      <!-- Инструменты своей картинки. Под кадром, а не в боковой колонке:
+           тут было пустое место, а настраивать картинку удобнее, глядя
+           на кадр прямо над ползунками. Видны, пока открыта вкладка
+           «Своё» и в выбранном месте стоит картинка. -->
+      <div class="wxe-tools" id="wx-tools" hidden>
+        <div class="wxe-tools-head">
+          <span class="wxe-tools-thumb" id="wx-tools-thumb"></span>
+          <div class="wxe-tools-name">
+            <b id="wx-tools-title"></b>
+            <small>Тащи картинку прямо в кадре · колесо — размер · Shift + колесо — поворот</small>
+          </div>
+          <div class="wxe-tools-acts">
+            <button class="wxe-ibtn" data-tact="center">По центру</button>
+            <button class="wxe-ibtn" data-tact="reset">Сбросить</button>
+            <button class="wxe-ibtn" data-tact="remove">Убрать</button>
+          </div>
+        </div>
+        <div class="wxe-tools-grid">
+          <section class="wxe-card">
+            <h4>Положение</h4>
+          <label class="wxe-slider" data-k="t:scale" data-unit="%">
+            <span>Размер <b></b></span>
+            <input type="range" min="10" max="500" step="1">
+          </label>
+          <label class="wxe-slider" data-k="t:rot" data-unit="°">
+            <span>Поворот <b></b></span>
+            <input type="range" min="-180" max="180" step="1">
+          </label>
+          <div class="wxe-row-btns">
+            <button class="wxe-ibtn" data-tact="rot-l">↺ 90°</button>
+            <button class="wxe-ibtn" data-tact="rot-r">↻ 90°</button>
+            <button class="wxe-ibtn" data-tact="flip">Отразить</button>
+          </div>
+          <label class="wxe-slider" data-k="t:x" data-unit="%">
+            <span>По горизонтали <b></b></span>
+            <input type="range" min="-150" max="150" step="1">
+          </label>
+          <label class="wxe-slider" data-k="t:y" data-unit="%">
+            <span>По вертикали <b></b></span>
+            <input type="range" min="-150" max="150" step="1">
+          </label>
+          </section>
+          <section class="wxe-card">
+            <h4>Вид</h4>
+            <span class="wxe-mini">Как ложится</span>
+          <div class="wxe-seg small wrap" data-k="t:fit"><button data-v="cover">Заполнить</button><button data-v="contain">Целиком</button></div>
+            <span class="wxe-mini">Фон картинки</span>
+          <div class="wxe-seg small wrap" data-k="t:key"><button data-v="">Оставить</button><button data-v="black">Убрать чёрный</button><button data-v="white">Убрать белый</button></div>
+          <label class="wxe-slider" data-k="t:opacity" data-unit="%">
+            <span>Видимость <b></b></span>
+            <input type="range" min="5" max="100" step="1">
+          </label>
+            <div data-only="anim">
+          <label class="wxe-slider" data-k="t:speed" data-unit="%">
+            <span>Скорость <b></b></span>
+            <input type="range" min="10" max="400" step="5">
+          </label>
+            </div>
+          </section>
+          <section class="wxe-card">
+            <h4>Цвет</h4>
+          <label class="wxe-slider" data-k="t:bright" data-unit="%">
+            <span>Яркость <b></b></span>
+            <input type="range" min="10" max="200" step="1">
+          </label>
+          <label class="wxe-slider" data-k="t:contrast" data-unit="%">
+            <span>Контраст <b></b></span>
+            <input type="range" min="10" max="200" step="1">
+          </label>
+          <label class="wxe-slider" data-k="t:sat" data-unit="%">
+            <span>Насыщенность <b></b></span>
+            <input type="range" min="0" max="300" step="1">
+          </label>
+          <div class="wxe-seg small wrap" data-k="t:gray"><button data-v="">Цветная</button><button data-v="1">Чёрно-белая</button></div>
+          </section>
+          <section class="wxe-card" data-slots="bg">
+            <h4>Фон плашки</h4>
+          <label class="wxe-slider" data-k="m:bg_dim" data-unit="%">
+            <span>Затемнение <b></b></span>
+            <input type="range" min="0" max="90" step="5">
+          </label>
+          <label class="wxe-slider" data-k="m:bg_blur" data-unit=" px">
+            <span>Размытие <b></b></span>
+            <input type="range" min="0" max="20" step="1">
+          </label>
+          </section>
+          <section class="wxe-card" data-slots="sticker">
+            <h4>Наклейка</h4>
+            <span class="wxe-mini">Край плашки</span>
+          <div class="wxe-seg small wrap" data-k="m:sticker_side"><button data-v="left">Слева</button><button data-v="top">Сверху</button><button data-v="right">Справа</button><button data-v="bottom">Снизу</button></div>
+          <label class="wxe-slider" data-k="m:sticker_size" data-unit=" px">
+            <span>Размер наклейки <b></b></span>
+            <input type="range" min="16" max="400" step="2">
+          </label>
+          <label class="wxe-slider" data-k="m:sticker_x" data-unit=" px">
+            <span>Отступ по горизонтали <b></b></span>
+            <input type="range" min="-300" max="300" step="2">
+          </label>
+          <label class="wxe-slider" data-k="m:sticker_y" data-unit=" px">
+            <span>Отступ по вертикали <b></b></span>
+            <input type="range" min="-300" max="300" step="2">
+          </label>
+            <span class="wxe-mini">Форма</span>
+          <div class="wxe-seg small wrap" data-k="t:mask"><button data-v="">Как есть</button><button data-v="circle">Круг</button><button data-v="rounded">Скругление</button></div>
+            <span class="wxe-mini">Слой</span>
+          <div class="wxe-seg small wrap" data-k="t:back"><button data-v="">Поверх плашки</button><button data-v="1">Под плашкой</button></div>
+          </section>
+        </div>
+      </div>
+
+      <div class="wxe-obs">
+        <div class="wxe-h">Адрес для OBS</div>
+        <div class="wxe-sub">Один раз и навсегда — правки долетают в OBS сами.</div>
+        <div class="wxe-url">
+          <input type="text" id="wx-url" readonly spellcheck="false" aria-label="Адрес для OBS">
+          <button class="act small key" id="wx-copy"><svg><use href="#i-copy"></use></svg>Скопировать адрес</button>
+        </div>
+        <div class="wxe-obs-acts">
+          <a class="act small" id="wx-drag" draggable="true"
+             title="Перетащите кнопку мышью в окно сцены OBS — источник появится сразу нужного размера"><svg><use href="#i-move"></use></svg>Перетащить в OBS</a>
+          <a class="act small" id="wx-open" target="_blank" rel="noopener"><svg><use href="#i-external-link"></use></svg>Открыть в браузере</a>
+        </div>
+
+        <!-- Связь с OBS: по ней формат кадра меняет источник в самом OBS. -->
+        <div class="obs-link" id="obs-link">
+          <div class="obs-head">
+            <span>Связь с OBS</span>
+            <span class="obs-dot" id="obs-dot" data-status=""></span>
+          </div>
+          <div class="obs-status" id="obs-status">ещё не проверяли</div>
+          <div class="obs-fields">
+            <label class="field">
+              <span>Порт</span>
+              <input type="number" id="obs-port" min="1" max="65535" placeholder="4455">
+            </label>
+            <label class="field">
+              <span>Пароль</span>
+              <input type="password" id="obs-password" autocomplete="off" spellcheck="false"
+                     placeholder="без пароля">
+            </label>
+          </div>
+          <span class="hint">В OBS: «Инструменты → Настройки сервера WebSocket».
+            Там же «Показать сведения о подключении» — порт и пароль.</span>
+          <div class="acts">
+            <button class="act small" id="obs-check">Проверить связь</button>
+            <button class="act small" id="obs-fit" hidden>Подогнать сейчас</button>
+            <button class="act small key" id="obs-add" hidden>Добавить в OBS</button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="wx-right">
-      <div class="kicker">Как поставить</div>
-
-      <div class="field">
-        <span>Формат кадра</span>
-        <div class="chips wx-frames" id="wx-frame-pick">
-          <button data-frame="16:9">16:9</button>
-          <button data-frame="16:10">16:10</button>
-          <button data-frame="4:3">4:3</button>
-          <button data-frame="5:4">5:4</button>
-          <button data-frame="21:9">21:9</button>
-          <button data-frame="32:9">32:9</button>
-          <button data-frame="9:16">9:16</button>
-          <button data-frame="1:1">1:1</button>
+    <div class="wxe-side thin-scroll" id="wx-side">
+      <!-- Два экрана. Первый — «Оформление»: что сейчас в кадре, свои стили
+           и готовые. Второй — настройка со всеми вкладками; открывается
+           кнопкой «Настроить». Раньше всё жило на одном экране, и семь
+           вкладок встречали человека, который хотел просто выбрать стиль. -->
+      <div class="wxe-home" id="wx-home">
+        <div class="wxe-hero">
+          <span class="wxe-hero-tag">Сейчас в кадре</span>
+          <b class="wxe-hero-name" id="wx-cur-name"></b>
+          <span class="wxe-hero-sub" id="wx-cur-sub"></span>
+          <button class="act key wxe-hero-btn" id="wx-open-edit"><svg><use href="#i-settings"></use></svg>Настроить</button>
         </div>
-        <span class="hint" id="wx-frame-hint"></span>
+
+        <div class="wxe-group">
+          <div class="wxe-label">Мои стили <span class="wxe-note">щёлкни — включится</span></div>
+          <form class="wxe-newstyle" id="wx-style-form" hidden>
+            <span class="hint">Дайте стилю имя — откроется его настройка: всё, что поменяете во вкладках, сразу запишется в него. За основу берётся то, что сейчас в кадре.</span>
+            <div class="wxe-newstyle-row">
+              <input type="text" id="wx-style-name" maxlength="40" autocomplete="off" spellcheck="false" placeholder="Название стиля">
+              <button class="act small key" type="submit">Создать и настроить</button>
+              <button class="act small" type="button" id="wx-style-cancel">Отмена</button>
+            </div>
+          </form>
+          <div class="wxe-fams wxe-mine" id="wx-mine"></div>
+        </div>
+
+        <div class="wxe-group" id="wx-gallery-home">
+          <div class="wxe-label">Готовые стили <span class="wxe-note">наведи — примерится в кадре</span></div>
+        </div>
       </div>
 
-      <!-- Связь с OBS: по ней формат кадра меняет источник в самом OBS. -->
-      <div class="obs-link" id="obs-link">
-        <div class="obs-head">
-          <span>Связь с OBS</span>
-          <span class="obs-dot" id="obs-dot" data-status=""></span>
+      <div class="wxe-edit" id="wx-edit" hidden>
+      <div class="wxe-topbar" id="wx-topbar">
+        <button class="wxe-back" id="wx-back" title="Вернуться к выбору стиля"><svg><use href="#i-arrow-left"></use></svg>К стилям</button>
+        <div class="wxe-topbar-title">
+          <span class="wxe-editing-tag" id="wx-edit-tag"></span>
+          <input type="text" id="wx-edit-name" maxlength="40" autocomplete="off" spellcheck="false" title="Название стиля — можно поменять">
+          <b id="wx-edit-title"></b>
         </div>
-        <div class="obs-status" id="obs-status">ещё не проверяли</div>
-        <div class="obs-fields">
-          <label class="field">
-            <span>Порт</span>
-            <input type="number" id="obs-port" min="1" max="65535" placeholder="4455">
+        <button class="act small key" id="wx-edit-done">Готово</button>
+        <form class="wxe-saveas" id="wx-saveas" hidden>
+          <input type="text" id="wx-saveas-name" maxlength="40" autocomplete="off" spellcheck="false" placeholder="Название стиля">
+          <button class="act small key" type="submit">Сохранить</button>
+        </form>
+        <button class="link-btn wxe-saveas-open" id="wx-saveas-open">+ Сохранить как свой стиль</button>
+      </div>
+      <div class="wxe-tabs" id="wx-tabs" role="tablist">
+        <button class="wxe-tab on" data-wtab="style"><svg><use href="#i-layout"></use></svg>Стиль</button>
+        <button class="wxe-tab" data-wtab="cover"><svg><use href="#i-image"></use></svg>Обложка</button>
+        <button class="wxe-tab" data-wtab="media"><svg><use href="#i-image-plus"></use></svg>Своё</button>
+        <button class="wxe-tab" data-wtab="color"><svg><use href="#i-palette"></use></svg>Цвет</button>
+        <button class="wxe-tab" data-wtab="motion"><svg><use href="#i-sparkles"></use></svg>Анимация</button>
+        <button class="wxe-tab" data-wtab="place"><svg><use href="#i-move"></use></svg>Место</button>
+        <button class="wxe-tab" data-wtab="show"><svg><use href="#i-eye"></use></svg>Показ</button>
+      </div>
+
+      <!-- ── Стиль ── -->
+      <div class="wxe-pane" data-wpane="style">
+        <div class="wxe-group">
+          <div class="wxe-label">Окраска <span class="wxe-note" id="wx-fam-name"></span></div>
+          <div class="wxe-swatches" id="wx-variants"></div>
+        </div>
+        <div class="wxe-group" id="wx-gallery-group">
+          <div class="wxe-label">Основа <span class="wxe-note">наведи — примерится в кадре</span></div>
+          <div class="wxe-shelves" id="wx-gallery"></div>
+        </div>
+      </div>
+
+      <!-- ── Обложка ── -->
+      <div class="wxe-pane" data-wpane="cover" hidden>
+        <label class="wxe-switch"><input type="checkbox" id="wx-art-on"><i></i>
+          <span><b>Показывать обложку</b><small>Картинка альбома рядом с названием.</small></span></label>
+
+        <div class="wxe-group" id="wx-shape-group">
+          <div class="wxe-label">Форма</div>
+          <div class="wxe-shapes" id="wx-shapes"></div>
+          <div class="hint" id="wx-shape-hint"></div>
+        </div>
+
+        <div class="wxe-group">
+          <div class="wxe-slider" data-tweak-slider="--w-art">
+            <span>Размер обложки <b></b><button class="wxe-x" data-clear="--w-art" title="вернуть как в стиле">×</button></span>
+            <input type="range" min="24" max="200" step="1">
+          </div>
+        </div>
+
+        <label class="wxe-switch" id="wx-glow-row"><input type="checkbox" id="wx-glow"><i></i>
+          <span><b>Свечение</b><small id="wx-glow-note">Мягкий ореол вокруг обложки её же цветом.</small></span></label>
+        <label class="wxe-switch" id="wx-coverbg-row"><input type="checkbox" id="wx-coverbg"><i></i>
+          <span><b>Обложка фоном</b><small id="wx-coverbg-note">Размытая обложка под плашкой: каждый трек плашка перекрашивается сама.</small></span></label>
+      </div>
+
+      <!-- ── Своё: свои гифки, ролики и встроенные анимации ── -->
+      <div class="wxe-pane" data-wpane="media" hidden>
+        <div class="wxe-group">
+          <div class="wxe-label">Куда ставим <span class="wxe-note">выбери место, потом картинку ниже</span></div>
+          <div class="wxe-slots" id="wx-slots"></div>
+        </div>
+
+        <div class="wxe-group">
+          <div class="wxe-label">Мои файлы <span class="wxe-note">до 10 МБ</span></div>
+          <label class="wxe-drop" id="wx-drop">
+            <input type="file" id="wx-file" multiple hidden
+                   accept=".gif,.webp,.png,.jpg,.jpeg,.webm,.mp4,image/gif,image/webp,image/png,image/jpeg,video/webm,video/mp4">
+            <svg><use href="#i-upload"></use></svg>
+            <span><b>Загрузить файл</b><small>или перетащите сюда: GIF, WebP, PNG, JPG, WebM, MP4</small></span>
           </label>
-          <label class="field">
-            <span>Пароль</span>
-            <input type="password" id="obs-password" autocomplete="off" spellcheck="false"
-                   placeholder="без пароля">
+          <div class="wxe-lib" id="wx-lib-own"></div>
+        </div>
+
+        <div class="wxe-group">
+          <div class="wxe-label">Анимации <span class="wxe-note">нарисованы кодом, берут цвет акцента</span></div>
+          <div class="wxe-lib" id="wx-lib-fx"></div>
+        </div>
+      </div>
+
+      <!-- ── Цвет ── -->
+      <div class="wxe-pane" data-wpane="color" hidden>
+        <label class="wxe-switch wxe-magic"><input type="checkbox" id="wx-magic"><i></i>
+          <span><b>Цвета из обложки</b><small>Акцент — ник, полоса, столбики — берётся из картинки альбома и меняется с каждым треком.</small></span></label>
+
+        <div class="wxe-group">
+          <div class="wxe-label">Свои цвета <button class="link-btn" id="wx-reset">вернуть как в стиле</button></div>
+          <div class="wxe-colors" id="wx-tweaks"></div>
+        </div>
+
+        <div class="wxe-group">
+          <div class="wxe-label">Шрифт названия</div>
+          <div class="wxe-fonts" id="wx-fonts"></div>
+        </div>
+
+        <div class="wxe-group">
+          <div class="wxe-slider" data-tweak-slider="--w-title-size">
+            <span>Кегль названия <b></b><button class="wxe-x" data-clear="--w-title-size" title="вернуть как в стиле">×</button></span>
+            <input type="range" min="10" max="34" step="1">
+          </div>
+          <div class="wxe-slider" data-tweak-slider="--w-radius">
+            <span>Скругление углов <b></b><button class="wxe-x" data-clear="--w-radius" title="вернуть как в стиле">×</button></span>
+            <input type="range" min="0" max="40" step="1">
+          </div>
+          <div class="wxe-slider" data-tweak-slider="--w-blur">
+            <span>Размытие под плашкой <b></b><button class="wxe-x" data-clear="--w-blur" title="вернуть как в стиле">×</button></span>
+            <input type="range" min="0" max="30" step="1">
+          </div>
+          <label class="wxe-slider">
+            <span>Видимость плашки <b id="wx-op-val">100%</b></span>
+            <input type="range" id="wx-op" min="10" max="100" step="5">
           </label>
         </div>
-        <span class="hint">В OBS: «Инструменты → Настройки сервера WebSocket».
-          Там же «Показать сведения о подключении» — порт и пароль.</span>
-        <div class="acts">
-          <button class="act small" id="obs-check">Проверить связь</button>
-          <button class="act small" id="obs-fit" hidden>Подогнать сейчас</button>
-          <button class="act small key" id="obs-add" hidden>Добавить в OBS</button>
+      </div>
+
+      <!-- ── Анимация ── -->
+      <div class="wxe-pane" data-wpane="motion" hidden>
+        <div class="wxe-group">
+          <div class="wxe-label">Появление <span class="wxe-note">нажми — сыграет в кадре</span></div>
+          <div class="wxe-anims" id="wx-in"></div>
+        </div>
+        <div class="wxe-group">
+          <div class="wxe-label">Уход</div>
+          <div class="wxe-anims" id="wx-out"></div>
+        </div>
+        <label class="wxe-switch"><input type="checkbox" id="wx-motion-on"><i></i>
+          <span><b>Движение</b><small>Живое в покое: крутится пластинка, мерцает неон, пляшут столбики. Сними, если в кадре нужен полный покой.</small></span></label>
+      </div>
+
+      <!-- ── Место ── -->
+      <div class="wxe-pane" data-wpane="place" hidden>
+        <div class="wxe-group">
+          <div class="wxe-label">Формат кадра</div>
+          <div class="wxe-seg wrap wx-frames" id="wx-frame-pick">
+            <button data-frame="16:9">16:9</button>
+            <button data-frame="16:10">16:10</button>
+            <button data-frame="4:3">4:3</button>
+            <button data-frame="5:4">5:4</button>
+            <button data-frame="21:9">21:9</button>
+            <button data-frame="32:9">32:9</button>
+            <button data-frame="9:16">9:16</button>
+            <button data-frame="1:1">1:1</button>
+          </div>
+          <span class="hint" id="wx-frame-hint"></span>
+        </div>
+
+        <div class="wxe-group wxe-place">
+          <!-- Девять точек вместо четырёх углов: «сверху по центру» и «слева
+               посередине» раньше приходилось изображать огромным отступом от
+               угла, и на другом разрешении кадра плашка уезжала не туда. -->
+          <div class="wx-anchors" id="wx-anchors">
+            <button data-pos="left-top"      title="Слева сверху"></button>
+            <button data-pos="center-top"    title="Сверху по центру"></button>
+            <button data-pos="right-top"     title="Справа сверху"></button>
+            <button data-pos="left-middle"   title="Слева посередине"></button>
+            <button data-pos="center-middle" title="Ровно посередине"></button>
+            <button data-pos="right-middle"  title="Справа посередине"></button>
+            <button data-pos="left-bottom"   title="Слева снизу"></button>
+            <button data-pos="center-bottom" title="Снизу по центру"></button>
+            <button data-pos="right-bottom"  title="Справа снизу"></button>
+          </div>
+          <div>
+            <div class="wxe-label">Место в кадре</div>
+            <span class="hint" id="wx-pos-hint">Плашку можно просто перетащить
+              мышью прямо по кадру — точка привязки и отступы подставятся сами.</span>
+          </div>
+        </div>
+
+        <div class="wxe-group">
+          <label class="wxe-slider">
+            <span>Размер <b id="wx-scale-val">100%</b></span>
+            <input type="range" id="wx-scale" min="50" max="300" step="5">
+          </label>
+          <div class="wxe-seg small" id="wx-scale-quick">
+            <button data-scale="75">S</button>
+            <button data-scale="100">M</button>
+            <button data-scale="150">L</button>
+            <button data-scale="200">XL</button>
+          </div>
+        </div>
+
+        <div class="wxe-group">
+          <label class="wxe-slider">
+            <span>Отступ слева-справа <b id="wx-gapx-val">40 px</b></span>
+            <input type="range" id="wx-gapx" min="0" max="320" step="2">
+          </label>
+          <label class="wxe-slider">
+            <span>Отступ сверху-снизу <b id="wx-gapy-val">40 px</b></span>
+            <input type="range" id="wx-gapy" min="0" max="320" step="2">
+          </label>
+        </div>
+
+        <div class="wxe-group">
+          <div class="wxe-label">Текст внутри плашки</div>
+          <div class="wxe-seg" id="wx-align">
+            <button data-align="auto">Авто</button>
+            <button data-align="left">Влево</button>
+            <button data-align="center">По центру</button>
+            <button data-align="right">Вправо</button>
+          </div>
+          <span class="hint">Авто: плашка стоит справа — текст упирается в правый
+            край, слева — в левый.</span>
         </div>
       </div>
 
-      <div class="field">
-        <span>Место в кадре</span>
-        <!-- Девять точек вместо четырёх углов: «сверху по центру» и «слева
-             посередине» раньше приходилось изображать огромным отступом от
-             угла, и на другом разрешении кадра плашка уезжала не туда. -->
-        <div class="wx-anchors" id="wx-anchors">
-          <button data-pos="left-top"      title="Слева сверху"></button>
-          <button data-pos="center-top"    title="Сверху по центру"></button>
-          <button data-pos="right-top"     title="Справа сверху"></button>
-          <button data-pos="left-middle"   title="Слева посередине"></button>
-          <button data-pos="center-middle" title="Ровно посередине"></button>
-          <button data-pos="right-middle"  title="Справа посередине"></button>
-          <button data-pos="left-bottom"   title="Слева снизу"></button>
-          <button data-pos="center-bottom" title="Снизу по центру"></button>
-          <button data-pos="right-bottom"  title="Справа снизу"></button>
+      <!-- ── Показ ── -->
+      <div class="wxe-pane" data-wpane="show" hidden>
+        <div class="wxe-group">
+          <div class="wxe-label">Что на плашке</div>
+          <label class="wxe-switch"><input type="checkbox" id="wx-by-on"><i></i>
+            <span><b>Ник заказчика</b><small>«заказал ник» под артистом. Без него — просто «заказ зрителя».</small></span></label>
+          <label class="wxe-switch"><input type="checkbox" id="wx-bar-on"><i></i>
+            <span><b>Полоса времени</b></span></label>
+          <label class="wxe-switch"><input type="checkbox" id="wx-time-on"><i></i>
+            <span><b>Время цифрами</b><small>«1:24 / 3:51».</small></span></label>
+          <label class="wxe-switch"><input type="checkbox" id="wx-eq-on"><i></i>
+            <span><b>Эквалайзер</b><small>Пляшущие столбики: видно, что музыка живая. На паузе ложатся.</small></span></label>
+          <label class="wxe-switch"><input type="checkbox" id="wx-own-on"><i></i>
+            <span><b>Своя музыка тоже</b><small>Не только заказы, но и то, что слушаешь сам — с подписью «музыка канала». Сними, если свой плейлист светить не хочешь: тогда и в панели «В эфире» будет только во время заказов.</small></span></label>
         </div>
-        <span class="hint" id="wx-pos-hint">Плашку можно просто перетащить
-          мышью прямо по кадру — точка привязки и отступы подставятся сами.</span>
+
+        <div class="wxe-group">
+          <div class="wxe-label">Когда видно</div>
+          <div class="wxe-seg" id="wx-mode">
+            <button data-mode="always">Всё время</button>
+            <button data-mode="flash">Всплывает и уходит</button>
+          </div>
+          <span class="hint" id="wx-mode-hint"></span>
+
+          <div class="wxe-flash" id="wx-flash" hidden>
+            <label class="wxe-switch"><input type="checkbox" id="wx-onchange"><i></i>
+              <span><b>Всплывать при смене трека</b><small id="wx-onchange-note">Главный повод показать плашку: заиграло что-то новое.</small></span></label>
+            <label class="wxe-slider">
+              <span>Держать на экране <b id="wx-hold-val">15 с</b></span>
+              <input type="range" id="wx-hold" min="3" max="60" step="1">
+            </label>
+            <label class="wxe-slider">
+              <span>Напоминать <b id="wx-every-val">не напоминать</b></span>
+              <input type="range" id="wx-every" min="0" max="30" step="1">
+            </label>
+            <span class="hint">Плашка всплывает снова через этот срок — чтобы зашедший
+              в середине трека тоже узнал, что играет.</span>
+            <button class="act small" id="wx-flash-try"><svg><use href="#i-play"></use></svg>Показать, как это выглядит</button>
+          </div>
+
+          <label class="wxe-switch"><input type="checkbox" id="wx-pause-on"><i></i>
+            <span><b>Прятать на паузе</b><small>Плашка с замершей полосой выглядит как зависший виджет. Уходит через пару секунд паузы и возвращается, когда музыка пошла.</small></span></label>
+        </div>
       </div>
-
-      <label class="field">
-        <span>Текст внутри плашки</span>
-        <select id="wx-align">
-          <option value="auto">Как встанет — по стороне кадра</option>
-          <option value="left">Прижать влево</option>
-          <option value="center">По центру</option>
-          <option value="right">Прижать вправо</option>
-        </select>
-        <span class="hint">Плашка стоит справа — текст упирается в правый край,
-          слева — в левый. Обложка при этом остаётся на своём месте.</span>
-      </label>
-
-      <label class="field">
-        <span>Размер <b id="wx-scale-val">100%</b></span>
-        <input type="range" id="wx-scale" min="50" max="400" step="5">
-      </label>
-
-      <label class="field">
-        <span>Отступ слева-справа <b id="wx-gapx-val">40 px</b></span>
-        <input type="range" id="wx-gapx" min="0" max="320" step="2">
-      </label>
-
-      <label class="field">
-        <span>Отступ сверху-снизу <b id="wx-gapy-val">40 px</b></span>
-        <input type="range" id="wx-gapy" min="0" max="320" step="2">
-      </label>
-
-      <label class="field">
-        <span>Прозрачность <b id="wx-op-val">100%</b></span>
-        <input type="range" id="wx-op" min="10" max="100" step="5">
-        <span class="hint">Вся плашка целиком, вместе с текстом и обложкой.</span>
-      </label>
-
-      <div class="kicker" style="margin-top:24px">Что показывать</div>
-      <label class="check"><input type="checkbox" id="wx-art-on"> Обложку</label>
-      <label class="check"><input type="checkbox" id="wx-by-on"> Ник заказчика</label>
-      <label class="check"><input type="checkbox" id="wx-bar-on"> Полосу времени</label>
-      <label class="check"><input type="checkbox" id="wx-motion-on"> Движение</label>
-      <div class="hint">Сними, если анимация мешает — плашка станет неподвижной,
-        но останется на месте.</div>
-
-      <label class="check" style="margin-top:12px"><input type="checkbox" id="wx-own-on"> Свою музыку тоже</label>
-      <div class="hint">Виджет показывает и то, что ты слушаешь сам, а не только
-        заказы. Под артистом всегда написано, откуда трек: «заказал ник» или
-        «музыка канала». Сними галочку, если свой плейлист светить не хочешь —
-        тогда и в панели «В эфире» будет только во время заказов.</div>
-
-      <div class="kicker" style="margin-top:24px">Когда показывать</div>
-
-      <label class="field">
-        <span>Как держится в кадре</span>
-        <select id="wx-mode">
-          <option value="always">Висит всё время</option>
-          <option value="flash">Всплывает и уходит</option>
-        </select>
-        <span class="hint" id="wx-mode-hint"></span>
-      </label>
-
-      <div id="wx-flash" hidden>
-        <label class="check"><input type="checkbox" id="wx-onchange"> Всплывать при смене трека</label>
-        <div class="hint">Главный повод показать плашку: заиграло что-то новое.</div>
-
-        <label class="field" style="margin-top:12px">
-          <span>Держать на экране <b id="wx-hold-val">15 с</b></span>
-          <input type="range" id="wx-hold" min="3" max="60" step="1">
-        </label>
-
-        <label class="field">
-          <span>Напоминать <b id="wx-every-val">не напоминать</b></span>
-          <input type="range" id="wx-every" min="0" max="30" step="1">
-          <span class="hint">Плашка всплывает снова через этот срок — чтобы
-            зашедший в середине трека тоже узнал, что играет. Появление и уход
-            с той же анимацией, что и обычно.</span>
-        </label>
-
-        <button class="act small" id="wx-flash-try">Показать, как это выглядит</button>
       </div>
-
-      <div class="kicker" style="margin-top:24px">
-        Своими руками
-        <button class="link-btn" id="wx-reset" style="margin-left:auto">вернуть как в наборе</button>
-      </div>
-      <div class="hint" style="margin-top:0">Поверх выбранного набора. Что не тронул —
-        остаётся как в наборе.</div>
-      <div id="wx-tweaks"></div>
     </div>
 
   </div>
-
-  <div class="wx-gallery" id="wx-gallery"></div>
 </section>
 
 <section class="panel" id="log" hidden>
@@ -899,7 +1186,7 @@
       и вернуться к нему потом.</div>
     <div id="setup-rail-steps"></div>
     <div class="rail-tail">
-      <button data-act="finish">закрыть и настроить потом</button>
+      <button data-act="close">закрыть и настроить потом</button>
     </div>
   </aside>
   <div class="setup-body">
@@ -908,7 +1195,9 @@
 </div>
 
 <footer id="status" class="offline">Подключаюсь к приложению…</footer>
+<script src="/static/i18n-ru.js"></script>
 <script src="/static/widget-presets.js"></script>
+<script src="/static/widget-fx.js"></script>
 <script src="/static/app.js"></script>
 <script src="/static/setup.js"></script>
 </body>

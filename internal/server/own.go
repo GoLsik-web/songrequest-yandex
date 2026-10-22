@@ -189,7 +189,24 @@ type ownWatch struct {
 	// секунды, — ровно та утечка, ради устранения которой всё и затевалось.
 	// Поймано проверкой TestIdleSpotifyIsNotAskedOften.
 	coverTried bool
+	// coverTries и coverAt — сколько раз и когда последний раз ходили за
+	// обложкой. Один отказ ещё не повод сдаваться: Ynison на смене трека
+	// часто ещё рассказывает про прежний, и через пару секунд ответ верный.
+	coverTries int
+	coverAt    time.Time
+	// duration — длина трека, если Windows её не сообщила.
+	duration int
+	// seenAt — когда трек появился в панели. От него считаем положение,
+	// если Windows не сообщает и его.
+	seenAt time.Time
 }
+
+// ownCoverTries и ownCoverGap — сколько раз и как часто пробовать достать
+// обложку одного трека.
+const (
+	ownCoverTries = 4
+	ownCoverGap   = 5 * time.Second
+)
 
 // forget сбрасывает всё, что знали про трек. Время последнего запроса по сети
 // остаётся: оно про частоту запросов, а не про трек.
@@ -528,6 +545,7 @@ func (s *Server) pollOwnPanel(ctx context.Context, w *ownWatch) bool {
 		// Трек сменился — прежняя обложка больше не годится.
 		w.forget()
 		w.track = track
+		w.seenAt = time.Now()
 	}
 
 	now := &app.NowPlaying{
@@ -543,12 +561,32 @@ func (s *Server) pollOwnPanel(ctx context.Context, w *ownWatch) bool {
 
 	// Обложка — единственное, чего в панели Windows нет в готовом виде
 	// (она отдаёт картинку потоком, а это отдельная возня с COM). Спрашиваем
-	// её у Spotify один раз на трек и запоминаем.
-	if w.cover == "" && !w.coverTried && s.wantCover() && s.ym.Connected() {
-		w.coverTried = true
-		if url := s.fetchOwnCover(ctx, seen.Title); url != "" {
-			w.cover = url
-			now.CoverURL = url
+	// её у Яндекса и запоминаем; заодно берём длину, если Windows её не дала.
+	if w.cover == "" && w.coverTries < ownCoverTries && time.Since(w.coverAt) >= ownCoverGap &&
+		s.wantCover() && s.ym.Connected() {
+		w.coverTries++
+		w.coverAt = time.Now()
+		w.coverTried = w.coverTries >= ownCoverTries
+		if d := s.fetchOwnCover(ctx, seen.Artist, seen.Title); d.cover != "" || d.duration > 0 {
+			w.cover = d.cover
+			now.CoverURL = d.cover
+			if d.duration > 0 {
+				w.duration = d.duration
+			}
+			// Положение от Ynison точнее нашего отсчёта от появления трека.
+			if seen.PositionMs == 0 && d.position > 0 {
+				w.seenAt = time.Now().Add(-time.Duration(d.position) * time.Millisecond)
+			}
+		}
+	}
+
+	// Яндекс Музыка не всегда сообщает Windows длину и положение — тогда
+	// полоса трека пропадала совсем. Длину берём у Яндекса, положение
+	// считаем сами от того, когда трек появился.
+	if now.DurationMs == 0 && w.duration > 0 {
+		now.DurationMs = w.duration
+		if now.PositionMs == 0 && !w.seenAt.IsZero() && !now.Paused {
+			now.PositionMs = min(int(time.Since(w.seenAt)/time.Millisecond), now.DurationMs)
 		}
 	}
 
@@ -599,28 +637,63 @@ func (s *Server) wantCover() bool {
 	return s.cfg.Get().Widget.ShowArt
 }
 
-// fetchOwnCover спрашивает у Spotify обложку играющего трека.
+// ownDetails — то, что удалось узнать о своём треке у Яндекса.
+type ownDetails struct {
+	cover    string
+	duration int
+	position int
+}
+
+// fetchOwnCover спрашивает у Яндекса обложку и длину играющего трека.
 //
-// Один запрос на смену трека. Сверяем название: заголовок в панели Windows
-// меняется раньше, чем это доезжает до серверов Spotify, и без сверки к
-// новому треку прилипла бы обложка предыдущего.
-func (s *Server) fetchOwnCover(ctx context.Context, title string) string {
+// Сначала Ynison: он знает именно тот трек, что играет. Но он бывает не
+// поднят, а название в нём может отличаться от панели Windows («feat.»,
+// версия в скобках) — раньше в обоих случаях обложки не было вовсе. Тогда
+// ищем по артисту и названию, как ищем заказы.
+func (s *Server) fetchOwnCover(ctx context.Context, artist, title string) ownDetails {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	st, ok, err := s.ym.State(ctx)
 	if err != nil {
+		s.log.Debug("Ynison не рассказал про свою музыку, ищу по названию", "ошибка", err)
+	} else if ok && st != nil && st.Item != nil && sameTitle(st.Item.Name, title) {
+		d := ownDetails{duration: st.Item.DurationMs, position: st.ProgressMs}
+		if len(st.Item.Album.Images) > 0 {
+			d.cover = st.Item.Album.Images[0].URL
+		}
+		if d.cover != "" {
+			return d
+		}
+	}
+
+	query := strings.TrimSpace(artist + " " + title)
+	if query == "" {
+		return ownDetails{}
+	}
+	found, err := s.ym.SearchTracks(ctx, query, 5)
+	if err != nil {
 		s.noteYandexError(err)
-		s.log.Debug("не спросил обложку своей музыки", "ошибка", err)
-		return ""
+		s.log.Debug("не нашёл обложку своей музыки", "ошибка", err)
+		return ownDetails{}
 	}
-	if !ok || st == nil || st.Item == nil || len(st.Item.Album.Images) == 0 {
-		return ""
+	for _, c := range found {
+		if sameTitle(c.Title, title) {
+			return ownDetails{cover: c.CoverURL, duration: c.DurationMs}
+		}
 	}
-	if !strings.EqualFold(strings.TrimSpace(st.Item.Name), strings.TrimSpace(title)) {
-		s.log.Debug("обложка пришла от другого трека",
-			"в_панели", title, "в_ответе", st.Item.Name)
-		return ""
+	return ownDetails{}
+}
+
+// sameTitle сверяет названия, не придираясь к хвостам в скобках: панель
+// Windows и Яндекс пишут версии трека по-разному.
+func sameTitle(a, b string) bool {
+	norm := func(s string) string {
+		s = strings.ToLower(strings.TrimSpace(s))
+		if i := strings.IndexAny(s, "(["); i > 0 {
+			s = strings.TrimSpace(s[:i])
+		}
+		return s
 	}
-	return st.Item.Album.Images[0].URL
+	return norm(a) != "" && norm(a) == norm(b)
 }

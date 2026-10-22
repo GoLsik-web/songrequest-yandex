@@ -1088,13 +1088,6 @@ footer[hidden] { display: none; }
    «похожей» вёрстки здесь нет намеренно — она разошлась бы с настоящей
    в первый же день. */
 
-.wx {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
-  gap: var(--s7);
-  align-items: start;
-}
-
 /* Кадр всегда тёмный или светлый по выбору, а не по теме панели: это не
    часть интерфейса, а изображение — то, что увидят зрители. */
 .wx-stage {
@@ -1151,17 +1144,6 @@ footer[hidden] { display: none; }
   background: radial-gradient(100% 100% at 50% 45%, transparent 55%, rgba(0, 0, 0, .35) 100%);
 }
 
-.wx-stage-bar {
-  display: flex; align-items: center; gap: var(--s4);
-  flex-wrap: wrap;
-  padding: var(--s3) 0;
-  border-bottom: 1px solid var(--line);
-}
-/* Три ссылки проигрыша держатся одной группой: по отдельности они
-   разъезжались и ломались по одной на новую строку. */
-.wx-replay { display: flex; gap: var(--s3); margin-left: auto; }
-.wx-replay .link-btn { white-space: nowrap; }
-
 .chips { display: flex; gap: var(--s1); }
 .chips button {
   font: 500 12px/1 inherit;
@@ -1173,8 +1155,6 @@ footer[hidden] { display: none; }
 .chips button:hover { color: var(--text); border-color: var(--line-2); }
 .chips button.on { color: var(--lime); border-color: var(--lime-lo); }
 .chips button:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
-
-.wx-right .kicker { display: flex; align-items: baseline; }
 
 /* Девять точек привязки.
    ─────────────────────────────────────────────────────────────────────────
@@ -1264,100 +1244,6 @@ input[type="range"]:disabled::-webkit-slider-thumb { background: var(--dimmer); 
 input[type="range"]:disabled::-moz-range-thumb { background: var(--dimmer); }
 
 .field > span b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
-
-/* ── ручная настройка ─────────────────────────────────────────────── */
-
-#wx-tweaks { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s3); }
-
-.tweak {
-  display: flex; align-items: center; gap: var(--s2);
-  font-size: var(--t-sm); color: var(--dim);
-  cursor: pointer;
-}
-.tweak.wide { flex-direction: column; align-items: stretch; gap: var(--s1); cursor: default; }
-.tweak-name { display: flex; align-items: center; gap: var(--s2); flex: 1; }
-.tweak-name b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
-
-/* Тронутое руками помечено: иначе через неделю не вспомнить, что здесь
-   набор, а что своя правка. */
-.tweak.set .tweak-name { color: var(--lime); }
-
-.tweak input[type="color"] {
-  -webkit-appearance: none; appearance: none;
-  width: 30px; height: 24px; padding: 0; flex: none; cursor: pointer;
-  background: none; border: 1px solid var(--line-2); border-radius: 2px;
-}
-.tweak input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
-.tweak input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 1px; }
-.tweak input[type="color"]::-moz-color-swatch { border: 0; border-radius: 1px; }
-
-.tweak-off {
-  background: none; border: 0; color: var(--dimmer);
-  font-size: 15px; line-height: 1; padding: 0 2px; cursor: pointer;
-  transition: color var(--fast) var(--ease);
-}
-.tweak-off:hover { color: var(--bad); }
-.tweak-off:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
-
-/* ── галерея наборов ──────────────────────────────────────────────── */
-
-.wx-gallery { margin-top: var(--s7); display: flex; flex-direction: column; gap: var(--s7); }
-
-.fam { display: flex; flex-direction: column; gap: var(--s3); }
-.fam-head { display: flex; align-items: baseline; gap: var(--s4); flex-wrap: wrap; }
-.fam-head h3 {
-  margin: 0; font-family: var(--f-head); font-size: var(--t-sm);
-  font-weight: 600; letter-spacing: var(--track-chip);
-}
-.fam-head p { margin: 0; font-size: 12px; color: var(--dimmer); flex: 1; min-width: 200px; }
-
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--s3); }
-
-.tile {
-  display: flex; flex-direction: column; gap: var(--s2);
-  padding: 0; background: none; border: 0; color: inherit;
-  font: inherit; text-align: left; cursor: pointer;
-}
-.tile-stage {
-  display: block; position: relative; overflow: hidden;
-  aspect-ratio: 16 / 7;
-  border: 1px solid var(--line);
-  background:
-    radial-gradient(120% 100% at 70% 20%, #26333f 0%, #141b21 50%, #0c0e10 100%);
-  transition: border-color var(--fast) var(--ease);
-}
-/* Плитка — не сцена, а образец: плашка стоит по центру, а не в углу. */
-.tile-stage .card {
-  position: absolute; left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  max-width: 92%;
-}
-.tile-stage .card.show { transform: translate(-50%, -50%); }
-/* Тикер тянется во всю ширину и по горизонтали не центрируется: сдвиг на
-   половину увёл бы его за край плитки. */
-.tile-stage .card[data-family="ticker"],
-.tile-stage .card[data-family="ticker"].show { transform: translate(0, -50%); }
-/* Постоянные анимации в плитках оставлены: пластинка крутится, катушки
-   идут, каретка мигает — ради этого на них и смотрят. А вот появление в
-   плитках не играет: сорок штук разом — это припадок, а не показ.
-   Появление смотрят в кадре наверху, по кнопке. */
-.tile-stage .card { animation: none !important; }
-
-.tile-name {
-  font-size: 12px; color: var(--dimmer);
-  transition: color var(--fast) var(--ease);
-}
-.tile:hover .tile-stage { border-color: var(--line-2); }
-.tile:hover .tile-name { color: var(--text); }
-.tile:focus-visible .tile-stage { outline: 2px solid var(--lime); outline-offset: 2px; }
-
-.tile.on .tile-stage { border-color: var(--lime); }
-.tile.on .tile-name { color: var(--lime); }
-.tile.on .tile-name::after { content: " · выбран"; color: var(--dimmer); }
-
-@media (max-width: 900px) {
-  .wx { grid-template-columns: minmax(0, 1fr); }
-}
 
 /* Метка «сохранено». Поля настроек сохраняются сами, как только уходит фокус,
    и без метки это выглядит так, будто ничего не произошло: человек правит
@@ -1716,3 +1602,737 @@ body.menu-open { overflow: hidden; }
 .obs-status b { font-weight: 600; }
 .obs-fields { display: grid; grid-template-columns: 96px 1fr; gap: var(--s3); }
 .obs-link .acts { margin-top: var(--s3); flex-wrap: wrap; }
+
+/* ═══ Редактор виджета ════════════════════════════════════════════════
+   Слева кадр, справа вкладки. Кадр не уезжает при прокрутке настроек: ради
+   него сюда и приходят, и каждую правку надо видеть сразу, а не после
+   прокрутки наверх. Поэтому раздел занимает всю высоту окна, а
+   прокручиваются колонки по отдельности. */
+
+.panel.wxe-panel { padding: 0; height: 100%; }
+
+.wxe {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 372px;
+  height: 100%;
+  min-height: 0;
+}
+
+.wxe-view {
+  overflow-y: auto;
+  padding: var(--s6) var(--s6) var(--s6) var(--edge);
+  display: flex; flex-direction: column; gap: var(--s4);
+}
+
+.wxe-side {
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--raise), var(--bg) 340px);
+  padding: 0 var(--s5) var(--edge);
+}
+
+/* ── Кадр ─────────────────────────────────────────────────────────────── */
+
+.wx-stage.wxe-stage {
+  flex: none;
+  width: 100%;
+  max-width: calc((100vh - 380px) * var(--wx-arn, 1.7778));
+  margin: 0 auto;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .45);
+}
+.wxe-frame {
+  position: absolute; left: 0; top: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.wxe-frame iframe { display: block; border: 0; background: transparent; }
+/* Приближение плавное: камера подъезжает к плашке, а не прыгает. */
+.wxe-stage.zoomed .wxe-frame,
+.wxe-stage.zooming .wxe-frame { transition: transform .5s var(--ease-soft); }
+.wxe-stage.dragging .wxe-frame { transition: none; }
+.wxe-hit { position: absolute; inset: 0; z-index: 3; touch-action: none; }
+.wx-grid { z-index: 2; }
+
+/* Размер кадра и масштаб — в углу, мелко. Пока плашку тащат, здесь же
+   словами пишется, куда она встаёт. */
+.wxe-badge {
+  position: absolute; right: 10px; top: 10px; z-index: 4;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(8, 9, 10, .62);
+  backdrop-filter: blur(8px);
+  color: rgba(242, 244, 245, .8);
+  font: 600 11px/1.3 var(--f-body);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  /* Видна, когда мышь над кадром: в углу она иначе ложилась бы поверх
+     плашки, поставленной в тот же угол. */
+  opacity: 0;
+  transition: opacity var(--fast) var(--ease);
+}
+.wxe-stage:hover .wxe-badge, .wxe-stage.dragging .wxe-badge { opacity: 1; }
+
+/* Четвёртая сцена: игровой кадр. Главный вопрос стримера — как плашка
+   встанет поверх игры, а не поверх ровного фона. */
+.wx-stage[data-scene="game"] .wx-scene {
+  background:
+    linear-gradient(180deg, #7fb3d9 0%, #c9dbe0 38%, #6b7f5a 38.5%, #3d4b2f 60%, #262e1d 100%);
+}
+.wx-stage[data-scene="game"] .wx-scene::before {
+  background:
+    radial-gradient(14% 24% at 22% 40%, #2f3a26 0 60%, transparent 62%),
+    radial-gradient(10% 18% at 70% 42%, #34412a 0 60%, transparent 62%),
+    radial-gradient(30% 8% at 50% 92%, rgba(0, 0, 0, .35), transparent 70%);
+}
+
+/* ── Полоса под кадром ────────────────────────────────────────────────── */
+
+.wxe-bar { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+
+.wxe-scenes { display: flex; gap: 6px; }
+.wxe-scenes button {
+  width: 26px; height: 26px; padding: 0; cursor: pointer;
+  border-radius: 50%;
+  border: 2px solid var(--bg);
+  box-shadow: 0 0 0 1px var(--line-2);
+  transition: box-shadow var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.wxe-scenes button:hover { transform: scale(1.08); }
+.wxe-scenes button.on { box-shadow: 0 0 0 2px var(--lime); }
+.wxe-scenes [data-scene="dark"]  { background: radial-gradient(circle at 30% 30%, #2b3a47, #0b0d0e); }
+.wxe-scenes [data-scene="light"] { background: radial-gradient(circle at 30% 30%, #f2f5f7, #8fa2ad); }
+.wxe-scenes [data-scene="busy"]  { background: repeating-linear-gradient(58deg, #7d3f8c 0 5px, #2b6ea8 5px 10px, #d0763a 10px 15px); }
+.wxe-scenes [data-scene="game"]  { background: linear-gradient(180deg, #7fb3d9 0 45%, #4d5d38 45%); }
+
+.wxe-replay { display: flex; gap: 4px; margin-left: auto; }
+.wxe-ibtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 11px;
+  border: 1px solid var(--line-2); border-radius: 999px;
+  background: none; color: var(--dim);
+  font: 600 12px/1 var(--f-body);
+  cursor: pointer;
+  transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.wxe-ibtn svg { width: 13px; height: 13px; }
+.wxe-ibtn:hover { color: var(--lime); border-color: var(--lime-lo); background: rgba(255, 204, 0, .06); }
+.wxe-ibtn:active { transform: translateY(1px); }
+.wxe-ibtn.on { color: var(--ink); background: var(--lime); border-color: var(--lime); }
+
+/* Переключатель-сегмент: одна дорожка, внутри пилюли. Читается как «одно
+   из», чего у ряда одинаковых кнопок не было. */
+.wxe-seg {
+  display: inline-flex; gap: 2px; padding: 3px;
+  align-self: flex-start;
+  border-radius: 999px;
+  background: var(--raise);
+  border: 1px solid var(--line);
+}
+.wxe-seg.wrap { flex-wrap: wrap; border-radius: 14px; }
+.wxe-seg button {
+  border: 0; background: none; cursor: pointer;
+  padding: 7px 12px;
+  border-radius: 999px;
+  color: var(--dim);
+  font: 600 12px/1 var(--f-body);
+  font-variant-numeric: tabular-nums;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.wxe-seg.small button { padding: 6px 10px; }
+.wxe-seg button:hover { color: var(--text); }
+.wxe-seg button.on { background: var(--lime); color: var(--ink); }
+.wxe-seg button:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+
+/* ── Блок «Адрес для OBS» ─────────────────────────────────────────────── */
+
+.wxe-obs {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--raise);
+  padding: var(--s4);
+}
+.wxe-h { font: 600 13px/1.3 var(--f-head); letter-spacing: .02em; }
+.wxe-sub { font-size: 12px; color: var(--dimmer); margin-top: 2px; }
+.wxe-url { display: flex; gap: var(--s2); margin-top: var(--s3); }
+.wxe-url input {
+  flex: 1; min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line-2); border-radius: 10px;
+  background: var(--bg); color: var(--dim);
+  font: 500 13px/1.2 "JetBrains Mono", Consolas, monospace;
+}
+.wxe-url .act, .wxe-obs-acts .act { border-radius: 10px; display: inline-flex; align-items: center; gap: 6px; }
+.wxe-url .act svg, .wxe-obs-acts .act svg { width: 14px; height: 14px; }
+.wxe-obs-acts { display: flex; gap: var(--s2); margin-top: var(--s2); flex-wrap: wrap; }
+
+.wxe-more { margin-top: var(--s3); border-top: 1px solid var(--line); padding-top: var(--s3); }
+.wxe-more > summary {
+  display: flex; align-items: center; gap: var(--s2);
+  cursor: pointer; list-style: none;
+  font-size: 13px; font-weight: 600; color: var(--dim);
+}
+.wxe-more > summary::-webkit-details-marker { display: none; }
+.wxe-more > summary::before {
+  content: ""; width: 6px; height: 6px; flex: none; margin-right: 4px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg); transition: transform var(--fast) var(--ease);
+}
+.wxe-more[open] > summary::before { transform: rotate(45deg); }
+.wxe-more > summary > span:first-child { margin-right: auto; }
+.wxe-more > summary:hover { color: var(--text); }
+.wxe-more .obs-box { border: 0; padding: var(--s3) 0 0; background: none; margin: 0; }
+
+/* ── Вкладки ──────────────────────────────────────────────────────────── */
+
+.wxe-tabs {
+  position: sticky; top: 0; z-index: 3;
+  /* Семь вкладок — два ряда по четыре, а не три ряда по три: третий ряд
+     съедал место у самих настроек. */
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+  margin: 0 calc(var(--s5) * -1) var(--s5);
+  padding: var(--s4) var(--s5) var(--s3);
+  background: rgba(16, 18, 20, .92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.wxe-tab {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 3px;
+  border: 1px solid transparent; border-radius: 10px;
+  background: none; color: var(--dim);
+  font: 600 11.5px/1 var(--f-body);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.wxe-tab svg { width: 14px; height: 14px; flex: none; }
+.wxe-tab:hover { color: var(--text); background: var(--hover); }
+.wxe-tab.on { color: var(--lime); background: rgba(255, 204, 0, .08); border-color: var(--lime-lo); }
+
+.wxe-pane { display: flex; flex-direction: column; gap: var(--s5); animation: wxePane .32s var(--ease-soft); }
+.wxe-pane[hidden] { display: none; }
+@keyframes wxePane { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.wxe-group { display: flex; flex-direction: column; gap: var(--s2); }
+.wxe-group.off { opacity: .4; pointer-events: none; }
+.wxe-label {
+  display: flex; align-items: baseline; gap: var(--s2);
+  font: 600 10.5px/1.4 var(--f-head);
+  letter-spacing: var(--track-caps); text-transform: uppercase;
+  color: var(--dim);
+}
+.wxe-label .link-btn { margin-left: auto; text-transform: none; letter-spacing: 0; font-family: var(--f-body); }
+.wxe-note {
+  font: 500 11px/1.4 var(--f-body); letter-spacing: 0; text-transform: none;
+  color: var(--dimmer);
+}
+.wxe-side .hint { margin-top: 0; }
+
+/* ── Стиль: окраска и плитки ──────────────────────────────────────────── */
+
+.wxe-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.wxe-sw {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 12px 5px 5px;
+  border: 1px solid var(--line-2); border-radius: 999px;
+  background: none; color: var(--dim);
+  font: 600 12px/1 var(--f-body);
+  cursor: pointer;
+  transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.wxe-sw:hover { color: var(--text); border-color: var(--dim); }
+.wxe-sw.on { color: var(--text); border-color: var(--lime); background: rgba(255, 204, 0, .06); }
+/* Кружок окраски: подложка набора, две строчки текста и капля акцента. */
+.wxe-sw-dot {
+  position: relative; width: 22px; height: 22px; flex: none;
+  border-radius: 50%;
+  background: var(--sw-bg, #000);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14);
+  overflow: hidden;
+}
+.wxe-sw-dot.clear {
+  background: repeating-conic-gradient(#3a3f44 0 25%, #22262a 0 50%) 0 0 / 8px 8px;
+}
+.wxe-sw-dot i {
+  position: absolute; right: 3px; bottom: 3px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--sw-ac);
+}
+.wxe-sw-dot::before {
+  content: ""; position: absolute; left: 4px; top: 6px;
+  width: 9px; height: 2px; border-radius: 2px;
+  background: var(--sw-ink, #fff);
+  box-shadow: 0 4px 0 0 var(--sw-ink, #fff);
+  opacity: .8;
+}
+
+.wxe-fams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.wxe-fam {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 0; border: 0; background: none; color: inherit;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.wxe-fam-stage {
+  position: relative; display: block; overflow: hidden;
+  height: 86px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: radial-gradient(120% 110% at 75% 15%, #2a3846 0%, #151c22 50%, #0c0e10 100%);
+  transition: border-color var(--fast) var(--ease), transform .25s var(--ease-soft), box-shadow .25s var(--ease-soft);
+}
+/* Плитка — не сцена, а образец: плашка уменьшена целиком и стоит по
+   центру. Уменьшена zoom-ом — так же, как размер в настоящем виджете. */
+.wxe-fam-stage .card {
+  position: absolute; left: 50%; top: 50%;
+  zoom: .36;
+  transform: translate(-50%, -50%);
+  animation: none !important;
+}
+.wxe-fam-stage .card.show { transform: translate(-50%, -50%); }
+.wxe-fam-stage .card[data-family="ticker"],
+.wxe-fam-stage .card[data-family="ticker"].show { left: 0; width: 278%; max-width: none; transform: translate(0, -50%); }
+.wxe-fam-stage .card[data-family="card"] { zoom: .26; }
+.wxe-fam-name {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: var(--dim);
+  transition: color var(--fast) var(--ease);
+}
+.wxe-fam-name em {
+  font-style: normal; font: 700 9px/1 var(--f-head); letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 3px 6px; border-radius: 999px;
+  background: var(--lime); color: var(--ink);
+}
+.wxe-fam:hover .wxe-fam-stage { border-color: var(--dim); transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0, 0, 0, .4); }
+.wxe-fam:hover .wxe-fam-name { color: var(--text); }
+.wxe-fam.on .wxe-fam-stage { border-color: var(--lime); box-shadow: 0 0 0 1px var(--lime), 0 10px 30px rgba(255, 204, 0, .12); }
+.wxe-fam.on .wxe-fam-name { color: var(--lime); }
+.wxe-fam:focus-visible .wxe-fam-stage { outline: 2px solid var(--lime); outline-offset: 2px; }
+
+/* ── Выключатели ──────────────────────────────────────────────────────── */
+
+.wxe-switch {
+  position: relative;
+  display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: rgba(255, 255, 255, .015);
+  cursor: pointer;
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.wxe-switch:hover { border-color: var(--line-2); background: var(--hover); }
+.wxe-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.wxe-switch > i {
+  position: relative; width: 34px; height: 20px; margin-top: 1px;
+  border-radius: 999px; background: var(--line-2);
+  transition: background .2s var(--ease);
+}
+.wxe-switch > i::after {
+  content: ""; position: absolute; left: 3px; top: 3px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--dim);
+  transition: transform .25s var(--ease-soft), background .2s var(--ease);
+}
+.wxe-switch input:checked + i { background: var(--lime); }
+.wxe-switch input:checked + i::after { transform: translateX(14px); background: var(--ink); }
+.wxe-switch input:focus-visible + i { outline: 2px solid var(--lime); outline-offset: 2px; }
+.wxe-switch > span { display: flex; flex-direction: column; gap: 2px; }
+.wxe-switch b { font-size: 13px; font-weight: 600; color: var(--text); }
+.wxe-switch small { font-size: 12px; line-height: 1.45; color: var(--dimmer); }
+.wxe-switch.off { opacity: .4; pointer-events: none; }
+/* Цвета из обложки — главная новинка вкладки, её видно сразу. */
+.wxe-magic {
+  border-color: rgba(255, 204, 0, .25);
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgba(255, 204, 0, .1), transparent 60%),
+    radial-gradient(100% 120% at 0% 100%, rgba(127, 227, 255, .08), transparent 60%);
+}
+
+/* ── Ползунки ─────────────────────────────────────────────────────────── */
+
+.wxe-slider { display: flex; flex-direction: column; gap: 4px; }
+.wxe-slider > span { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--dim); }
+.wxe-slider > span b { margin-left: auto; color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.wxe-slider.set > span { color: var(--lime); }
+.wxe-slider input[type="range"] { height: 22px; }
+.wxe-slider input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; }
+.wxe-slider input[type="range"]::-webkit-slider-thumb {
+  width: 16px; height: 16px; margin-top: -6px;
+  box-shadow: 0 0 0 4px rgba(255, 204, 0, .14);
+  transition: box-shadow var(--fast) var(--ease);
+}
+.wxe-slider input[type="range"]:hover::-webkit-slider-thumb { box-shadow: 0 0 0 6px rgba(255, 204, 0, .2); }
+
+.wxe-x {
+  border: 0; background: none; padding: 0 3px; cursor: pointer;
+  color: var(--dimmer); font-size: 15px; line-height: 1;
+  transition: color var(--fast) var(--ease);
+}
+.wxe-x:hover { color: var(--bad); }
+.wxe-slider:not(.set) .wxe-x { display: none; }
+
+/* ── Обложка: формы; шрифты; движения ─────────────────────────────────── */
+
+.wxe-shapes, .wxe-fonts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.wxe-shape, .wxe-font, .wxe-anim {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  padding: 11px 6px 9px;
+  border: 1px solid var(--line-2); border-radius: 12px;
+  background: none; color: var(--dim);
+  font: 600 11.5px/1.2 var(--f-body);
+  cursor: pointer;
+  transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease), background var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.wxe-shape:hover, .wxe-font:hover, .wxe-anim:hover { color: var(--text); border-color: var(--dim); }
+.wxe-shape.on, .wxe-font.on, .wxe-anim.on { color: var(--lime); border-color: var(--lime); background: rgba(255, 204, 0, .06); }
+.wxe-shape:active, .wxe-font:active, .wxe-anim:active { transform: scale(.97); }
+.wxe-shape[disabled] { opacity: .35; pointer-events: none; }
+
+.wxe-shape-ico {
+  width: 30px; height: 30px;
+  background: linear-gradient(135deg, #ff6a3d, #b3125b 60%, #2a0a3a);
+}
+.wxe-shape-ico[data-s="style"]   { background: none; border: 1.5px dashed currentColor; border-radius: 8px; }
+.wxe-shape-ico[data-s="square"]  { border-radius: 0; }
+.wxe-shape-ico[data-s="rounded"] { border-radius: 8px; }
+.wxe-shape-ico[data-s="circle"]  { border-radius: 50%; }
+.wxe-shape-ico[data-s="disc"]    {
+  border-radius: 50%;
+  -webkit-mask-image: radial-gradient(circle, transparent 0 14%, #000 15%);
+  animation: discSpin 6s linear infinite;
+}
+
+.wxe-font-aa { font-size: 20px; line-height: 1; color: var(--text); }
+.wxe-font.on .wxe-font-aa { color: var(--lime); }
+
+/* ── Цвета ────────────────────────────────────────────────────────────── */
+
+.wxe-colors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.wxe-color {
+  position: relative;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px 8px 8px;
+  border: 1px solid var(--line-2); border-radius: 12px;
+  cursor: pointer;
+  transition: border-color var(--fast) var(--ease);
+}
+.wxe-color:hover { border-color: var(--dim); }
+.wxe-color input[type="color"] {
+  -webkit-appearance: none; appearance: none;
+  width: 30px; height: 30px; padding: 0; flex: none; cursor: pointer;
+  border: 0; border-radius: 9px; background: none; overflow: hidden;
+}
+.wxe-color input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.wxe-color input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 9px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .15); }
+.wxe-color-name { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--text); }
+.wxe-color-name small { font-size: 11px; font-weight: 500; color: var(--dimmer); }
+.wxe-color.set .wxe-color-name small { font-family: "JetBrains Mono", Consolas, monospace; }
+.wxe-color.set { border-color: var(--lime-lo); }
+.wxe-color.set .wxe-color-name small { color: var(--lime); }
+.wxe-color .wxe-x { position: absolute; right: 6px; top: 6px; }
+.wxe-color.locked { opacity: .5; cursor: default; }
+
+/* ── Анимация ─────────────────────────────────────────────────────────── */
+
+.wxe-anims { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.wxe-anim { padding: 10px 4px 8px; font-size: 11px; }
+/* Значок движения сам показывает движение — при наведении. Квадратик
+   проигрывает то же, что сделает плашка. */
+.wxe-anim-ico {
+  position: relative; width: 26px; height: 18px;
+  border: 1.5px solid currentColor; border-radius: 5px;
+  overflow: hidden;
+}
+.wxe-anim-ico i {
+  position: absolute; left: 3px; right: 3px; top: 3px; bottom: 3px;
+  border-radius: 2px; background: currentColor; opacity: .85;
+}
+.wxe-anim-ico[data-a="style"] i { background: linear-gradient(90deg, var(--lime), #7fe3ff); opacity: 1; }
+.wxe-anim:hover .wxe-anim-ico i { animation: wxeFade 1.1s var(--ease-soft) infinite; }
+.wxe-anim:hover .wxe-anim-ico[data-a="left"] i   { animation-name: wxeLeft; }
+.wxe-anim:hover .wxe-anim-ico[data-a="right"] i  { animation-name: wxeRight; }
+.wxe-anim:hover .wxe-anim-ico[data-a="up"] i     { animation-name: wxeUp; }
+.wxe-anim:hover .wxe-anim-ico[data-a="down"] i   { animation-name: wxeDown; }
+.wxe-anim:hover .wxe-anim-ico[data-a="grow"] i   { animation-name: wxeGrow; }
+.wxe-anim:hover .wxe-anim-ico[data-a="shrink"] i { animation-name: wxeShrink; }
+.wxe-anim:hover .wxe-anim-ico[data-a="swing"] i  { animation-name: wxeSwing; transform-origin: 50% 0; }
+.wxe-anim:hover .wxe-anim-ico[data-a="tilt"] i   { animation-name: wxeTilt; }
+.wxe-anim:hover .wxe-anim-ico[data-a="blur"] i   { animation-name: wxeBlur; }
+.wxe-anim:hover .wxe-anim-ico[data-a="style"] i  { animation-name: wxeStyle; }
+@keyframes wxeFade   { 0% { opacity: 0; } 60%, 100% { opacity: .85; } }
+@keyframes wxeLeft   { 0% { transform: translateX(-120%); } 60%, 100% { transform: none; } }
+@keyframes wxeRight  { 0% { transform: translateX(120%); } 60%, 100% { transform: none; } }
+@keyframes wxeUp     { 0% { transform: translateY(120%); } 60%, 100% { transform: none; } }
+@keyframes wxeDown   { 0% { transform: translateY(-120%); } 60%, 100% { transform: none; } }
+@keyframes wxeGrow   { 0% { transform: scale(0); } 60%, 100% { transform: none; } }
+@keyframes wxeShrink { 0% { transform: scale(2); opacity: 0; } 60%, 100% { transform: none; opacity: .85; } }
+@keyframes wxeSwing  { 0% { transform: perspective(40px) rotateX(-90deg); } 60%, 100% { transform: none; } }
+@keyframes wxeTilt   { 0% { transform: translateY(80%) rotate(-25deg); } 60%, 100% { transform: none; } }
+@keyframes wxeBlur   { 0% { filter: blur(4px); opacity: 0; } 60%, 100% { filter: none; opacity: .85; } }
+@keyframes wxeStyle  { 0% { clip-path: inset(0 100% 0 0); } 60%, 100% { clip-path: inset(0); } }
+
+/* ── Место ────────────────────────────────────────────────────────────── */
+
+.wxe-place { flex-direction: row; align-items: center; gap: var(--s4); }
+.wxe-place .wx-anchors {
+  margin: 0; flex: none;
+  width: calc(66px * var(--wx-arn, 1.7778)); max-width: 140px; max-height: 130px;
+  border-radius: 10px; border-color: var(--line-2);
+}
+.wxe-place .wx-anchors button { border-radius: 6px; }
+.wxe-place .wx-anchors button:hover { background: var(--hover); }
+.wxe-place .wx-anchors button.on { background: rgba(255, 204, 0, .1); }
+.wxe-place .hint { display: block; margin-top: 4px; }
+
+.wxe-flash { display: flex; flex-direction: column; gap: var(--s3); padding: var(--s3); border: 1px dashed var(--line-2); border-radius: 12px; }
+.wxe-flash[hidden] { display: none; }
+.wxe-flash .act { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; border-radius: 10px; }
+.wxe-flash .act svg { width: 13px; height: 13px; }
+
+/* Узкое окно: кадр сверху, настройки под ним, одна прокрутка на всё. */
+@media (max-width: 1100px) {
+  .panel.wxe-panel { height: auto; }
+  .wxe { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .wxe-view { overflow: visible; padding: var(--s5) var(--s5) 0; }
+  .wxe-side { overflow: visible; border-left: 0; padding: 0 var(--s5) var(--edge); background: none; }
+  .wx-stage.wxe-stage { max-width: 100%; }
+}
+
+/* Ползунок или выключатель, которому сейчас не к чему относиться, — серый.
+   Почему — написано рядом. */
+.wxe-slider.off { opacity: .35; pointer-events: none; }
+.wxe-switch.locked { cursor: default; }
+.wxe-switch.locked > i { opacity: .5; }
+/* Значок ухода проигрывает движение наоборот: из кадра, а не в кадр. */
+.wxe-anim:hover .wxe-anim-ico.out i { animation-direction: reverse; }
+/* Предупреждение в кадре видно и без наведения мыши. */
+.wxe-badge.warn { opacity: 1; color: #ffd36e; }
+
+/* Полки стилей: «Живые» и «Классика». */
+.wxe-shelves { display: flex; flex-direction: column; gap: var(--s5); }
+.wxe-shelf-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.wxe-shelf-head b { font-size: 13px; font-weight: 700; color: var(--text); }
+.wxe-shelf-head span { font-size: 11.5px; color: var(--dimmer); }
+
+/* ── Своё: места, библиотека, загрузка ────────────────────────────────── */
+
+.wxe-slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.wxe-slot {
+  position: relative;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px; min-width: 0;
+  border: 1px solid var(--line-2); border-radius: 12px;
+  background: none; color: var(--dim);
+  font: inherit; text-align: left; cursor: pointer;
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.wxe-slot:hover { border-color: var(--dim); }
+.wxe-slot.on { border-color: var(--lime); background: rgba(255, 204, 0, .06); }
+.wxe-slot-thumb {
+  position: relative; flex: none; overflow: hidden;
+  width: 40px; height: 40px; border-radius: 9px;
+  background: repeating-conic-gradient(#2a2f34 0 25%, #1b1f23 0 50%) 0 0 / 10px 10px;
+}
+/* Пустое место — пунктир с плюсом, а не шахматка: «сюда можно поставить». */
+.wxe-slot:not(.full) .wxe-slot-thumb { background: none; border: 1px dashed var(--line-2); }
+.wxe-slot:not(.full) .wxe-slot-thumb::after {
+  content: "+"; position: absolute; inset: 0; display: grid; place-items: center;
+  color: var(--dimmer); font: 500 18px/1 var(--f-body);
+}
+.wxe-slot-thumb img, .wxe-slot-thumb video, .wxe-slot-thumb canvas,
+.wxe-pick-thumb img, .wxe-pick-thumb video, .wxe-pick-thumb canvas {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.wxe-slot-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.wxe-slot-text b { font-size: 12.5px; font-weight: 600; color: var(--text); }
+.wxe-slot-text small { font-size: 11px; color: var(--dimmer); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wxe-slot.on .wxe-slot-text b { color: var(--lime); }
+.wxe-slot .wxe-x { position: absolute; top: 4px; right: 6px; }
+
+.wxe-lib { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.wxe-lib:empty { display: none; }
+.wxe-pick {
+  position: relative; display: flex; flex-direction: column; gap: 5px;
+  padding: 0; border: 0; background: none; color: var(--dim);
+  font: 600 11px/1.2 var(--f-body); cursor: pointer;
+}
+.wxe-pick-thumb {
+  display: block; overflow: hidden; aspect-ratio: 1;
+  border-radius: 10px; border: 1px solid var(--line-2);
+  background: repeating-conic-gradient(#2a2f34 0 25%, #1b1f23 0 50%) 0 0 / 10px 10px;
+  transition: border-color var(--fast) var(--ease), transform .2s var(--ease-soft);
+}
+.wxe-pick:hover .wxe-pick-thumb { border-color: var(--dim); transform: translateY(-2px); }
+.wxe-pick.on .wxe-pick-thumb { border-color: var(--lime); box-shadow: 0 0 0 1px var(--lime); }
+.wxe-pick.on .wxe-pick-name { color: var(--lime); }
+.wxe-pick-name { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wxe-pick .wxe-x {
+  position: absolute; top: 3px; right: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: rgba(8, 9, 10, .8); opacity: 0;
+  transition: opacity var(--fast) var(--ease);
+}
+.wxe-pick:hover .wxe-x { opacity: 1; }
+
+.wxe-drop {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px;
+  border: 1px dashed var(--line-2); border-radius: 12px;
+  color: var(--dim); cursor: pointer;
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.wxe-drop svg { width: 20px; height: 20px; flex: none; color: var(--lime); }
+.wxe-drop span { display: flex; flex-direction: column; gap: 2px; }
+.wxe-drop b { font-size: 13px; color: var(--text); font-weight: 600; }
+.wxe-drop small { font-size: 11.5px; color: var(--dimmer); }
+.wxe-drop:hover, .wxe-drop.over { border-color: var(--lime); background: rgba(255, 204, 0, .05); }
+.wxe-drop.busy { opacity: .6; pointer-events: none; }
+.wxe-drop.busy svg { animation: wxeBusy 1s ease-in-out infinite alternate; }
+@keyframes wxeBusy { to { transform: translateY(-3px); } }
+
+/* ── Мои стили ────────────────────────────────────────────────────────── */
+
+.wxe-newstyle { display: flex; flex-direction: column; gap: 8px; }
+.wxe-newstyle[hidden] { display: none; }
+.wxe-newstyle-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.wxe-newstyle-row input { flex: 1 1 140px; min-width: 0; }
+.wxe-mine .wxe-fam-name { justify-content: space-between; min-width: 0; }
+.wxe-fam-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Кнопки — в углу плитки, а не рядом с названием: там они отъедали
+   место, и «Ночные искры» превращались в «Ночные и…». */
+.wxe-mine-acts { position: absolute; top: 6px; right: 6px; z-index: 2; display: inline-flex; align-items: center; gap: 4px; }
+.wxe-mine-acts .wxe-x { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: rgba(8, 9, 10, .85); }
+.wxe-mine-act {
+  font-size: 10.5px; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--line-2); color: var(--dim); background: rgba(8, 9, 10, .85);
+  opacity: 0; transition: opacity var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.wxe-mine-act:hover { color: var(--lime); border-color: var(--lime); }
+.wxe-mine .wxe-fam:hover .wxe-mine-act { opacity: 1; }
+.wxe-mine .wxe-fam .wxe-x { opacity: 0; }
+.wxe-mine .wxe-fam:hover .wxe-x { opacity: 1; }
+.wxe-mine-new .wxe-fam-stage {
+  display: grid; place-items: center;
+  background: none; border-style: dashed;
+}
+.wxe-mine-plus { font: 300 34px/1 var(--f-body); color: var(--dimmer); transition: color var(--fast) var(--ease), transform .25s var(--ease-soft); }
+.wxe-mine-new:hover .wxe-mine-plus { color: var(--lime); transform: rotate(90deg); }
+
+/* ── Два экрана: «Оформление» и настройка ─────────────────────────────── */
+
+.wxe-home, .wxe-edit { display: flex; flex-direction: column; gap: var(--s5); }
+.wxe-home { padding-top: var(--s5); animation: wxePane .32s var(--ease-soft); }
+.wxe-home[hidden], .wxe-edit[hidden] { display: none; }
+.wxe-edit { gap: 0; animation: wxePane .32s var(--ease-soft); }
+.wxe-edit > .wxe-pane { margin-bottom: var(--s5); }
+
+/* Что сейчас в кадре — крупно, с главной кнопкой. */
+.wxe-hero {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--lime-lo); border-radius: 14px;
+  background: radial-gradient(120% 140% at 0% 0%, rgba(255, 204, 0, .12), transparent 60%), var(--raise);
+}
+.wxe-hero-tag {
+  font: 700 10px/1.3 var(--f-head); letter-spacing: var(--track-caps);
+  text-transform: uppercase; color: var(--lime);
+}
+.wxe-hero-name {
+  font: 700 19px/1.25 var(--f-head); color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wxe-hero-sub { font-size: 12px; color: var(--dim); }
+.wxe-hero-btn { margin-top: 10px; justify-content: center; gap: 8px; width: 100%; }
+.wxe-hero-btn svg { width: 16px; height: 16px; flex: none; }
+
+/* Шапка настройки: назад, что настраиваем, «Готово». */
+.wxe-topbar {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px 10px; align-items: center;
+  margin: 0 calc(var(--s5) * -1);
+  padding: 12px var(--s5);
+  border-bottom: 1px solid var(--line);
+}
+.wxe-topbar.own { background: linear-gradient(90deg, rgba(255, 204, 0, .14), rgba(255, 204, 0, .03)); border-bottom-color: var(--lime-lo); }
+.wxe-back {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 10px 6px 6px; border: 1px solid var(--line-2); border-radius: 999px;
+  background: none; color: var(--dim); font: 600 12px/1 var(--f-body); cursor: pointer;
+  transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.wxe-back:hover { color: var(--text); border-color: var(--dim); }
+.wxe-back svg { width: 14px; height: 14px; }
+.wxe-topbar-title { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.wxe-topbar-title b { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wxe-topbar-title input { min-width: 0; padding: 5px 9px; font-weight: 600; }
+.wxe-topbar-title input[hidden], .wxe-topbar-title b[hidden] { display: none; }
+.wxe-editing-tag {
+  font: 700 9.5px/1.3 var(--f-head); letter-spacing: var(--track-caps);
+  text-transform: uppercase; color: var(--dim);
+}
+.wxe-topbar.own .wxe-editing-tag { color: var(--lime); }
+.wxe-saveas-open { grid-column: 1 / -1; justify-self: start; }
+.wxe-saveas-open[hidden] { display: none; }
+.wxe-saveas { grid-column: 1 / -1; display: flex; gap: 6px; }
+.wxe-saveas[hidden] { display: none; }
+.wxe-saveas input { flex: 1; min-width: 0; }
+.wxe-edit .wxe-tabs { margin-top: 0; }
+.wxe-mine .wxe-fam.editing .wxe-fam-stage { box-shadow: 0 0 0 1px var(--lime), 0 0 0 4px rgba(255, 204, 0, .2); }
+
+/* ── Инструменты картинки под кадром ──────────────────────────────────── */
+
+.wxe-tools {
+  border: 1px solid var(--lime-lo); border-radius: 14px;
+  background: radial-gradient(90% 120% at 0% 0%, rgba(255, 204, 0, .07), transparent 55%), var(--raise);
+  padding: var(--s4);
+  display: flex; flex-direction: column; gap: var(--s4);
+  animation: wxePane .32s var(--ease-soft);
+}
+.wxe-tools[hidden] { display: none; }
+.wxe-tools-head { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.wxe-tools-thumb {
+  position: relative; overflow: hidden; width: 44px; height: 44px; border-radius: 10px;
+  background: repeating-conic-gradient(#2a2f34 0 25%, #1b1f23 0 50%) 0 0 / 10px 10px;
+  box-shadow: 0 0 0 1px var(--line-2);
+}
+.wxe-tools-thumb img, .wxe-tools-thumb video, .wxe-tools-thumb canvas { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wxe-tools-name { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.wxe-tools-name b { font: 600 13px/1.3 var(--f-head); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wxe-tools-name small { font-size: 11.5px; color: var(--dimmer); }
+.wxe-tools-acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* Карточки по смыслу: положение, вид, цвет и то, что есть только у места. */
+.wxe-tools-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.wxe-card {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: rgba(8, 9, 10, .35);
+}
+.wxe-card[hidden], .wxe-card [hidden] { display: none; }
+.wxe-card h4 {
+  margin: 0 0 2px;
+  font: 600 10.5px/1.4 var(--f-head); letter-spacing: var(--track-caps);
+  text-transform: uppercase; color: var(--dim);
+}
+.wxe-mini { font-size: 11.5px; color: var(--dimmer); margin-top: 2px; }
+.wxe-row-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.wxe-card .wxe-seg { align-self: flex-start; }
+
+/* В режиме своей картинки кадр подсвечен: мышь двигает картинку. */
+.wxe-stage.media-mode { box-shadow: 0 0 0 1px var(--lime), 0 0 0 4px rgba(255, 204, 0, .12); }
+.wxe-stage.media-mode .wxe-hit { cursor: move; }
+
+/* Нет Плюса — заказы играют отрывками. Видно сразу, а не только в карточке. */
+#plus-warn {
+  padding: 10px 18px;
+  background: var(--bad, #e5484d);
+  color: #fff;
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+#plus-warn[hidden] { display: none; }
+#plus-warn b { font-weight: 700; }

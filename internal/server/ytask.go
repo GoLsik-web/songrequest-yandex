@@ -29,10 +29,9 @@ import (
 //     youtube_ask_else: пропустить или включить);
 //   - «off»  — не играть вовсе, баллы вернуть.
 //
-// Ждущие заказы живут в памяти, а не в базе: срок ожидания — минута-другая,
-// и перезапуск приложения ровно в эту минуту — редкость. Если всё же
-// случится, заказ останется в очереди наград Twitch, откуда стример вернёт
-// баллы руками.
+// Ждущие заказы лежат и в памяти, и в базе (ключ ytAsksKey). Раньше только в
+// памяти: перезапуск в эту минуту оставлял зрителя без трека и без баллов.
+// Теперь при запуске они снова встают в панель (см. loadYouTubeAsks).
 
 // ytAsk — заказ с YouTube, ждущий решения.
 type ytAsk struct {
@@ -98,19 +97,89 @@ func (s *Server) offerYouTube(ctx context.Context, r twitch.Redemption, item que
 	s.say(ctx, "@"+r.UserName+", в Яндекс Музыке такого нет. Нашёл на YouTube: "+trackLine(item)+
 		" — стример решает, включать ли.")
 
-	// Срок ожидания. Решение по сроку идёт тем же путём, что и кнопка, — но
-	// только если заказ ещё ждёт: стример мог успеть нажать сам.
 	if wait > 0 {
-		id := ask.view.ID
-		time.AfterFunc(wait, func() {
-			ctx, cancel := context.WithTimeout(s.baseContext(), 30*time.Second)
-			defer cancel()
-			play := s.cfg.Get().YouTubeAskElse == "play"
-			if _, err := s.decideYouTube(ctx, id, play, "время вышло"); err == nil {
-				s.log.Info("заказ с YouTube решён по сроку", "номер", id, "включён", play)
-			}
-		})
+		s.scheduleYouTubeAsk(ask.view.ID, wait)
 	}
+}
+
+// scheduleYouTubeAsk — срок ожидания. Решение по сроку идёт тем же путём, что
+// и кнопка, — но только если заказ ещё ждёт: стример мог успеть нажать сам.
+func (s *Server) scheduleYouTubeAsk(id string, wait time.Duration) {
+	time.AfterFunc(wait, func() {
+		ctx, cancel := context.WithTimeout(s.baseContext(), 30*time.Second)
+		defer cancel()
+		play := s.cfg.Get().YouTubeAskElse == "play"
+		if _, err := s.decideYouTube(ctx, id, play, "время вышло"); err == nil {
+			s.log.Info("заказ с YouTube решён по сроку", "номер", id, "включён", play)
+		}
+	})
+}
+
+// ytAsksKey — ждущие решения заказы с YouTube в kv.
+const ytAsksKey = "youtube_asks"
+
+// savedYTAsk — ytAsk в виде для базы (у ytAsk поля закрытые).
+type savedYTAsk struct {
+	View app.YouTubeAsk    `json:"view"`
+	R    twitch.Redemption `json:"r"`
+	Item queue.Item        `json:"item"`
+	Note string            `json:"note"`
+}
+
+// saveYouTubeAsks пишет список ждущих в базу целиком.
+func (s *Server) saveYouTubeAsks(list []ytAsk) {
+	if s.queue == nil {
+		return
+	}
+	if len(list) == 0 {
+		s.queue.PutJSON(ytAsksKey, nil)
+		return
+	}
+	out := make([]savedYTAsk, 0, len(list))
+	for _, a := range list {
+		out = append(out, savedYTAsk{View: a.view, R: a.r, Item: a.item, Note: a.note})
+	}
+	s.queue.PutJSON(ytAsksKey, out)
+}
+
+// loadYouTubeAsks поднимает ждущие заказы прошлого запуска. Сеть для этого не
+// нужна, поэтому заказы не отклоняются, а снова ждут решения. Чей срок вышел,
+// пока приложение было закрыто, решается по сроку через минуту — чтобы
+// стример успел увидеть, о чём речь.
+func (s *Server) loadYouTubeAsks() {
+	if s.queue == nil {
+		return
+	}
+	var saved []savedYTAsk
+	if !s.queue.GetJSON(ytAsksKey, &saved) || len(saved) == 0 {
+		return
+	}
+	s.mu.Lock()
+	for _, a := range saved {
+		if n, err := strconv.ParseInt(a.View.ID, 10, 64); err == nil && n > s.ytAskNo {
+			s.ytAskNo = n
+		}
+	}
+	var timers []string
+	var waits []time.Duration
+	for _, a := range saved {
+		if !a.View.Until.IsZero() {
+			left := time.Until(a.View.Until)
+			if left < time.Minute {
+				left = time.Minute
+				a.View.Until = time.Now().Add(left)
+			}
+			timers = append(timers, a.View.ID)
+			waits = append(waits, left)
+		}
+		s.ytAsks = append(s.ytAsks, ytAsk{view: a.View, r: a.R, item: a.Item, note: a.Note})
+	}
+	s.mu.Unlock()
+	s.syncYouTubeAsks()
+	for i, id := range timers {
+		s.scheduleYouTubeAsk(id, waits[i])
+	}
+	s.log.Info("заказы с YouTube из прошлого запуска снова ждут решения", "сколько", len(saved))
 }
 
 // decideYouTube включает или отклоняет ждущий заказ.
@@ -154,11 +223,13 @@ func (s *Server) decideYouTube(ctx context.Context, id string, play bool, actor 
 func (s *Server) syncYouTubeAsks() {
 	s.mu.Lock()
 	list := make([]app.YouTubeAsk, 0, len(s.ytAsks))
+	asks := append([]ytAsk(nil), s.ytAsks...)
 	for _, a := range s.ytAsks {
 		list = append(list, a.view)
 	}
 	s.mu.Unlock()
 	s.state.SetYouTubeAsks(list)
+	s.saveYouTubeAsks(asks)
 }
 
 // handleYouTubeTestSound — кнопка «Проверить звук» в разделе «YouTube».

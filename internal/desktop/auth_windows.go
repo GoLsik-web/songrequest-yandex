@@ -3,6 +3,7 @@
 package desktop
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -41,7 +42,12 @@ func OpenAuth(o AuthOptions) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
-	authMu.Lock()
+	// Второе нажатие «Войти», пока первое окно открыто, раньше вставало в
+	// очередь: новое окно выскакивало само, когда человек закрывал первое,
+	// уже без всякой связи с тем, что он делает. Окно входа одно — и хватит.
+	if !authMu.TryLock() {
+		return ErrAuthBusy
+	}
 	defer authMu.Unlock()
 
 	version, err := webviewloader.GetInstalledVersion()
@@ -79,7 +85,6 @@ func OpenAuth(o AuthOptions) error {
 	if wv == nil {
 		return fmt.Errorf("%w: окно входа не создалось", ErrNoWebView)
 	}
-	defer wv.Destroy()
 
 	setWindowIcon(uintptr(wv.Window()), o.IconPath)
 
@@ -87,13 +92,19 @@ func OpenAuth(o AuthOptions) error {
 	// секунду, чтобы человек успел это прочитать, и закрываем сами: закрывать
 	// окна за людей нехорошо, но здесь окно ровно одноразовое, и оставлять его
 	// висеть — значит собрать те самые лишние окна, от которых уходим.
+	//
+	// Закрываем именно окно (Destroy шлёт ему WM_CLOSE), а не просто цикл
+	// сообщений: после Terminate цикл кончался, а окно оставалось на экране
+	// без хозяина — мёртвое, «не отвечает», и крестик на нём Windows
+	// превращала в снятие всего приложения. Уничтоженное окно само зовёт
+	// Terminate из WM_DESTROY, и Run возвращается уже без окна.
 	wv.Bind("srAuthDone", func() {
-		wv.Terminate()
+		wv.Destroy()
 	})
 	if o.OnURL != nil {
 		wv.Bind("srAuthURL", func(u string) {
 			if o.OnURL(u) {
-				wv.Terminate()
+				wv.Destroy()
 			}
 		})
 		wv.Init(authURLJS)
@@ -108,6 +119,9 @@ func OpenAuth(o AuthOptions) error {
 	}
 	return nil
 }
+
+// ErrAuthBusy — окно входа уже открыто.
+var ErrAuthBusy = errors.New("окно входа уже открыто")
 
 // browserArgsEnv — переменная, через которую движку передаются аргументы
 // запуска. Имя задано самим WebView2, менять его нельзя.

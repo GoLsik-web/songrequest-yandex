@@ -323,9 +323,7 @@ func (f *File) Update(fn func(*Config)) error {
 func (f *File) Get() Config {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	cp := f.cfg
-	cp.RejectKeywords = append([]string(nil), f.cfg.RejectKeywords...)
-	return cp
+	return f.cfg.Clone()
 }
 
 // NormalizeMatching чинит пороги и веса подбора, если их испортили.

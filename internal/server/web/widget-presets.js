@@ -31,6 +31,78 @@ window.WIDGET_FAMILIES = [
     ],
   },
   {
+    id: "aura",
+    name: "Аура",
+    note: "Подложка — размытая обложка: плашка каждый трек перекрашивается под музыку сама.",
+    fresh: true,
+    variants: [
+      { id: "dusk",  name: "Сумерки" },
+      { id: "bloom", name: "Цветение" },
+      { id: "mono",  name: "Монохром" },
+      { id: "frost", name: "Иней" },
+    ],
+  },
+  {
+    id: "capsule",
+    name: "Капсула",
+    note: "Таблетка в одну строку: крутящаяся обложка, пляшущие столбики, время тонкой нитью снизу.",
+    fresh: true,
+    variants: [
+      { id: "night",  name: "Ночь" },
+      { id: "white",  name: "Белая" },
+      { id: "sunset", name: "Закат" },
+      { id: "ocean",  name: "Океан" },
+    ],
+  },
+  {
+    id: "ink",
+    name: "Тушь",
+    note: "Страница манги: панель тушью, растр, титр с ником. Контур дрожит, будто его только что провели пером; появляется ударом со спидлайнами.",
+    fresh: true,
+    variants: [
+      { id: "paper", name: "Бумага" },
+      { id: "night", name: "Ночь" },
+      { id: "blood", name: "Красная тушь" },
+      { id: "sepia", name: "Сепия" },
+    ],
+  },
+  {
+    id: "pixel",
+    name: "Пиксель",
+    note: "8-битная ночь: пиксельная обложка, шрифт из приставки, снег за текстом и глаза, моргающие из темноты.",
+    fresh: true,
+    variants: [
+      { id: "snow",      name: "Снег" },
+      { id: "fog",       name: "Туман" },
+      { id: "rain",      name: "Дождь" },
+      { id: "fireflies", name: "Светлячки" },
+    ],
+  },
+  {
+    id: "glow",
+    name: "Отблеск",
+    note: "Чёрно-белое кино: по обложке проходит свет, снизу она отражается, как в чёрной воде, сзади поднимаются пылинки света.",
+    fresh: true,
+    variants: [
+      { id: "moon",  name: "Луна" },
+      { id: "petal", name: "Лепестки" },
+      { id: "ember", name: "Угли" },
+      { id: "abyss", name: "Бездна" },
+    ],
+  },
+  {
+    id: "sketch",
+    name: "Скетч",
+    note: "Нарисовано от руки в тетради: дрожащая линия, рукописная подпись, нотки вылетают из-за обложки.",
+    fresh: true,
+    variants: [
+      { id: "paper",     name: "Тетрадь" },
+      { id: "chalk",     name: "Мел" },
+      { id: "blueprint", name: "Чертёж" },
+      { id: "marker",    name: "Маркер" },
+    ],
+  },
+  {
     id: "bare",
     name: "Открытый текст",
     note: "Без подложки — не закрывает ни пикселя картинки. Держится на тени.",
@@ -155,6 +227,66 @@ window.WIDGET_TWEAKS = [
   { key: "--w-title-size", name: "Кегль названия",    kind: "px", min: 10, max: 34 },
   { key: "--w-art",        name: "Обложка",           kind: "px", min: 0,  max: 200 },
   { key: "--w-blur",       name: "Размытие под ней",  kind: "px", min: 0,  max: 30 },
+];
+
+// Что из настроек «поверх набора» имеет смысл для семейства. Без подложки
+// (открытый текст, неон, полоса) размытой обложке негде лечь, у винила и
+// кассеты обложка — часть предмета, и менять ей форму значит ломать вещь.
+// Панель прячет то, что не сработает: показывать выключатель, который
+// ничего не делает, — худшее, что можно сделать с настройкой.
+window.WIDGET_LIMITS = {
+  bare:     { coverbg: false },
+  neon:     { coverbg: false },
+  stripe:   { coverbg: false, shape: false },
+  vinyl:    { shape: false },
+  tape:     { shape: false, glow: false },
+  aura:     { coverbg: false },
+  capsule:  { shape: false },
+  // У «живых» семейств своя подложка и свой свет: размытая обложка и
+  // ореол поверх них спорили бы с задумкой, а у «Пикселя» обложка —
+  // нарочно крупные пиксели, и форма ей не к лицу.
+  ink:      { coverbg: false, glow: false },
+  pixel:    { coverbg: false, glow: false, shape: false },
+  glow:     { coverbg: false },
+  sketch:   { coverbg: false, glow: false, shape: false },
+};
+window.widgetCan = function (family, what) {
+  const lim = window.WIDGET_LIMITS[family] || {};
+  return lim[what] !== false;
+};
+
+// Формы обложки, появления и шрифты. Пустой id — «как задумано в наборе».
+window.WIDGET_SHAPES = [
+  { id: "",        name: "Как в стиле" },
+  { id: "square",  name: "Квадрат" },
+  { id: "rounded", name: "Скруглённая" },
+  { id: "circle",  name: "Круг" },
+  { id: "disc",    name: "Пластинка" },
+];
+
+// У каждого движения два имени: для появления и для ухода. «Слева» для
+// ухода читалось бы как «уходит, появившись слева» — а уходит она влево.
+window.WIDGET_ANIMS = [
+  { id: "",       name: "Фирменное",   out: "Фирменное", hint: "Движение, придуманное для этого стиля" },
+  { id: "fade",   name: "Проявление",  out: "Растворение" },
+  { id: "left",   name: "Слева",       out: "Влево" },
+  { id: "right",  name: "Справа",      out: "Вправо" },
+  { id: "up",     name: "Снизу",       out: "Вверх" },
+  { id: "down",   name: "Сверху",      out: "Вниз" },
+  { id: "grow",   name: "Вырастает",   out: "Наплывает" },
+  { id: "shrink", name: "Опускается",  out: "Сжимается" },
+  { id: "swing",  name: "Откидной",    out: "Откидной" },
+  { id: "tilt",   name: "Наклон",      out: "Наклон" },
+  { id: "blur",   name: "Из фокуса",   out: "В расфокус" },
+];
+
+window.WIDGET_FONTS = [
+  { id: "",          name: "Как в стиле", css: "" },
+  { id: "unbounded", name: "Unbounded",   css: "Unbounded, sans-serif" },
+  { id: "manrope",   name: "Manrope",     css: "Manrope, sans-serif" },
+  { id: "oswald",    name: "Oswald",      css: "Oswald, sans-serif" },
+  { id: "playfair",  name: "Playfair",    css: "'Playfair Display', serif" },
+  { id: "mono",      name: "Mono",        css: "'JetBrains Mono', monospace" },
 ];
 
 // find возвращает семейство и вариант по строке «семейство/вариант».

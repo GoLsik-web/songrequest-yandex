@@ -6,6 +6,7 @@ package queue
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -56,6 +57,10 @@ type Item struct {
 
 // ErrEmpty означает, что очередь пуста.
 var ErrEmpty = errors.New("очередь пуста")
+
+// ErrNotFound — заказа с таким номером в очереди уже нет. Чаще всего его
+// только что забрал плеер: тогда возвращать за него баллы нельзя, он играет.
+var ErrNotFound = errors.New("заказа в очереди уже нет")
 
 // Queue — очередь поверх SQLite.
 type Queue struct {
@@ -213,13 +218,84 @@ func (q *Queue) Next() (Item, error) {
 	if _, err := tx.Exec(`DELETE FROM queue WHERE id = ?`, it.ID); err != nil {
 		return Item{}, err
 	}
+	it.Uncertain = uncertain == 1
+	it.CreatedAt = time.Unix(created, 0)
+
+	// Взятый заказ запоминаем той же сделкой — см. TakeInflight.
+	if raw, err := json.Marshal(it); err == nil {
+		if _, err := tx.Exec(`INSERT INTO kv(key, value) VALUES(?, ?)
+			ON CONFLICT(key) DO UPDATE SET value = excluded.value`, inflightKey, string(raw)); err != nil {
+			return Item{}, err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return Item{}, err
 	}
-
-	it.Uncertain = uncertain == 1
-	it.CreatedAt = time.Unix(created, 0)
 	return it, nil
+}
+
+// inflightKey — заказ, который вынут из очереди и ещё не закончился.
+//
+// Приложение закрыли посреди заказа — и он пропадал бесследно: из очереди
+// уже вынут, а плеер о нём забыл. Зритель заплатил, трек не дослушал.
+const inflightKey = "inflight"
+
+// Done — взятый заказ закончился (любым исходом).
+func (q *Queue) Done() {
+	_, _ = q.db.Exec(`DELETE FROM kv WHERE key = ?`, inflightKey)
+}
+
+// TakeInflight отдаёт заказ, оставшийся незаконченным с прошлого запуска.
+// Запись не стирается: это делает ForgetInflight, когда заказ уже снова в
+// очереди (или решён иначе).
+func (q *Queue) TakeInflight() (Item, bool) {
+	var raw string
+	if err := q.db.QueryRow(`SELECT value FROM kv WHERE key = ?`, inflightKey).Scan(&raw); err != nil {
+		return Item{}, false
+	}
+	var it Item
+	if err := json.Unmarshal([]byte(raw), &it); err != nil || it.URI == "" {
+		q.Done()
+		return Item{}, false
+	}
+	return it, true
+}
+
+// ForgetInflight стирает запись о незаконченном заказе — но только если это
+// всё ещё он: плеер мог уже взять новый и записать его на то же место.
+func (q *Queue) ForgetInflight(it Item) {
+	var raw string
+	if err := q.db.QueryRow(`SELECT value FROM kv WHERE key = ?`, inflightKey).Scan(&raw); err != nil {
+		return
+	}
+	var cur Item
+	if json.Unmarshal([]byte(raw), &cur) == nil && (cur.ID != it.ID || cur.URI != it.URI) {
+		return
+	}
+	_, _ = q.db.Exec(`DELETE FROM kv WHERE key = ? AND value = ?`, inflightKey, raw)
+}
+
+// PutJSON кладёт значение в kv; nil — стирает ключ.
+func (q *Queue) PutJSON(key string, v any) {
+	if v == nil {
+		_, _ = q.db.Exec(`DELETE FROM kv WHERE key = ?`, key)
+		return
+	}
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return
+	}
+	_, _ = q.db.Exec(`INSERT INTO kv(key, value) VALUES(?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, string(raw))
+}
+
+// GetJSON читает значение из kv. false — ключа нет или он испорчен.
+func (q *Queue) GetJSON(key string, v any) bool {
+	var raw string
+	if err := q.db.QueryRow(`SELECT value FROM kv WHERE key = ?`, key).Scan(&raw); err != nil {
+		return false
+	}
+	return json.Unmarshal([]byte(raw), v) == nil
 }
 
 // Peek смотрит на первый заказ, не забирая его.
@@ -250,8 +326,14 @@ func (q *Queue) Get(id int64) (Item, error) {
 
 // Remove убирает заказ.
 func (q *Queue) Remove(id int64) error {
-	_, err := q.db.Exec(`DELETE FROM queue WHERE id = ?`, id)
-	return err
+	res, err := q.db.Exec(`DELETE FROM queue WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // Clear очищает очередь и возвращает то, что в ней было, — чтобы вызывающий
@@ -291,8 +373,12 @@ func (q *Queue) MoveTop(id int64) error {
 	if err := tx.QueryRow(`SELECT MIN(position) FROM queue`).Scan(&min); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`UPDATE queue SET position = ? WHERE id = ?`, int(min.Int64)-1, id); err != nil {
+	res, err := tx.Exec(`UPDATE queue SET position = ? WHERE id = ?`, int(min.Int64)-1, id)
+	if err != nil {
 		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
 	}
 	return tx.Commit()
 }
@@ -306,10 +392,45 @@ func (q *Queue) Reorder(ids []int64) error {
 	}
 	defer tx.Rollback()
 
-	for i, id := range ids {
-		if _, err := tx.Exec(`UPDATE queue SET position = ? WHERE id = ?`, i, id); err != nil {
+	seen := make(map[int64]bool, len(ids))
+	pos := 0
+	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		if _, err := tx.Exec(`UPDATE queue SET position = ? WHERE id = ?`, pos, id); err != nil {
 			return err
 		}
+		pos++
+	}
+	// Панель могла прислать список неполным: пока тащили заказ, пришёл новый.
+	// Пропущенные дописываем в конец в прежнем взаимном порядке, иначе их
+	// старые позиции совпали бы с новыми.
+	rows, err := tx.Query(`SELECT id FROM queue ORDER BY position, id`)
+	if err != nil {
+		return err
+	}
+	var rest []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		if !seen[id] {
+			rest = append(rest, id)
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, id := range rest {
+		if _, err := tx.Exec(`UPDATE queue SET position = ? WHERE id = ?`, pos, id); err != nil {
+			return err
+		}
+		pos++
 	}
 	return tx.Commit()
 }

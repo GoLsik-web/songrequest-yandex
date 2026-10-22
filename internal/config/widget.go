@@ -94,11 +94,260 @@ type Widget struct {
 	// настройки старые, и умолчание ставится честное.
 	Rev int `json:"rev"`
 
+	// CoverShape — форма обложки поверх набора: "" — как задумано в наборе,
+	// square, rounded, circle, disc (круг, который крутится пластинкой).
+	// Отдельно от набора, потому что форма обложки — самое частое, что
+	// хотят поменять, не трогая остального.
+	CoverShape string `json:"cover_shape,omitempty"`
+	// CoverGlow — свечение вокруг обложки её же цветом.
+	CoverGlow bool `json:"cover_glow"`
+	// CoverBg — размытая обложка подложкой плашки: плашка каждый трек
+	// перекрашивается сама.
+	CoverBg bool `json:"cover_bg"`
+	// Magic — акцент берётся из обложки. Ручной цвет акцента при этом
+	// не действует: два источника одного цвета человек не распутает.
+	Magic bool `json:"magic"`
+
+	// AnimIn и AnimOut — как плашка появляется и уходит. "" — фирменное
+	// движение набора; остальное — общие движения из списка animNames.
+	AnimIn  string `json:"anim_in"`
+	AnimOut string `json:"anim_out"`
+
+	// Font — шрифт названия поверх набора. Отдельным полем, а не правкой
+	// токена: в имени шрифта бывают кавычки, а их в токены не пускаем.
+	Font string `json:"font"`
+
+	// ShowEq — пляшущие столбики рядом с названием: видно, что музыка
+	// живая, даже когда полоса времени ползёт незаметно.
+	ShowEq bool `json:"show_eq"`
+	// ShowTime — время трека цифрами: «1:24 / 3:51».
+	ShowTime bool `json:"show_time"`
+	// HideOnPause — убирать плашку, пока трек стоит на паузе. Плашка с
+	// замершей полосой в кадре выглядит как зависший виджет.
+	HideOnPause bool `json:"hide_on_pause"`
+
 	// Tweaks — ручная правка поверх набора: значения токенов оформления.
 	// Пустая карта означает «как в наборе». Ключи проверяются при записи,
 	// чтобы в стиль страницы не попало что попало.
 	Tweaks map[string]string `json:"tweaks,omitempty"`
+
+	// Media — свои картинки и анимации на плашке: фон, замена обложки,
+	// страховка на случай, когда обложки нет, и наклейка сбоку.
+	Media WidgetMedia `json:"media"`
+
+	// Styles — стили, которые стример собрал сам и сохранил под своим
+	// именем. Style — какой из них выбран сейчас (пусто — ни один): нужно
+	// только панели, чтобы подсветить плитку на полке «Мои».
+	Styles []WidgetStyle `json:"styles,omitempty"`
+	Style  string        `json:"style"`
 }
+
+// WidgetMedia — что куда поставлено из своих картинок.
+//
+// Без omitempty нарочно. Настройки из панели ложатся поверх сохранённых, и
+// поле, которого в присланном нет, остаётся старым. Пустой «поворот 0»
+// при omitempty не доезжал до панели, панель не присылала его обратно —
+// и стиль без поворота включался с поворотом от предыдущего.
+//
+// Каждое место хранит ссылку одного из двух видов: «fx:имя» — встроенная
+// анимация, которую виджет рисует сам, или имя загруженного файла вида
+// «0123456789abcdef.gif». Пусто — место свободно.
+type WidgetMedia struct {
+	// Bg — картинка во весь фон плашки. BgDim — затемнение поверх неё в
+	// процентах: на пёстрой гифке иначе не прочитать название. BgBlur —
+	// размытие в пикселях, по той же причине.
+	Bg     string `json:"bg"`
+	BgDim  int    `json:"bg_dim"`
+	BgBlur int    `json:"bg_blur"`
+
+	// Cover — всегда вместо обложки трека. Fallback — только когда обложки
+	// нет или она не загрузилась: вместо серой ноты — своя «страховочная»
+	// картинка.
+	Cover    string `json:"cover"`
+	Fallback string `json:"fallback"`
+
+	// Sticker — наклейка у края плашки: персонаж, кот, огонёк. Side —
+	// к какому краю прилеплена (left, right, top, bottom), Size — размер в
+	// пикселях, X и Y — сдвиг от края, чтобы посадить её «на» плашку.
+	Sticker     string `json:"sticker"`
+	StickerSide string `json:"sticker_side"`
+	StickerSize int    `json:"sticker_size"`
+	StickerX    int    `json:"sticker_x"`
+	StickerY    int    `json:"sticker_y"`
+
+	// Положение картинки внутри своего места: сдвиг, размер, поворот,
+	// зеркало. Отдельно для каждого места — фон обычно хотят увеличить и
+	// сдвинуть к лицу персонажа, а наклейку повернуть набок.
+	BgT       MediaT `json:"bg_t"`
+	CoverT    MediaT `json:"cover_t"`
+	FallbackT MediaT `json:"fallback_t"`
+	StickerT  MediaT `json:"sticker_t"`
+}
+
+// MediaT — как картинка сидит в своём месте. Сдвиг — в процентах от
+// размера места, а не в пикселях: иначе при смене размера плашки лицо на
+// гифке уезжало бы из кадра.
+type MediaT struct {
+	Scale int  `json:"scale"` // проценты, 100 — как есть
+	X     int  `json:"x"`     // −150…150 % ширины места
+	Y     int  `json:"y"`
+	Rot   int  `json:"rot"` // градусы, −180…180
+	Flip  bool `json:"flip"`
+
+	// Fit — как картинка ложится в место: cover — заполняет его целиком
+	// (лишнее срезает рамка), contain — видна целиком. Пусто — как
+	// принято у места: фон и обложка заполняют, наклейка видна целиком.
+	Fit string `json:"fit"`
+	// Opacity — прозрачность самой картинки, проценты.
+	Opacity int `json:"opacity"`
+	// Key — убрать фон картинки: black или white. Почти все анимированные
+	// пины и гифки сделаны на чёрном или белом фоне, а на плашке нужен
+	// только сам рисунок.
+	Key string `json:"key"`
+	// Цвет: яркость, контраст, насыщенность в процентах (100 — как есть)
+	// и чёрно-белый вариант — подогнать чужую гифку под палитру стиля.
+	Bright   int  `json:"bright"`
+	Contrast int  `json:"contrast"`
+	Sat      int  `json:"sat"`
+	Gray     bool `json:"gray"`
+	// Speed — скорость ролика или встроенной анимации, проценты. У GIF
+	// скорость задана внутри файла, на неё не влияет.
+	Speed int `json:"speed"`
+	// Mask — форма наклейки: circle, rounded или пусто (как есть).
+	// Back — наклейка под плашкой, а не поверх: выглядывает из-за края.
+	Mask string `json:"mask"`
+	Back bool   `json:"back"`
+}
+
+// pct — проценты с умолчанием 100: ноль в старых настройках значит «не
+// задано», а не «выключить совсем».
+func pct(v, lo, hi int) int {
+	if v == 0 {
+		return 100
+	}
+	return clampInt(v, lo, hi)
+}
+
+func (t *MediaT) normalize() {
+	t.Scale = pct(t.Scale, 10, 500)
+	t.X = clampInt(t.X, -150, 150)
+	t.Y = clampInt(t.Y, -150, 150)
+	t.Rot = clampInt(t.Rot, -180, 180)
+	if t.Fit != "cover" && t.Fit != "contain" {
+		t.Fit = ""
+	}
+	t.Opacity = pct(t.Opacity, 5, 100)
+	if t.Key != "black" && t.Key != "white" {
+		t.Key = ""
+	}
+	t.Bright = pct(t.Bright, 10, 200)
+	t.Contrast = pct(t.Contrast, 10, 200)
+	t.Sat = pct(t.Sat, 0, 300)
+	t.Speed = pct(t.Speed, 10, 400)
+	if t.Mask != "circle" && t.Mask != "rounded" {
+		t.Mask = ""
+	}
+}
+
+// WidgetStyle — свой стиль: всё, что отвечает за внешний вид, без места в
+// кадре и расписания показа. Место и расписание — про сцену, а не про
+// стиль: переключая стиль, стример не ждёт, что плашка уедет в другой угол.
+type WidgetStyle struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+
+	Preset     string            `json:"preset"`
+	Tweaks     map[string]string `json:"tweaks,omitempty"`
+	Font       string            `json:"font"`
+	CoverShape string            `json:"cover_shape,omitempty"`
+	CoverGlow  bool              `json:"cover_glow"`
+	CoverBg    bool              `json:"cover_bg"`
+	Magic      bool              `json:"magic"`
+	AnimIn     string            `json:"anim_in"`
+	AnimOut    string            `json:"anim_out"`
+	ShowEq     bool              `json:"show_eq"`
+	ShowArt    bool              `json:"show_art"`
+	Opacity    int               `json:"opacity"`
+	Media      WidgetMedia       `json:"media"`
+}
+
+// fxNames — встроенные анимации, их рисует сам виджет (widget-fx.js).
+var fxNames = map[string]bool{
+	"ink": true, "night": true, "rain": true, "sparks": true,
+	"snow": true, "waves": true, "scribble": true, "aurora": true,
+}
+
+// mediaRef — годится ли ссылка на картинку. Имя файла строго нашего
+// вида: оно уходит в адрес /media/..., и путь вида «..\config.json» не
+// должен пройти даже случайно.
+func mediaRef(ref string) bool {
+	if strings.HasPrefix(ref, "fx:") {
+		return fxNames[ref[3:]]
+	}
+	return MediaName(ref)
+}
+
+// MediaName — имя загруженного файла: 16 шестнадцатеричных знаков и
+// расширение из разрешённых.
+func MediaName(name string) bool {
+	dot := strings.IndexByte(name, '.')
+	if dot != 16 || !MediaExt[name[dot+1:]] {
+		return false
+	}
+	for _, c := range name[:dot] {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+// MediaExt — какие файлы принимаем. Видео — потому что WebM легче и
+// красивее гифки и бывает с прозрачным фоном; MP4 — потому что так
+// сохраняются ролики почти отовсюду.
+var MediaExt = map[string]bool{
+	"gif": true, "webp": true, "png": true, "jpg": true, "webm": true, "mp4": true,
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
+// normalize чинит ссылки и числа. Плохая ссылка просто освобождает место:
+// виджет на стриме не должен падать из-за руками поправленного файла.
+func (m *WidgetMedia) normalize() {
+	for _, ref := range []*string{&m.Bg, &m.Cover, &m.Fallback, &m.Sticker} {
+		if !mediaRef(*ref) {
+			*ref = ""
+		}
+	}
+	m.BgDim = clampInt(m.BgDim, 0, 90)
+	m.BgBlur = clampInt(m.BgBlur, 0, 20)
+	switch m.StickerSide {
+	case "left", "right", "top", "bottom":
+	default:
+		m.StickerSide = "right"
+	}
+	if m.StickerSize == 0 {
+		m.StickerSize = 72
+	}
+	m.StickerSize = clampInt(m.StickerSize, 16, 400)
+	m.StickerX = clampInt(m.StickerX, -300, 300)
+	m.StickerY = clampInt(m.StickerY, -300, 300)
+	for _, t := range []*MediaT{&m.BgT, &m.CoverT, &m.FallbackT, &m.StickerT} {
+		t.normalize()
+	}
+}
+
+// maxStyles — больше своих стилей на полке не разобрать глазами, а
+// config.json не должен расти без конца.
+const maxStyles = 40
 
 // frames — форматы кадра, которые знает панель. Список тот же, что в
 // app.js (WX_FRAMES): там к ним приписаны размеры источника.
@@ -149,13 +398,14 @@ func DefaultWidget() Widget {
 		Motion:        true,
 		ShowOwn:       true,
 		ShowOnChange:  true,
+		Media:         WidgetMedia{BgDim: 35, StickerSide: "right", StickerSize: 72},
 		Rev:           widgetRev,
 	}
 }
 
 // widgetRev — нынешний вид настроек виджета. Поднимать при каждом новом поле,
-// умолчание которого не «пусто».
-const widgetRev = 1
+// умолчание которого не «пусто», и при каждой смене смысла старого поля.
+const widgetRev = 2
 
 // tweakKeys — что стример может править руками. Список закрытый: значения
 // уходят в style страницы, и принимать произвольные имена оттуда нельзя.
@@ -166,6 +416,18 @@ var tweakKeys = map[string]bool{
 	"--w-title-size": true, "--w-shadow": true, "--w-title-font": true,
 	"--w-body-font": true, "--w-caps": true, "--w-weight": true,
 }
+
+// Списки допустимого для полей-выборов. Неизвестное значение молча
+// становится «как в наборе»: так переживается и ручная правка
+// config.json, и настройки из будущей сборки после отката.
+var (
+	coverShapes = map[string]bool{"square": true, "rounded": true, "circle": true, "disc": true}
+	animNames   = map[string]bool{
+		"fade": true, "left": true, "right": true, "up": true, "down": true,
+		"grow": true, "shrink": true, "swing": true, "tilt": true, "blur": true,
+	}
+	fonts = map[string]bool{"unbounded": true, "manrope": true, "oswald": true, "playfair": true, "mono": true}
+)
 
 // positions — все места кадра, куда можно прижать плашку.
 var positions = map[string]bool{
@@ -183,8 +445,18 @@ func (w *Widget) Normalize() {
 		// ещё не знала. Молча оставить «нет» нельзя: у стримера с настройкой
 		// «убирать через N секунд» плашка исчезла бы навсегда.
 		w.ShowOnChange = true
-		w.Rev = widgetRev
 	}
+	if w.Rev < 2 {
+		// До второй редакции ноль в раздельных отступах значил «не задано,
+		// возьми общий». Из-за этого отступ 0 px было не сохранить: панель
+		// писала ноль, а сюда он приходил как «не задано» и становился
+		// сорока. Теперь ноль — это ноль, а «не задано» осталось только у
+		// настроек, записанных до раздельных отступов.
+		if w.GapX <= 0 && w.GapY <= 0 {
+			w.GapX, w.GapY = w.Gap, w.Gap
+		}
+	}
+	w.Rev = widgetRev
 	if strings.TrimSpace(w.Preset) == "" {
 		w.Preset = "nefor/yellow"
 	}
@@ -214,10 +486,10 @@ func (w *Widget) Normalize() {
 	// Настройки из прошлых сборок знают только общий отступ. Берём его, пока
 	// раздельные не заданы, — иначе после обновления плашка прыгнула бы в
 	// самый угол, и стример решил бы, что сбились настройки.
-	if w.GapX <= 0 || w.GapX > 400 {
+	if w.GapX < 0 || w.GapX > 400 {
 		w.GapX = w.Gap
 	}
-	if w.GapY <= 0 || w.GapY > 400 {
+	if w.GapY < 0 || w.GapY > 400 {
 		w.GapY = w.Gap
 	}
 	if w.HoldSeconds < 0 || w.HoldSeconds > 3600 {
@@ -240,6 +512,19 @@ func (w *Widget) Normalize() {
 		w.ShowOnChange = true
 	}
 
+	if !coverShapes[w.CoverShape] {
+		w.CoverShape = ""
+	}
+	if !animNames[w.AnimIn] {
+		w.AnimIn = ""
+	}
+	if !animNames[w.AnimOut] {
+		w.AnimOut = ""
+	}
+	if !fonts[w.Font] {
+		w.Font = ""
+	}
+
 	for key, value := range w.Tweaks {
 		// Значение уходит прямо в style, поэтому проверяем строго.
 		//
@@ -257,5 +542,39 @@ func (w *Widget) Normalize() {
 	}
 	if len(w.Tweaks) == 0 {
 		w.Tweaks = nil
+	}
+
+	w.Media.normalize()
+
+	// Свои стили чиним тем же сито, что и сами настройки: стиль — это
+	// кусок настроек, и испортиться он может так же.
+	seen := map[string]bool{}
+	styles := w.Styles[:0]
+	for _, st := range w.Styles {
+		st.Name = strings.TrimSpace(st.Name)
+		if r := []rune(st.Name); len(r) > 40 {
+			st.Name = string(r[:40])
+		}
+		if st.ID == "" || len(st.ID) > 32 || seen[st.ID] || st.Name == "" || len(styles) >= maxStyles {
+			continue
+		}
+		seen[st.ID] = true
+		probe := Widget{
+			Rev: widgetRev, Preset: st.Preset, Tweaks: st.Tweaks, Font: st.Font,
+			CoverShape: st.CoverShape, AnimIn: st.AnimIn, AnimOut: st.AnimOut,
+			Opacity: st.Opacity, Media: st.Media, Scale: 1,
+		}
+		probe.Normalize()
+		st.Preset, st.Tweaks, st.Font = probe.Preset, probe.Tweaks, probe.Font
+		st.CoverShape, st.AnimIn, st.AnimOut = probe.CoverShape, probe.AnimIn, probe.AnimOut
+		st.Opacity, st.Media = probe.Opacity, probe.Media
+		styles = append(styles, st)
+	}
+	if len(styles) == 0 {
+		styles = nil
+	}
+	w.Styles = styles
+	if !seen[w.Style] {
+		w.Style = ""
 	}
 }

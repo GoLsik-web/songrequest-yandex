@@ -276,14 +276,14 @@ func (c *Client) ynisonDown() error {
 	if err != nil {
 		return err
 	}
-	return errs.New(errs.YandexYnison, "Нет связи с Ynison — очередь Яндекса сейчас недоступна.")
+	return errs.New(errs.YandexYnison, "Нет связи с Яндекс Музыкой — очередь Яндекса сейчас недоступна.")
 }
 
 // Capture запоминает, что играет.
 func (c *Client) Capture(ctx context.Context) (*Snapshot, error) {
 	st, ok := c.ynison.snapshot()
 	if !ok {
-		return nil, errs.Wrap(errs.YandexSnapshot, "Не запомнил, что играло: нет связи с Ynison.", c.ynisonDown())
+		return nil, errs.Wrap(errs.YandexSnapshot, "Не запомнил, что играло: нет связи с Яндекс Музыкой.", c.ynisonDown())
 	}
 	_, device, _ := c.ynison.Status()
 	snap := &Snapshot{CapturedAt: time.Now(), DeviceName: device}
@@ -528,7 +528,10 @@ func (c *Client) Restore(ctx context.Context, snap *Snapshot, played string, for
 		return RestoreOutcome{Code: errs.YandexRestore, Message: errs.Wrap(errs.YandexRestore, "Не вернул музыку.", err).UserText()}, err
 	}
 
-	if !force {
+	// Чужой трек считается выбором стримера, только пока он играет. Стоящая
+	// на паузе очередь — это то, что оставил после себя заказ (с YouTube мы
+	// сами ставим Яндекс на паузу), и возвращать музыку туда можно.
+	if !force && !st.Status.Paused {
 		if cur, ok := st.Queue.current(); ok {
 			now := TrackURI(cur.PlayableID, cur.AlbumIDOptional)
 			if !SameTrack(now, played) && !SameTrack(now, snap.TrackURI) {
@@ -550,7 +553,7 @@ func (c *Client) Restore(ctx context.Context, snap *Snapshot, played string, for
 		PlaybackSpeed: 1,
 	}
 	if err := c.ynison.putState(ctx, st); err != nil {
-		return RestoreOutcome{Code: errs.YandexRestore, Message: "Не вернул музыку: Ynison не принял команду."}, err
+		return RestoreOutcome{Code: errs.YandexRestore, Message: "Не вернул музыку: Яндекс Музыка не приняла команду."}, err
 	}
 	return RestoreOutcome{Restored: true}, nil
 }

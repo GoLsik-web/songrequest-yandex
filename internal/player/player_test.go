@@ -174,7 +174,9 @@ func (f *fakeSpotify) dur() int {
 func (f *fakeSpotify) finish() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.playing = ""
+	// Заказ кончился — Яндекс ушёл на другой трек. Молчание (нет ответа)
+	// плеер заказом не считает и досиживает по своим часам.
+	f.playing = "yandex:track:после-заказа"
 }
 
 func (f *fakeSpotify) stats() (played []string, captured, restored int) {

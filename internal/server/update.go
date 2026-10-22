@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"os/exec"
@@ -58,6 +59,7 @@ func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 
 	rel, err := update.Latest(ctx, repo)
 	if err != nil {
+		err = manualHint(err, repo)
 		code, text := errs.Describe(err)
 		s.log.Warn("не проверил обновления", "код", code, "ошибка", err)
 		s.noteUpdate(code, text)
@@ -185,6 +187,11 @@ func (s *Server) handleUpdateInstall(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true, "version": rel.Version})
 	done = true
 
+	// Признак работы снимаем по таймеру: если выход почему-то не случился
+	// (окно зависло, quit не сработал), кнопка иначе отвечала бы «обновление
+	// уже идёт» до самого перезапуска.
+	time.AfterFunc(30*time.Second, func() { updateBusy.Store(false) })
+
 	// Выходим не сразу: ответ должен доехать до панели, а окну — успеть его
 	// показать. Полторы секунды человек воспримет как «нажал и оно закрылось».
 	go func() {
@@ -195,6 +202,7 @@ func (s *Server) handleUpdateInstall(w http.ResponseWriter, r *http.Request) {
 
 // failUpdate сообщает об отказе и снимает признак работы.
 func (s *Server) failUpdate(w http.ResponseWriter, err error) {
+	err = manualHint(err, strings.TrimSpace(s.cfg.Get().UpdateRepo))
 	code, text := errs.Describe(err)
 	s.log.Warn("обновление не встало", "код", code, "ошибка", err)
 	s.state.UpdateSelf(func(u *app.UpdateInfo) { u.Installing = false })
@@ -228,3 +236,19 @@ func (s *Server) syncUpdateInfo() {
 // OnQuit говорит панели, как закрыть программу. Кладёт сюда main — тем же
 // способом, каким выходят через значок возле часов.
 func (s *Server) OnQuit(f func()) { s.quit.Store(&f) }
+
+// manualHint дописывает к отказу проверки или закачки путь «скачай руками».
+// Ссылка есть всегда: при пустом или сломанном репозитории в настройках — на
+// страницу по умолчанию.
+func manualHint(err error, repo string) error {
+	code, text := errs.Describe(err)
+	switch code {
+	case errs.UpdateCheck, errs.UpdateDownload, errs.UpdateNoFile, errs.UpdateNoRepo:
+	default:
+		return err
+	}
+	// Причиной кладём голый текст, а не нашу ошибку: иначе Describe ещё раз
+	// дописал бы её объяснение, которое уже в text.
+	return errs.Wrap(code, text+" Скачай вручную со страницы выпусков: "+update.ReleasesPage(repo),
+		errors.New(err.Error()))
+}

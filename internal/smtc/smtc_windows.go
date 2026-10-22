@@ -180,8 +180,10 @@ const (
 
 	// IGlobalSystemMediaTransportControlsSessionTimelineProperties:
 	// StartTime, EndTime, MinSeekTime, MaxSeekTime, Position, LastUpdatedTime.
-	mTimelineEndTime  = firstMethod + 1
-	mTimelinePosition = firstMethod + 4
+	mTimelineStartTime   = firstMethod
+	mTimelineEndTime     = firstMethod + 1
+	mTimelinePosition    = firstMethod + 4
+	mTimelineLastUpdated = firstMethod + 5
 
 	// IGlobalSystemMediaTransportControlsSessionPlaybackInfo:
 	// Controls, PlaybackStatus, ...
@@ -475,8 +477,23 @@ func Read(want func(app string) bool) (Now, bool, error) {
 
 		var timeline uintptr
 		if hr := call(session, mSessionTimeline, uintptr(unsafe.Pointer(&timeline))); !failed(hr) && timeline != 0 {
-			out.PositionMs = ticksToMs(readTicks(timeline, mTimelinePosition))
-			out.DurationMs = ticksToMs(readTicks(timeline, mTimelineEndTime))
+			start := readTicks(timeline, mTimelineStartTime)
+			out.PositionMs = ticksToMs(readTicks(timeline, mTimelinePosition) - start)
+			out.DurationMs = ticksToMs(readTicks(timeline, mTimelineEndTime) - start)
+			// Position — это положение на момент LastUpdatedTime, а не сейчас.
+			// Проигрыватели на Chromium (Яндекс Музыка в их числе) обновляют
+			// его только на старте, паузе и перемотке, и без поправки полоса
+			// стояла на месте весь трек.
+			if out.Status == StatusPlaying && out.PositionMs > 0 {
+				if at := fileTimeToTime(readTicks(timeline, mTimelineLastUpdated)); !at.IsZero() {
+					if d := time.Since(at); d > 0 && d < 24*time.Hour {
+						out.PositionMs += int(d / time.Millisecond)
+					}
+				}
+				if out.DurationMs > 0 && out.PositionMs > out.DurationMs {
+					out.PositionMs = out.DurationMs
+				}
+			}
 			release(timeline)
 		}
 		return out, nil
@@ -539,6 +556,16 @@ func readTicks(this uintptr, method int) int64 {
 		return 0
 	}
 	return ticks
+}
+
+// fileTimeToTime переводит DateTime из WinRT (сотни наносекунд от 1601 года)
+// в обычное время.
+func fileTimeToTime(ticks int64) time.Time {
+	const unixOffset = 116444736000000000 // 1601→1970 в сотнях наносекунд
+	if ticks <= unixOffset {
+		return time.Time{}
+	}
+	return time.Unix(0, (ticks-unixOffset)*100)
 }
 
 func ticksToMs(ticks int64) int {

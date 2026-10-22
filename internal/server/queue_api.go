@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"songrequest-yandex/internal/errs"
+	"songrequest-yandex/internal/queue"
 )
 
 // Управление очередью из панели. Частые действия — скип и удаление — идут
@@ -33,9 +34,16 @@ func (s *Server) handleQueueRemove(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	refund := r.URL.Query().Get("refund") == "1"
+	item, _ := s.queue.Get(id)
 	if err := s.removeFromQueue(ctx, id, refund, panelActor); err != nil {
 		s.fail(w, errs.Wrap(errs.Code(""), "Не получилось удалить заказ.", err))
 		return
+	}
+	// Зритель панель не видит: без строки в чате его заказ просто пропадал,
+	// и было непонятно, вернулись ли баллы.
+	if item.Requester != "" && item.Source != queue.SourceDonation {
+		s.say(ctx, "@"+item.Requester+", заказ «"+trackLine(item)+"» убрали из очереди"+
+			refundTail(refund && item.RedemptionID != ""))
 	}
 	writeJSON(w, map[string]bool{"ok": true})
 }
@@ -76,7 +84,7 @@ func (s *Server) handleQueueClear(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	refund := r.URL.Query().Get("refund") == "1"
-	if err := s.clearQueue(ctx, refund, panelActor); err != nil {
+	if _, err := s.clearQueue(ctx, refund, panelActor); err != nil {
 		s.fail(w, errs.Wrap(errs.Code(""), "Не получилось очистить очередь.", err))
 		return
 	}
@@ -87,19 +95,7 @@ func (s *Server) handleQueueClear(w http.ResponseWriter, r *http.Request) {
 // тоже приостанавливается: пусть зрители не тратят баллы впустую.
 func (s *Server) handlePause(w http.ResponseWriter, r *http.Request) {
 	on := r.URL.Query().Get("on") == "1"
-	s.player.SetPaused(on)
-
-	s.mu.Lock()
-	rewardID := s.rewardID
-	s.mu.Unlock()
-
-	if rewardID != "" {
-		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
-		defer cancel()
-		if err := s.twitch.SetRewardPaused(ctx, rewardID, on); err != nil {
-			s.log.Warn("не приостановил награду", "ошибка", err)
-		}
-	}
+	s.setOrdersPaused(r.Context(), on)
 
 	if on {
 		s.state.Notify("info", "Приём заказов остановлен")
@@ -249,4 +245,28 @@ func (s *Server) handlePlaylistReject(w http.ResponseWriter, r *http.Request) {
 	}
 	s.say(ctx, fmt.Sprintf("@%s, плейлист «%s» не одобрили. Баллы вернул.", p.Requester, p.Title))
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+// setOrdersPaused останавливает или возобновляет приём заказов вместе с
+// наградами на Twitch — обеими, за трек и за плейлист.
+//
+// Одно место для панели и для «!стоп»/«!старт»: команда из чата раньше
+// останавливала только приём, а награды на канале оставались открытыми —
+// зрители тратили баллы и получали «заказ не принят».
+func (s *Server) setOrdersPaused(ctx context.Context, on bool) {
+	s.player.SetPaused(on)
+
+	s.mu.Lock()
+	ids := []string{s.rewardID, s.playlistRewardID}
+	s.mu.Unlock()
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	for _, rewardID := range ids {
+		if rewardID == "" {
+			continue
+		}
+		if err := s.twitch.SetRewardPaused(ctx, rewardID, on); err != nil {
+			s.log.Warn("не приостановил награду", "ошибка", err, "награда", rewardID)
+		}
+	}
 }
