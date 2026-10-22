@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -46,6 +47,8 @@ type Ynison struct {
 	connected bool
 	lastErr   error
 	updatedAt time.Time
+	// goAwayUntil — до какого времени Ynison просил не подключаться.
+	goAwayUntil time.Time
 	conn      *websocket.Conn
 	cancel    context.CancelFunc
 	running   bool
@@ -231,7 +234,25 @@ func (y *Ynison) loop(ctx context.Context) {
 		if time.Since(started) > time.Minute {
 			backoff = time.Second
 		}
-		if !sleepCtx(ctx, backoff) {
+		wait := backoff
+		var se *ynServerError
+		if errors.As(err, &se) {
+			// Сервер сам сказал, сколько ждать. Не слушаться нельзя: на
+			// «уйди на час» приложение раньше стучалось каждую минуту, и
+			// каждый стук продлевал запрет ещё на час — очередь Яндекса
+			// так и не подключалась ни разу.
+			if se.goAway > 0 {
+				wait = se.goAway
+				y.mu.Lock()
+				y.goAwayUntil = time.Now().Add(wait)
+				y.mu.Unlock()
+				y.changed()
+				y.c.log.Info("Ynison просит не подключаться", "сколько", wait.String())
+			} else if se.backoff > wait {
+				wait = se.backoff
+			}
+		}
+		if !sleepCtx(ctx, wait) {
 			return
 		}
 		if backoff < time.Minute {
@@ -291,7 +312,7 @@ func (y *Ynison) session(ctx context.Context) error {
 			continue
 		}
 		if msg.Error != nil {
-			return errs.New(errs.YandexYnison, "Яндекс Музыка отказала: "+msg.Error.Message)
+			return y.serverError(msg.Error.Message, msg.Error.Details)
 		}
 		y.apply(msg)
 	}
@@ -317,6 +338,51 @@ func (y *Ynison) apply(msg ynMessage) {
 		close(w)
 	}
 	y.changed()
+}
+
+// ynServerError — отказ, присланный самим Ynison, с его просьбой о паузе.
+type ynServerError struct {
+	err     *errs.Error
+	goAway  time.Duration
+	backoff time.Duration
+}
+
+func (e *ynServerError) Error() string { return e.err.Error() }
+func (e *ynServerError) Unwrap() error { return e.err }
+
+// serverError разбирает отказ Ynison. В details сервер кладёт, сколько ждать
+// до следующей попытки: «ynison-go-away-for-seconds» — не возвращаться
+// вовсе столько секунд, «ynison-backoff-millis» — лесенка пауз.
+func (y *Ynison) serverError(message string, details json.RawMessage) error {
+	var d map[string]string
+	_ = json.Unmarshal(details, &d)
+	se := &ynServerError{}
+	if n, err := strconv.Atoi(d["ynison-go-away-for-seconds"]); err == nil && n > 0 {
+		se.goAway = time.Duration(n) * time.Second
+	}
+	if steps := strings.Split(d["ynison-backoff-millis"], ":"); len(steps) > 0 {
+		if n, err := strconv.Atoi(steps[len(steps)-1]); err == nil && n > 0 {
+			se.backoff = time.Duration(n) * time.Millisecond
+		}
+	}
+	text := "Яндекс Музыка отказала: " + message
+	if se.goAway > 0 {
+		text = fmt.Sprintf("Яндекс временно не пускает к очереди воспроизведения, попробую снова в %s.",
+			time.Now().Add(se.goAway).Format("15:04"))
+	}
+	se.err = errs.New(errs.YandexYnison, text)
+	return se
+}
+
+// GoAwayUntil — до какого времени Ynison просил не подключаться. Нулевое
+// время — не просил.
+func (y *Ynison) GoAwayUntil() time.Time {
+	y.mu.Lock()
+	defer y.mu.Unlock()
+	if time.Now().After(y.goAwayUntil) {
+		return time.Time{}
+	}
+	return y.goAwayUntil
 }
 
 // redirect спрашивает, к какому серверу идти.

@@ -275,8 +275,17 @@ func (c *Client) token(ctx context.Context) (string, error) {
 			"Twitch не подключён. Нажми «Подключить Twitch» в панели.")
 	}
 
+	// Пустой Client ID — поломка настроек, а не входа. Раньше запрос уходил
+	// как есть, Twitch отвечал «missing client id», и сохранённый вход
+	// стирался: вернул Client ID на место — а входить всё равно заново.
+	clientID := strings.TrimSpace(c.cfg.Get().TwitchClientID)
+	if clientID == "" {
+		return "", errs.New(errs.TwitchNoClientID,
+			"Не заполнен Client ID Twitch. Впиши его в настройках — вход сохранён, заново подключаться не придётся.")
+	}
+
 	form := url.Values{
-		"client_id":     {c.cfg.Get().TwitchClientID},
+		"client_id":     {clientID},
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {t.RefreshToken},
 	}
